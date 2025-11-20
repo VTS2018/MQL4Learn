@@ -14,7 +14,7 @@
 int OnInit()
   {
 //--- indicator buffers mapping
-   
+   //先测试一下 这个文件能否diff出来差异
 //---
    return(INIT_SUCCEEDED);
   }

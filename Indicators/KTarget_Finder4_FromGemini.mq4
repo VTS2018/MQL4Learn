@@ -107,7 +107,7 @@ void DrawTargetBottom(int target_index);
 void DrawTargetTop(int target_index);
 void CheckBullishSignalConfirmation(int target_index); 
 void CheckBearishSignalConfirmation(int target_index); 
-double FindSecondBaseline(int target_index, bool is_bullish); // [V1.22 NEW] 查找 P2
+double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
 void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 
@@ -293,7 +293,7 @@ void CheckBullishSignalConfirmation(int target_index)
     double target_open_price = Open[target_index]; 
     
     // [V1.22 NEW] P2 (第二基准价格线): 锚点左侧第一根阳线的收盘价
-    double P2_price = FindSecondBaseline(target_index, true); 
+    double P2_price = FindSecondBaseline(target_index, true, target_open_price); 
     
     // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
     for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
@@ -328,7 +328,7 @@ void CheckBearishSignalConfirmation(int target_index)
     double target_open_price = Open[target_index];
     
     // [V1.22 NEW] P2 (第二基准价格线): 锚点左侧第一根阴线的收盘价
-    double P2_price = FindSecondBaseline(target_index, false); 
+    double P2_price = FindSecondBaseline(target_index, false, target_open_price); 
     
     // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
     for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
@@ -361,8 +361,9 @@ void CheckBearishSignalConfirmation(int target_index)
    查找 P2 价格：从 K-Target 锚点向左回溯，直到找到第一根符合条件的 K 线。
    看涨 (Bullish): 锚点左侧第一根阳线 (Close > Open) 的收盘价。
    看跌 (Bearish): 锚点左侧第一根阴线 (Close < Open) 的收盘价。
+   约束条件 [V1.23 NEW]: P2 价格必须在 P1 价格之外 (看涨 P2 > P1, 看跌 P2 < P1)。
 */
-double FindSecondBaseline(int target_index, bool is_bullish)
+double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
 {
     // P2 价格 (初始为 0.0)
     double P2_price = 0.0;
@@ -376,14 +377,23 @@ double FindSecondBaseline(int target_index, bool is_bullish)
         if (past_index >= Bars) break; // 边界检查
         
         bool condition_met = false;
+        double candidate_P2 = 0.0;
         
         if (is_bullish)
         {
             // 看涨 P2: 锚点左侧第一根阳线 (Close > Open) 的收盘价
             if (Close[past_index] > Open[past_index])
             {
-                P2_price = Close[past_index];
-                condition_met = true;
+                //P2_price = Close[past_index];
+                //condition_met = true;
+
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须高于 P1 价格
+                if (candidate_P2 > P1_price)
+                {
+                    P2_price = candidate_P2;
+                    condition_met = true;
+                }
             }
         }
         else // is_bearish
@@ -391,8 +401,16 @@ double FindSecondBaseline(int target_index, bool is_bullish)
             // 看跌 P2: 锚点左侧第一根阴线 (Close < Open) 的收盘价
             if (Close[past_index] < Open[past_index])
             {
-                P2_price = Close[past_index];
-                condition_met = true;
+                //P2_price = Close[past_index];
+                //condition_met = true;
+
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须低于 P1 价格
+                if (candidate_P2 < P1_price)
+                {
+                    P2_price = candidate_P2;
+                    condition_met = true;
+                }
             }
         }
 
