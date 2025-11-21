@@ -60,6 +60,12 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 extern int Max_Signal_Lookforward = 5;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
 extern int DB_Threshold_Candles = 3;      // [V1.22 NEW] DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
+// [V1.25 NEW] 调试控制
+extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
+
+// --- 全局变量/静态标志 ---
+static bool initial_debug_prints_done = false; // [V1.25 NEW] 内部标志：是否已完成首次加载时的调试打印
+
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
 double BearishTargetBuffer[]; // 1: 用于标记看跌K-Target锚点 (顶部)
@@ -183,6 +189,15 @@ int OnCalculate(const int rates_total,
     
     // 寻找并绘制所有符合条件的 K-Target 及突破信号
     FindAndDrawTargetCandles(rates_total);
+
+    // [V1.25 NEW] 在第一次完整计算完成后，设置标志位，确保后续的 tick 不再触发调试打印。
+    if (rates_total > prev_calculated) // 检查是否有新数据
+    {
+         if (!initial_debug_prints_done)
+         {
+              initial_debug_prints_done = true;
+         }
+    }
     
     // 返回 rates_total 用于下一次调用
     return(rates_total);
@@ -418,6 +433,12 @@ double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
         {
             break; // 找到即退出
         }
+    }
+
+    // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
+    if (Debug_Print_Info_Once && !initial_debug_prints_done)
+    {
+        Print("FindSecondBaseline Info: P2_price = ", DoubleToString(P2_price, Digits), " points.");
     }
     
     return P2_price; 
