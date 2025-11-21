@@ -117,6 +117,8 @@ double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); /
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
 void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 
+int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish); // [V1.23 NEW] 辅助函数
+
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -146,7 +148,7 @@ int OnInit()
     ArrayInitialize(BearishSignalBuffer, 0.0);
     
     // 指标简称
-    string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.22"; // [V1.22 UPD] 更新版本号
+    string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.23"; // [V1.22 UPD] 更新版本号
     IndicatorShortName(shortName);
     return(INIT_SUCCEEDED);
 }
@@ -302,7 +304,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 //========================================================================
 // 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 
 //========================================================================
-void CheckBullishSignalConfirmation(int target_index)
+void CheckBullishSignalConfirmation_v1(int target_index)
 {
     // P1 (第一基准价格线): K-Target 锚点的开盘价
     double target_open_price = Open[target_index]; 
@@ -335,9 +337,72 @@ void CheckBullishSignalConfirmation(int target_index)
 }
 
 //========================================================================
+// 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 (V1.23 Final Logic)
+//========================================================================
+void CheckBullishSignalConfirmation(int target_index)
+{
+    double P1_price = Open[target_index]; 
+    double P2_price = FindSecondBaseline(target_index, true, P1_price);
+
+    // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
+    // K_Geo_Index 是第一个 Close[j] > P1_price 的 K 线索引
+    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, P1_price, Max_Signal_Lookforward, true);
+    
+    if (K_Geo_Index == -1) return; // 未发生 P1 突破，函数退出。
+
+    // 绘制 P1/P2 水平线 (即使是 IB 也要绘制)
+    int N_Geo = target_index - K_Geo_Index; 
+    DrawBreakoutTrendLine(target_index, K_Geo_Index, true, N_Geo, P2_price);
+
+    // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
+    
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price > P1_price)
+    {
+        // 只需检查到 K_Geo_Index (第一次 P1 突破点) 为止
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            if (Close[j] > P2_price) 
+            {
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+                BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB)
+    // 只有 P2 未在范围内突破时，才执行到此处。
+    // 检查范围只需到 K_Geo_Index 为止
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+    {
+        if (j < 0) break;
+        
+        // 只关心 P1 突破 K-bar
+        if (Close[j] > P1_price)
+        {
+            int N_DB = target_index - j;
+            string classification = (N_DB < DB_Threshold_Candles) ? "IB" : "DB";
+            
+            if (classification == "DB")
+            {
+                // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+                BullishSignalBuffer[j] = Low[j] - 20 * Point(); 
+                return; // 找到次高级别信号，立即退出函数
+            }
+            // 如果是 IB，则不绘制箭头，继续循环（寻找更晚的 DB）
+        }
+    }
+    
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}
+
+//========================================================================
 // 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 
 //========================================================================
-void CheckBearishSignalConfirmation(int target_index)
+void CheckBearishSignalConfirmation_v1(int target_index)
 {
     // P1 (第一基准价格线): K-Target 锚点的开盘价
     double target_open_price = Open[target_index];
@@ -367,6 +432,65 @@ void CheckBearishSignalConfirmation(int target_index)
             return;
         }
     }
+}
+
+//========================================================================
+// 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 (对称修改)
+//========================================================================
+void CheckBearishSignalConfirmation(int target_index)
+{
+    double P1_price = Open[target_index]; 
+    double P2_price = FindSecondBaseline(target_index, false, P1_price);
+
+    // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
+    // K_Geo_Index 是第一个 Close[j] < P1_price 的 K 线索引 [V1.23 FIX] 明确传入 is_bullish = false
+    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, P1_price, Max_Signal_Lookforward, false); // 辅助函数FindFirstP1BreakoutIndex也可以用于看跌信号
+    
+    if (K_Geo_Index == -1) return;
+
+    // 绘制 P1/P2 水平线 (即使是 IB 也要绘制)
+    int N_Geo = target_index - K_Geo_Index; 
+    DrawBreakoutTrendLine(target_index, K_Geo_Index, false, N_Geo, P2_price);
+
+    // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price < P1_price) // 看跌信号 P2 < P1
+    {
+        // 只需检查到 K_Geo_Index (第一次 P1 突破点) 为止
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            if (Close[j] < P2_price) // 🚨 看跌：Close < P2
+            {
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+                BearishSignalBuffer[j] = High[j] + 30 * Point(); 
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB)
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+    {
+        if (j < 0) break;
+        
+        if (Close[j] < P1_price) // 🚨 看跌：Close < P1
+        {
+            int N_DB = target_index - j;
+            string classification = (N_DB < DB_Threshold_Candles) ? "IB" : "DB";
+
+            if (classification == "DB")
+            {
+                // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+                BearishSignalBuffer[j] = High[j] + 20 * Point(); 
+                return; // 找到次高级别信号，立即退出函数
+            }
+        }
+    }
+
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
 }
 
 //========================================================================
@@ -576,4 +700,28 @@ void DrawTargetTop(int target_index)
 {
     // 将箭头标记在 K-Target 的最高价之上
     BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
+}
+
+//========================================================================
+// 14. FindFirstP1BreakoutIndex: 辅助函数 (V1.23 NEW) 辅助函数 (最终修正)
+//========================================================================
+// 查找第一个 P1 突破的 K 线索引 (用于确定水平线的绘制几何结构)
+int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish)
+{
+    for (int j = target_index - 1; j >= target_index - max_lookforward; j--)
+    {
+        if (j < 0) break;
+
+        if (is_bullish)
+        {
+            // 看涨突破 P1: Close > P1_price
+            if (Close[j] > P1_price) return j;
+        }
+        else
+        {
+            // 看跌突破 P1: Close < P1_price
+            if (Close[j] < P1_price) return j;
+        }
+    }
+    return -1; // 未找到 P1 突破
 }
