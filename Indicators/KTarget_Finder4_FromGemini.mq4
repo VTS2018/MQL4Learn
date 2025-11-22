@@ -123,6 +123,10 @@ void DrawTargetTop(int target_index);
 void CheckBullishSignalConfirmation(int target_index);
 void CheckBearishSignalConfirmation(int target_index);
 
+// V1.31 UPD: 流程协调者模式，传入所有几何参数，实现解耦
+void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo);
+void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo);
+
 void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish);
 void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, double P2_price);
 
@@ -262,7 +266,28 @@ void FindAndDrawTargetCandles(int total_bars)
         {
             DrawTargetBottom(i); 
             // 检查信号确认逻辑 (IB/DB 突破)
-            CheckBullishSignalConfirmation(i);
+            //CheckBullishSignalConfirmation(i);
+
+            // --- V1.31 NEW: 流程协调 (看涨) ---
+
+            // 查找 P2 索引和价格
+            int P2_index = FindP2Index(i, true);
+            if (P2_index == -1) continue; // P2 查找失败，跳过该锚点
+            double P2_price = Close[P2_index];
+
+            // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
+            int K_Geo_Index = FindFirstP1BreakoutIndex(i, true);
+            if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+
+            // 计算突破距离 N_Geo
+            int N_Geo = i - K_Geo_Index;
+
+            // 绘制 P1 辅助线 (几何绘制职责)
+            DrawP1Baseline(i, K_Geo_Index, true, P2_price);
+
+            // 调用信号标记器 (仅传入数据)
+            CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
+            // --- END V1.31 NEW ---
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -270,7 +295,28 @@ void FindAndDrawTargetCandles(int total_bars)
         {
             DrawTargetTop(i); 
             // 检查信号确认逻辑
-            CheckBearishSignalConfirmation(i);
+            //CheckBearishSignalConfirmation(i);
+
+            // --- V1.31 NEW: 流程协调 (看跌) ---
+
+            // 查找 P2 索引和价格
+            int P2_index = FindP2Index(i, false);
+            if (P2_index == -1) continue; // P2 查找失败，跳过该锚点
+            double P2_price = Close[P2_index];
+
+            // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
+            int K_Geo_Index = FindFirstP1BreakoutIndex(i, false);
+            if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+
+            // 计算突破距离 N_Geo
+            int N_Geo = i - K_Geo_Index;
+
+            // 绘制 P1 辅助线 (几何绘制职责)
+            DrawP1Baseline(i, K_Geo_Index, false, P2_price);
+
+            // 调用信号标记器 (仅传入数据)
+            CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
+            // --- END V1.31 NEW ---
         }
     }
 }
@@ -347,6 +393,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 void CheckBullishSignalConfirmation(int target_index)
 {
     double P1_price = Open[target_index];
+    // ---开始 从这里解耦代码---
     int P2_index = FindP2Index(target_index, true);
     if (P2_index == -1)
     {
@@ -367,6 +414,7 @@ void CheckBullishSignalConfirmation(int target_index)
 
     //DrawBreakoutTrendLine(target_index, K_Geo_Index, true, N_Geo, P2_price);
     DrawP1Baseline(target_index, K_Geo_Index, true, P2_price);
+    // ---结束 从这里解耦代码---
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
     
@@ -432,6 +480,65 @@ void CheckBullishSignalConfirmation(int target_index)
     return;
 }
 
+/**
+ * 7.1
+ * @param target_index: Argument 1
+ * @param P2_index: Argument 2
+ * @param K_Geo_Index: Argument 3
+ * @param N_Geo: Argument 4
+ */
+void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo)
+{
+    // K_Geo_Index 必须有效，否则协调者已经跳过了。
+    // P2_price 必须有效，否则协调者已经跳过了。
+
+    // P1 价格，用于判断 P2 是否高于 P1 (安全检查)
+    double P1_price = Open[target_index];
+    
+    double P2_price = Close[P2_index];
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    // P2 价格必须高于 P1 价格，否则 P2 突破不成立
+    if (P2_price > P1_price)
+    {
+        // 查找范围从锚点右侧到 Max_Signal_Lookforward 结束
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            // 检查 P2 突破条件：收盘价高于 P2 价格
+            if (Close[j] > P2_price) 
+            {
+                // **绘制 P2 辅助线** (职责：只有在 P2 突破时才绘制 P2 线)
+                DrawP2Baseline(P2_index, j, true);
+
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+                BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。同时还说明 没有找到P2突破 但是一定有P1突破的索引 一定有P1突破
+    
+    // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        //**绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
+
+        // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+        // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
+        BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point(); 
+        return; // 找到次高级别信号，立即退出函数
+    }
+    
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}
+
 
 //========================================================================
 // 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 (对称修改)
@@ -439,6 +546,7 @@ void CheckBullishSignalConfirmation(int target_index)
 void CheckBearishSignalConfirmation(int target_index)
 {
     double P1_price = Open[target_index];
+    // ---开始 从这里解耦代码---
     int P2_index = FindP2Index(target_index, false);
     if (P2_index == -1)
     {
@@ -458,6 +566,7 @@ void CheckBearishSignalConfirmation(int target_index)
     int N_Geo = target_index - K_Geo_Index; 
     //DrawBreakoutTrendLine(target_index, K_Geo_Index, false, N_Geo, P2_price);
     DrawP1Baseline(target_index, K_Geo_Index, false, P2_price);
+    // ---结束 从这里解耦代码---
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
 
@@ -509,6 +618,51 @@ void CheckBearishSignalConfirmation(int target_index)
     {
         // 绘制P2线
         DrawP2Baseline(P2_index, K_Geo_Index, false);
+        // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+        // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
+        BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
+        return; // 找到次高级别信号，立即退出函数
+    }
+
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}
+
+void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo)
+{
+    double P1_price = Open[target_index];
+    double P2_price = Close[P2_index];
+
+    // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price < P1_price) // 看跌信号 P2 < P1
+    {
+        // 只需检查到 K_Geo_Index (第一次 P1 突破点) 为止
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            if (Close[j] < P2_price) // 🚨 看跌：Close < P2
+            {
+                // 绘制P2线
+                DrawP2Baseline(P2_index, j, false);
+
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+                BearishSignalBuffer[j] = High[j] + 30 * Point(); 
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。
+    
+    // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        // **绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
+        DrawP2Baseline(P2_index, K_Geo_Index, false);
+
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
         BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
