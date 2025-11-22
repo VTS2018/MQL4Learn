@@ -119,11 +119,11 @@ void DrawTargetTop(int target_index);
 void CheckBullishSignalConfirmation(int target_index);
 void CheckBearishSignalConfirmation(int target_index);
 
-void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish);
-void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price);
+void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish);
+void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, double P2_price);
 
-int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish);
-int FindSecondBaseline_v1(int target_index, bool is_bullish);
+int FindFirstP1BreakoutIndex(int target_index, bool is_bullish);
+int FindP2Index(int target_index, bool is_bullish);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -326,7 +326,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 void CheckBullishSignalConfirmation(int target_index)
 {
     double P1_price = Open[target_index];
-    int P2_index = FindSecondBaseline_v1(target_index, true);
+    int P2_index = FindP2Index(target_index, true);
     if (P2_index == -1)
     {
         return;
@@ -337,7 +337,7 @@ void CheckBullishSignalConfirmation(int target_index)
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] > P1_price 的 K 线索引,K_Geo_Index 仅用于确定绘制 P1/P2 水平线的终点，以及 P1-DB 的箭头位置
-    int K_Geo_Index = FindFirstP1BreakoutIndex_v1(target_index, true);
+    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, true);
     
     if (K_Geo_Index == -1) return; // 未发生 P1 突破，函数退出。
 
@@ -345,7 +345,7 @@ void CheckBullishSignalConfirmation(int target_index)
     int N_Geo = target_index - K_Geo_Index; 
 
     //DrawBreakoutTrendLine(target_index, K_Geo_Index, true, N_Geo, P2_price);
-    DrawBreakoutTrendLine_v1(target_index, K_Geo_Index, true, P2_price);
+    DrawP1Baseline(target_index, K_Geo_Index, true, P2_price);
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
     
@@ -359,7 +359,7 @@ void CheckBullishSignalConfirmation(int target_index)
             if (Close[j] > P2_price) 
             {
                 //绘制P2线
-                DrawSecondBaseline_v2(P2_index,j,true);
+                DrawP2Baseline(P2_index,j,true);
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
                 return; // 找到最高级别信号，立即退出函数
@@ -399,7 +399,7 @@ void CheckBullishSignalConfirmation(int target_index)
     if (N_Geo >= DB_Threshold_Candles)
     {
         //绘制P2线
-        DrawSecondBaseline_v2(P2_index,K_Geo_Index,true);
+        DrawP2Baseline(P2_index,K_Geo_Index,true);
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
@@ -418,7 +418,7 @@ void CheckBullishSignalConfirmation(int target_index)
 void CheckBearishSignalConfirmation(int target_index)
 {
     double P1_price = Open[target_index];
-    int P2_index = FindSecondBaseline_v1(target_index, false);
+    int P2_index = FindP2Index(target_index, false);
     if (P2_index == -1)
     {
         return;
@@ -429,14 +429,14 @@ void CheckBearishSignalConfirmation(int target_index)
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] < P1_price 的 K 线索引 [V1.23 FIX] 明确传入 is_bullish = false
-    int K_Geo_Index = FindFirstP1BreakoutIndex_v1(target_index, false);
+    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, false);
     
     if (K_Geo_Index == -1) return;
 
     // 绘制 P1/P2 水平线 (即使是 IB 也要绘制)
     int N_Geo = target_index - K_Geo_Index; 
     //DrawBreakoutTrendLine(target_index, K_Geo_Index, false, N_Geo, P2_price);
-    DrawBreakoutTrendLine_v1(target_index, K_Geo_Index, false, P2_price);
+    DrawP1Baseline(target_index, K_Geo_Index, false, P2_price);
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
 
@@ -450,7 +450,7 @@ void CheckBearishSignalConfirmation(int target_index)
             if (Close[j] < P2_price) // 🚨 看跌：Close < P2
             {
                 // 绘制P2线
-                DrawSecondBaseline_v2(P2_index, j, false);
+                DrawP2Baseline(P2_index, j, false);
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BearishSignalBuffer[j] = High[j] + 30 * Point(); 
@@ -487,7 +487,7 @@ void CheckBearishSignalConfirmation(int target_index)
     if (N_Geo >= DB_Threshold_Candles)
     {
         // 绘制P2线
-        DrawSecondBaseline_v2(P2_index,K_Geo_Index,false);
+        DrawP2Baseline(P2_index,K_Geo_Index,false);
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
         BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
@@ -512,7 +512,7 @@ void CheckBearishSignalConfirmation(int target_index)
  * @param is_bullish: 看涨或者看跌
  * @return ( int ) P2 反向K线的索引
  */
-int FindSecondBaseline_v1(int target_index, bool is_bullish)
+int FindP2Index(int target_index, bool is_bullish)
 {
     double P1_price = Open[target_index];
 
@@ -585,7 +585,7 @@ int FindSecondBaseline_v1(int target_index, bool is_bullish)
  * @param breakout_index: Argument 2
  * @param is_bullish: Argument 3
  */
-void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish)
+void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
 {
     if (target_index == -1)
     {
@@ -651,7 +651,7 @@ void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish
  * @param is_bullish: 阳线或者阴线
  * @param P2_price: 顺带着 展示出P2的价格 便于直观的对比
  */
-void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price)
+void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, double P2_price)
 {
     // K_Geo_Index 这个值在函数调用之前 需要检查 如果是-1 就不执行了，通过这个值确定是 DB 还是IB
     int breakout_candle_count = target_index - breakout_index;
@@ -737,7 +737,7 @@ void DrawTargetTop(int target_index)
  * @param is_bullish: 阳线还是阴线
  * @return ( int ) P1的K线索引。注意P1和P2 可能是同一根K线
  */
-int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish)
+int FindFirstP1BreakoutIndex(int target_index, bool is_bullish)
 {
     double P1_price = Open[target_index];
     Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
