@@ -380,7 +380,7 @@ void CheckBullishSignalConfirmation(int target_index)
             if (Close[j] > P2_price) 
             {
                 //绘制P2线
-                DrawP2Baseline(P2_index,j,true);
+                DrawP2Baseline(P2_index, j, true);
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
                 return; // 找到最高级别信号，立即退出函数
@@ -420,7 +420,7 @@ void CheckBullishSignalConfirmation(int target_index)
     if (N_Geo >= DB_Threshold_Candles)
     {
         //绘制P2线
-        DrawP2Baseline(P2_index,K_Geo_Index,true);
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
@@ -508,7 +508,7 @@ void CheckBearishSignalConfirmation(int target_index)
     if (N_Geo >= DB_Threshold_Candles)
     {
         // 绘制P2线
-        DrawP2Baseline(P2_index,K_Geo_Index,false);
+        DrawP2Baseline(P2_index, K_Geo_Index, false);
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
         BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
@@ -593,7 +593,7 @@ int FindP2Index(int target_index, bool is_bullish)
     // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
     if (Debug_Print_Info_Once && !initial_debug_prints_done)
     {
-        Print("FindSecondBaseline_v1 Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
+        Print("FindP2Index Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
     }
     
     return P2_index; 
@@ -626,7 +626,8 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
     datetime time2 = Time[end_bar_index];
     
     string name = "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
-    
+    string comment;
+
     // 检查对象是否已存在
     if (ObjectFind(0, name) != -1) return; 
     
@@ -649,7 +650,9 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
     ObjectSetInteger(0, name, OBJPROP_WIDTH, 1); 
     ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DOT); // 点线/虚线
     ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景
-    ObjectSetString(0, name, OBJPROP_TEXT, "P2 Baseline");
+    
+    comment = "P2 Baseline" + " (P2:" + DoubleToString(P2_price, Digits) + ")";
+    ObjectSetString(0, name, OBJPROP_TEXT, comment);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
 }
 
