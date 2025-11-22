@@ -17,6 +17,9 @@
 */
 int OnInit()
 {
+   int a = 123;
+   Print(">[Hello.mq4:21]: a: ", a);
+
    return(INIT_SUCCEEDED); // 返回 INIT_SUCCEEDED 表示初始化成功
 }
 
