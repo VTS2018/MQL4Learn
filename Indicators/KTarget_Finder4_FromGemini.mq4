@@ -386,7 +386,7 @@ void CheckBullishSignalConfirmation(int target_index)
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
     
-    // 1. 最高优先级: 查找 P2 突破 (K_P2) 查找整个 Max_Signal_Lookforward 范围
+    // 1. 最高优先级: 查找 P2 突破 (K_P2) 查找整个 Max_Signal_Lookforward 范围 逻辑正确没有问题
     if (P2_price > P1_price)
     {
         // 只需检查到 K_Geo_Index (第一次 P1 突破点) 为止
@@ -428,7 +428,7 @@ void CheckBullishSignalConfirmation(int target_index)
     */
     
     // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
-    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。同时还说明 没有找到P2突破 但是一定有P1突破的索引 一定有P1突破
     
     // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
     if (N_Geo >= DB_Threshold_Candles)
@@ -639,10 +639,10 @@ double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
 
 
 /**
- * 我们应该找到P2K线的索引 而不仅仅是所谓的价格
- * @param target_index: 锚点索引
+ * 根据看涨K-target阴线锚点，寻找到反向P2的索引，同时P2的价格一定要大于P1的价格（看涨），反之P2<P1(看跌)
+ * @param target_index: 看涨K-target阴线锚点
  * @param is_bullish: 看涨或者看跌
- * @return ( int )
+ * @return ( int ) P2 反向K线的索引
  */
 int FindSecondBaseline_v1(int target_index, bool is_bullish)
 {
@@ -870,16 +870,17 @@ int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforw
 */
 
 /**
- * This function fulfills the will of the developer
+ * 根据看涨K-target阴线锚点 寻找出收复P1的第一根K线的索引
  * @param target_index: 看涨K-target阴线锚点
- * @param is_bullish: Argument 2
- * @return ( int )
+ * @param is_bullish: 阳线还是阴线
+ * @return ( int ) P1的K线索引。注意P1和P2 可能是同一根K线
  */
 int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish)
 {
     double P1_price = Open[target_index];
     Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
 
+    //向右边寻找 初始索引减去1 然后到最大前瞻
     for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
     {
         if (j < 0) break;
