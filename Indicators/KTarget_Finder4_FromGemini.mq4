@@ -60,15 +60,19 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
 extern int DB_Threshold_Candles = 3;      // [V1.22 NEW] DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
+// --- 四个变量开始 将来可能会移除掉 ---
 // [V1.25 NEW] 调试控制
 extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
-
 // --- 全局变量/静态标志 ---
 static bool initial_debug_prints_done = false; // [V1.25 NEW] 内部标志：是否已完成首次加载时的调试打印
 
 //限制运行次数
 extern bool Debug_LimitCalculations = true;
 static int g_run_count = 0; // 记录 OnCalculate 的运行次数
+// --- 四个变量结束 将来可能会移除掉 ---
+
+string g_object_prefix = ""; // [V1.32 NEW] 唯一对象名前缀
+
 
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
@@ -129,6 +133,11 @@ int FindP2Index(int target_index, bool is_bullish);
 //========================================================================
 int OnInit()
 {
+    // [V1.32 NEW] 生成唯一的对象名前缀
+    g_object_prefix = WindowExpertName() + StringFormat("_%d_", ChartID());
+    Print("-->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: ", g_object_prefix);
+
+
     g_run_count = 0;
     // 缓冲区映射设置 (无变化)
     SetIndexBuffer(0, BullishTargetBuffer);
@@ -168,6 +177,18 @@ void OnDeinit(const int reason)
     ObjectsDeleteAll(0, "IBDB_Line_"); 
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
     ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
+
+    // [V1.32 UPD] 使用唯一的 g_object_prefix 进行清理
+    for (int i = ObjectsTotal() - 1; i >= 0; i--)
+    {
+        string object_name = ObjectName(i);
+        // 检查对象名称是否包含我们独有的前缀
+        if (StringFind(object_name, g_object_prefix) != -1) 
+        {
+            ObjectDelete(0, object_name);
+        }
+    }
+    
     ChartRedraw();
 }
 
