@@ -122,6 +122,7 @@ void CheckBearishSignalConfirmation(int target_index);
 //double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
 int FindSecondBaseline_v1(int target_index, bool is_bullish);
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
+void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish);
 //void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price);
 
@@ -398,6 +399,8 @@ void CheckBullishSignalConfirmation(int target_index)
             if (j < 0) break;
             if (Close[j] > P2_price) 
             {
+                //绘制P2线
+                DrawSecondBaseline_v2(P2_index,j,true);
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
                 return; // 找到最高级别信号，立即退出函数
@@ -436,6 +439,9 @@ void CheckBullishSignalConfirmation(int target_index)
     // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
     if (N_Geo >= DB_Threshold_Candles)
     {
+        //绘制P2线
+        DrawSecondBaseline_v2(P2_index,K_Geo_Index,true);
+
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
         BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point(); 
@@ -520,6 +526,9 @@ void CheckBearishSignalConfirmation(int target_index)
             if (j < 0) break;
             if (Close[j] < P2_price) // 🚨 看跌：Close < P2
             {
+                // 绘制P2线
+                DrawSecondBaseline_v2(P2_index, j, false);
+
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BearishSignalBuffer[j] = High[j] + 30 * Point(); 
                 return; // 找到最高级别信号，立即退出函数
@@ -554,6 +563,8 @@ void CheckBearishSignalConfirmation(int target_index)
     // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
     if (N_Geo >= DB_Threshold_Candles)
     {
+        // 绘制P2线
+        DrawSecondBaseline_v2(P2_index,K_Geo_Index,false);
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
         BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
@@ -758,6 +769,53 @@ void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, b
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
 }
 
+// 用P2 K线的索引来解耦这个函数P2 K线的开盘价 突破P2的索引+2，终点是 P2 突破K的索引 但是这个突破值是一个动态值
+void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish)
+{
+    if (target_index == -1)
+    {
+        return;
+    }
+
+    double P2_price= Close[target_index];
+    // 如果 P2 价格无效 (未找到)，则不绘制
+    if (P2_price <= 0.0) return;
+    
+    // Anchor 1 (起点): P2 价格，K-Target 锚点时间
+    datetime time1 = Time[target_index];
+    
+    // Anchor 2 (终点): P2 价格，延伸到突破 K 线 + 2
+    int end_bar_index = breakout_index - 2; 
+    if (end_bar_index < 1) end_bar_index = 1;
+    datetime time2 = Time[end_bar_index];
+    
+    string name = "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    
+    // 检查对象是否已存在
+    if (ObjectFind(0, name) != -1) return; 
+    
+    // 创建趋势线对象 (OBJ_TREND)
+    if (!ObjectCreate(0, name, OBJ_TREND, 0, time1, P2_price))
+    {
+        Print("无法创建 P2 趋势线对象: ", name, ", 错误: ", GetLastError());
+        return;
+    }
+    
+    // 设置趋势线的第二个锚点 (终点)
+    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, name, OBJPROP_PRICE2, P2_price);
+    
+    // ** 明确设置它不是射线 **
+    ObjectSetInteger(0, name, OBJPROP_RAY, false); 
+    
+    // 设置线条属性: 虚线，较细，不同颜色
+    ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrDarkBlue : clrDarkRed); // 深色作为P2
+    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1); 
+    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DOT); // 点线/虚线
+    ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景
+    ObjectSetString(0, name, OBJPROP_TEXT, "P2 Baseline");
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
 
 //========================================================================
 // 11. DrawBreakoutTrendLine: 绘制突破趋势线 (P1)
@@ -902,7 +960,7 @@ void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bull
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
     
     // [V1.22 NEW] 绘制 P2 辅助线
-    DrawSecondBaseline(target_index, breakout_index, P2_price, is_bullish);
+    //DrawSecondBaseline(target_index, breakout_index, P2_price, is_bullish);
 }
 
 
