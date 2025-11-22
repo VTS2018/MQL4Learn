@@ -122,7 +122,8 @@ void CheckBearishSignalConfirmation(int target_index);
 //double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
 int FindSecondBaseline_v1(int target_index, bool is_bullish);
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
-void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
+//void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
+void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price);
 
 //int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish); // [V1.23 NEW] 辅助函数
 
@@ -382,7 +383,9 @@ void CheckBullishSignalConfirmation(int target_index)
 
     // 绘制 P1/P2 水平线 (即使是 IB 也要绘制)
     int N_Geo = target_index - K_Geo_Index; 
-    DrawBreakoutTrendLine(target_index, K_Geo_Index, true, N_Geo, P2_price);
+
+    //DrawBreakoutTrendLine(target_index, K_Geo_Index, true, N_Geo, P2_price);
+    DrawBreakoutTrendLine_v1(target_index, K_Geo_Index, true, P2_price);
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
     
@@ -503,7 +506,8 @@ void CheckBearishSignalConfirmation(int target_index)
 
     // 绘制 P1/P2 水平线 (即使是 IB 也要绘制)
     int N_Geo = target_index - K_Geo_Index; 
-    DrawBreakoutTrendLine(target_index, K_Geo_Index, false, N_Geo, P2_price);
+    //DrawBreakoutTrendLine(target_index, K_Geo_Index, false, N_Geo, P2_price);
+    DrawBreakoutTrendLine_v1(target_index, K_Geo_Index, false, P2_price);
 
     // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
 
@@ -763,8 +767,85 @@ void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, b
    时间 + 2 根 K 线的时间上。
    明确设置 OBJPROP_RAY = false，确保它是一条线段。
 */
+/*
 void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price)
 {
+    // Anchor 1 (起点): K-Target 锚点的 Open 价格和时间 (P1)
+    datetime time1 = Time[target_index];
+    double price1 = Open[target_index]; 
+    
+    // --- Anchor 2 (终点) 计算 ---
+    
+    // 终点 K 线索引: 使用突破 K 线索引，并向右 (现价方向) 延伸 2 根 K 线
+    int end_bar_index = breakout_index - 2; 
+    
+    // 边界检查：确保索引不小于 1 (1 是最新的已收盘 K 线)
+    if (end_bar_index < 1) 
+    {
+        end_bar_index = 1; // 防止数组越界
+    }
+    
+    datetime time2 = Time[end_bar_index]; // 使用推移后的时间
+    double price2 = price1;                 // 价格与起点价格保持一致 (实现水平线效果)
+    
+    // [V1.22 NEW] 突破类型分类
+    string classification = breakout_candle_count < DB_Threshold_Candles ? "IB" : "DB";
+    
+    // 生成唯一的对象名称 
+    string name = "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    string comment;
+    
+    // 检查对象是否已存在，如果存在则直接返回
+    if (ObjectFind(0, name) != -1) return; 
+    
+    // 创建趋势线对象 (OBJ_TREND)
+    if (!ObjectCreate(0, name, OBJ_TREND, 0, time1, price1))
+    {
+        Print("无法创建 P1 趋势线对象: ", name, ", 错误: ", GetLastError());
+        return;
+    }
+    
+    // 设置趋势线的第二个锚点 (终点)
+    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
+    
+    // ** 明确设置它不是射线 **
+    ObjectSetInteger(0, name, OBJPROP_RAY, false); 
+    
+    // 设置线条属性
+    ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrLimeGreen : clrDarkViolet); 
+    ObjectSetInteger(0, name, OBJPROP_WIDTH, 2); 
+    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID); // 实线 (P1)
+    ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景 (线在 K 线后面)
+    
+    // [V1.22 UPD] 设置注释/描述，包含 IB/DB 分类和 P2 价格
+    comment = classification + " P1 @" + DoubleToString(price1, Digits) + " (P2:" + DoubleToString(P2_price, Digits) + ")";
+    ObjectSetString(0, name, OBJPROP_TEXT, comment);
+    
+    // 将趋势线设置为不可选中
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    
+    // [V1.22 NEW] 绘制 P2 辅助线
+    DrawSecondBaseline(target_index, breakout_index, P2_price, is_bullish);
+}
+*/
+
+/**
+ * 根据看涨锚点的索引 和 P1 突破K线的索引  绘制趋势线，这是本程序绘制的第一条趋势线 非常关键
+ * 绘制一条从 K-Target.Open (P1) 开始，价格水平延伸到突破 K 线
+ * 时间 + 2 根 K 线的时间上。
+ * 明确设置 OBJPROP_RAY = false，确保它是一条线段。
+ * 
+ * @param target_index: 看涨锚点的索引
+ * @param breakout_index: P1 突破K线的索引
+ * @param is_bullish: 阳线或者阴线
+ * @param P2_price: 顺带着 展示出P2的价格 便于直观的对比
+ */
+void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price)
+{
+    // K_Geo_Index 这个值在函数调用之前 需要检查 如果是-1 就不执行了，通过这个值确定是 DB 还是IB
+    int breakout_candle_count = target_index - breakout_index;
+
     // Anchor 1 (起点): K-Target 锚点的 Open 价格和时间 (P1)
     datetime time1 = Time[target_index];
     double price1 = Open[target_index]; 
