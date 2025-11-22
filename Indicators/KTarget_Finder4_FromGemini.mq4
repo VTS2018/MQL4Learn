@@ -119,7 +119,8 @@ void DrawTargetTop(int target_index);
 void CheckBullishSignalConfirmation(int target_index);
 void CheckBearishSignalConfirmation(int target_index);
 
-double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
+//double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
+int FindSecondBaseline_v1(int target_index, bool is_bullish);
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
 void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 
@@ -321,7 +322,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
     
     return true;
 }
-
+/*
 //========================================================================
 // 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 老版本代码 我保留重命名了 没有删除
 //========================================================================
@@ -356,14 +357,22 @@ void CheckBullishSignalConfirmation_v1(int target_index)
         }
     }
 }
+*/
 
 //========================================================================
 // 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 (V1.23 Final Logic)
 //========================================================================
 void CheckBullishSignalConfirmation(int target_index)
 {
-    double P1_price = Open[target_index]; 
-    double P2_price = FindSecondBaseline(target_index, true, P1_price);
+    double P1_price = Open[target_index];
+    int P2_index = FindSecondBaseline_v1(target_index, true);
+    if (P2_index == -1)
+    {
+        return;
+    }
+
+    // double P2_price = FindSecondBaseline(target_index, true, P1_price);
+    double P2_price = Close[P2_index];
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] > P1_price 的 K 线索引,K_Geo_Index 仅用于确定绘制 P1/P2 水平线的终点，以及 P1-DB 的箭头位置
@@ -434,6 +443,7 @@ void CheckBullishSignalConfirmation(int target_index)
     return;
 }
 
+/*
 //========================================================================
 // 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 
 //========================================================================
@@ -468,14 +478,22 @@ void CheckBearishSignalConfirmation_v1(int target_index)
         }
     }
 }
+*/
 
 //========================================================================
 // 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 (对称修改)
 //========================================================================
 void CheckBearishSignalConfirmation(int target_index)
 {
-    double P1_price = Open[target_index]; 
-    double P2_price = FindSecondBaseline(target_index, false, P1_price);
+    double P1_price = Open[target_index];
+    int P2_index = FindSecondBaseline_v1(target_index, false);
+    if (P2_index == -1)
+    {
+        return;
+    }
+
+    // double P2_price = FindSecondBaseline(target_index, false, P1_price);
+    double P2_price = Close[P2_index];
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] < P1_price 的 K 线索引 [V1.23 FIX] 明确传入 is_bullish = false
@@ -551,6 +569,7 @@ void CheckBearishSignalConfirmation(int target_index)
    看跌 (Bearish): 锚点左侧第一根阴线 (Close < Open) 的收盘价。
    约束条件 [V1.23 NEW]: P2 价格必须在 P1 价格之外 (看涨 P2 > P1, 看跌 P2 < P1)。
 */
+/*
 double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
 {
     // P2 价格 (初始为 0.0)
@@ -616,7 +635,80 @@ double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
     
     return P2_price; 
 }
+*/
 
+
+/**
+ * 我们应该找到P2K线的索引 而不仅仅是所谓的价格
+ * @param target_index: 锚点索引
+ * @param is_bullish: 看涨或者看跌
+ * @return ( int )
+ */
+int FindSecondBaseline_v1(int target_index, bool is_bullish)
+{
+    double P1_price = Open[target_index];
+
+    // P2 价格 (初始为 0.0)
+    double P2_price = 0.0;
+
+    int P2_index = -1;
+
+    // 从锚点 K 线的左侧 (历史 K 线，索引 i+k) 开始回溯
+    // 使用外部参数 Scan_Range 作为回溯上限
+    for (int k = 1; k <= Scan_Range; k++)
+    {
+        int past_index = target_index + k;
+        
+        if (past_index >= Bars) break; // 边界检查
+        
+        bool condition_met = false;
+        double candidate_P2 = 0.0;
+        
+        if (is_bullish)
+        {
+            // 看涨 P2: 锚点左侧第一根阳线 (Close > Open) 的收盘价
+            if (Close[past_index] > Open[past_index])
+            {
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须高于 P1 价格
+                if (candidate_P2 > P1_price)
+                {
+                    P2_price = candidate_P2;
+                    P2_index = past_index;
+                    condition_met = true;
+                }
+            }
+        }
+        else // is_bearish
+        {
+            // 看跌 P2: 锚点左侧第一根阴线 (Close < Open) 的收盘价
+            if (Close[past_index] < Open[past_index])
+            {
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须低于 P1 价格
+                if (candidate_P2 < P1_price)
+                {
+                    P2_price = candidate_P2;
+                    P2_index = past_index;
+                    condition_met = true;
+                }
+            }
+        }
+
+        if (condition_met) 
+        {
+            break; // 找到即退出
+        }
+    }
+
+    // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
+    if (Debug_Print_Info_Once && !initial_debug_prints_done)
+    {
+        Print("FindSecondBaseline_v1 Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
+    }
+    
+    return P2_index; 
+}
 
 //========================================================================
 // 10. DrawSecondBaseline: 绘制第二基准价格线 (P2)
