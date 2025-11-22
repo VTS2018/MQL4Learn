@@ -41,6 +41,7 @@ int OnInit()
         "Timer set to: " + IntegerToString(Timer_Interval_Seconds) + " seconds.";
 
     Comment(init_message);
+    Print("---->[Indicator_Event_Demo.mq4:44]: init_message: ", init_message);
 
     return(INIT_SUCCEEDED);
 }
