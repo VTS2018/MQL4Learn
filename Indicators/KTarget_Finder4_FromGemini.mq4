@@ -119,16 +119,11 @@ void DrawTargetTop(int target_index);
 void CheckBullishSignalConfirmation(int target_index);
 void CheckBearishSignalConfirmation(int target_index);
 
-//double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); // [V1.23 UPD] 查找 P2 增加 P1 价格作为约束
-int FindSecondBaseline_v1(int target_index, bool is_bullish);
-void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
 void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish);
-//void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bullish, double P2_price);
 
-//int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish); // [V1.23 NEW] 辅助函数
-
 int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish);
+int FindSecondBaseline_v1(int target_index, bool is_bullish);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -324,42 +319,6 @@ bool CheckKTargetTopCondition(int i, int total_bars)
     
     return true;
 }
-/*
-//========================================================================
-// 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 老版本代码 我保留重命名了 没有删除
-//========================================================================
-void CheckBullishSignalConfirmation_v1(int target_index)
-{
-    // P1 (第一基准价格线): K-Target 锚点的开盘价
-    double target_open_price = Open[target_index]; 
-    
-    // [V1.22 NEW] P2 (第二基准价格线): 锚点左侧第一根阳线的收盘价
-    double P2_price = FindSecondBaseline(target_index, true, target_open_price); 
-    
-    // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
-    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
-    {
-        if (j < 0) break;
-        
-        // 突破确认条件: 突破 K 线的收盘价 > P1 (K-Target 的开盘价)
-        if (Close[j] > target_open_price)
-        {
-            // [V1.22 NEW] 计算突破距离 (N = 突破K线到锚点的K线数)
-            int breakout_candle_count = target_index - j; 
-            
-            // 1. 绘制信号箭头
-            BullishSignalBuffer[j] = Low[j] - 20 * Point(); 
-            
-            // 2. 绘制水平延伸的趋势突破线 (P1) 和 P2 辅助线
-            // [V1.22 UPD] 传递突破 K 线数量和 P2 价格
-            DrawBreakoutTrendLine(target_index, j, true, breakout_candle_count, P2_price);
-            
-            // 找到第一个突破后，IB/DB 确认完成，立即退出循环
-            return;
-        }
-    }
-}
-*/
 
 //========================================================================
 // 7. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 (V1.23 Final Logic)
@@ -452,42 +411,6 @@ void CheckBullishSignalConfirmation(int target_index)
     return;
 }
 
-/*
-//========================================================================
-// 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 
-//========================================================================
-void CheckBearishSignalConfirmation_v1(int target_index)
-{
-    // P1 (第一基准价格线): K-Target 锚点的开盘价
-    double target_open_price = Open[target_index];
-    
-    // [V1.22 NEW] P2 (第二基准价格线): 锚点左侧第一根阴线的收盘价
-    double P2_price = FindSecondBaseline(target_index, false, target_open_price); 
-    
-    // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
-    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
-    {
-        if (j < 0) break;
-        
-        // 突破确认条件: 突破 K 线的收盘价 < P1 (K-Target 的开盘价)
-        if (Close[j] < target_open_price)
-        {
-            // [V1.22 NEW] 计算突破距离 (N = 突破K线到锚点的K线数)
-            int breakout_candle_count = target_index - j;
-            
-            // 1. 绘制信号箭头
-            BearishSignalBuffer[j] = High[j] + 20 * Point();
-            
-            // 2. 绘制水平延伸的趋势突破线 (P1) 和 P2 辅助线
-            // [V1.22 UPD] 传递突破 K 线数量和 P2 价格
-            DrawBreakoutTrendLine(target_index, j, false, breakout_candle_count, P2_price);
-            
-            // 找到第一个突破后，确认完成，立即退出循环
-            return;
-        }
-    }
-}
-*/
 
 //========================================================================
 // 8. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 (对称修改)
@@ -578,82 +501,12 @@ void CheckBearishSignalConfirmation(int target_index)
 //========================================================================
 // 9. FindSecondBaseline: 查找第二基准价格线 (P2)
 //========================================================================
-/*
+/**
    查找 P2 价格：从 K-Target 锚点向左回溯，直到找到第一根符合条件的 K 线。
    看涨 (Bullish): 锚点左侧第一根阳线 (Close > Open) 的收盘价。
    看跌 (Bearish): 锚点左侧第一根阴线 (Close < Open) 的收盘价。
    约束条件 [V1.23 NEW]: P2 价格必须在 P1 价格之外 (看涨 P2 > P1, 看跌 P2 < P1)。
-*/
-/*
-double FindSecondBaseline(int target_index, bool is_bullish, double P1_price)
-{
-    // P2 价格 (初始为 0.0)
-    double P2_price = 0.0;
-    
-    // 从锚点 K 线的左侧 (历史 K 线，索引 i+k) 开始回溯
-    // 使用外部参数 Scan_Range 作为回溯上限
-    for (int k = 1; k <= Scan_Range; k++)
-    {
-        int past_index = target_index + k;
-        
-        if (past_index >= Bars) break; // 边界检查
-        
-        bool condition_met = false;
-        double candidate_P2 = 0.0;
-        
-        if (is_bullish)
-        {
-            // 看涨 P2: 锚点左侧第一根阳线 (Close > Open) 的收盘价
-            if (Close[past_index] > Open[past_index])
-            {
-                //P2_price = Close[past_index];
-                //condition_met = true;
 
-                candidate_P2 = Close[past_index];
-                // 2. [新增约束] P2 价格必须高于 P1 价格
-                if (candidate_P2 > P1_price)
-                {
-                    P2_price = candidate_P2;
-                    condition_met = true;
-                }
-            }
-        }
-        else // is_bearish
-        {
-            // 看跌 P2: 锚点左侧第一根阴线 (Close < Open) 的收盘价
-            if (Close[past_index] < Open[past_index])
-            {
-                //P2_price = Close[past_index];
-                //condition_met = true;
-
-                candidate_P2 = Close[past_index];
-                // 2. [新增约束] P2 价格必须低于 P1 价格
-                if (candidate_P2 < P1_price)
-                {
-                    P2_price = candidate_P2;
-                    condition_met = true;
-                }
-            }
-        }
-
-        if (condition_met) 
-        {
-            break; // 找到即退出
-        }
-    }
-
-    // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
-    if (Debug_Print_Info_Once && !initial_debug_prints_done)
-    {
-        Print("FindSecondBaseline Info: P2_price = ", DoubleToString(P2_price, Digits), " points.");
-    }
-    
-    return P2_price; 
-}
-*/
-
-
-/**
  * 根据看涨K-target阴线锚点，寻找到反向P2的索引，同时P2的价格一定要大于P1的价格（看涨），反之P2<P1(看跌)
  * @param target_index: 看涨K-target阴线锚点
  * @param is_bullish: 看涨或者看跌
@@ -725,51 +578,13 @@ int FindSecondBaseline_v1(int target_index, bool is_bullish)
     return P2_index; 
 }
 
-//========================================================================
-// 10. DrawSecondBaseline: 绘制第二基准价格线 (P2)
-//========================================================================
-void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish)
-{
-    // 如果 P2 价格无效 (未找到)，则不绘制
-    if (P2_price <= 0.0) return;
-    
-    // Anchor 1 (起点): P2 价格，K-Target 锚点时间
-    datetime time1 = Time[target_index];
-    
-    // Anchor 2 (终点): P2 价格，延伸到突破 K 线 + 2
-    int end_bar_index = breakout_index - 2; 
-    if (end_bar_index < 1) end_bar_index = 1;
-    datetime time2 = Time[end_bar_index];
-    
-    string name = "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
-    
-    // 检查对象是否已存在
-    if (ObjectFind(0, name) != -1) return; 
-    
-    // 创建趋势线对象 (OBJ_TREND)
-    if (!ObjectCreate(0, name, OBJ_TREND, 0, time1, P2_price))
-    {
-        Print("无法创建 P2 趋势线对象: ", name, ", 错误: ", GetLastError());
-        return;
-    }
-    
-    // 设置趋势线的第二个锚点 (终点)
-    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
-    ObjectSetDouble(0, name, OBJPROP_PRICE2, P2_price);
-    
-    // ** 明确设置它不是射线 **
-    ObjectSetInteger(0, name, OBJPROP_RAY, false); 
-    
-    // 设置线条属性: 虚线，较细，不同颜色
-    ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrDarkBlue : clrDarkRed); // 深色作为P2
-    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1); 
-    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DOT); // 点线/虚线
-    ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景
-    ObjectSetString(0, name, OBJPROP_TEXT, "P2 Baseline");
-    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-}
-
-// 用P2 K线的索引来解耦这个函数P2 K线的开盘价 突破P2的索引+2，终点是 P2 突破K的索引 但是这个突破值是一个动态值
+/**
+ * DrawSecondBaseline: 绘制第二基准价格线 (P2)
+ * 用P2 K线的索引来解耦这个函数,P2 K线的开盘价, 突破P2的索引+2，终点是 P2 突破K的索引 但是这个突破值是一个动态值
+ * @param target_index: Argument 1
+ * @param breakout_index: Argument 2
+ * @param is_bullish: Argument 3
+ */
 void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish)
 {
     if (target_index == -1)
@@ -825,69 +640,6 @@ void DrawSecondBaseline_v2(int target_index, int breakout_index, bool is_bullish
    时间 + 2 根 K 线的时间上。
    明确设置 OBJPROP_RAY = false，确保它是一条线段。
 */
-/*
-void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price)
-{
-    // Anchor 1 (起点): K-Target 锚点的 Open 价格和时间 (P1)
-    datetime time1 = Time[target_index];
-    double price1 = Open[target_index]; 
-    
-    // --- Anchor 2 (终点) 计算 ---
-    
-    // 终点 K 线索引: 使用突破 K 线索引，并向右 (现价方向) 延伸 2 根 K 线
-    int end_bar_index = breakout_index - 2; 
-    
-    // 边界检查：确保索引不小于 1 (1 是最新的已收盘 K 线)
-    if (end_bar_index < 1) 
-    {
-        end_bar_index = 1; // 防止数组越界
-    }
-    
-    datetime time2 = Time[end_bar_index]; // 使用推移后的时间
-    double price2 = price1;                 // 价格与起点价格保持一致 (实现水平线效果)
-    
-    // [V1.22 NEW] 突破类型分类
-    string classification = breakout_candle_count < DB_Threshold_Candles ? "IB" : "DB";
-    
-    // 生成唯一的对象名称 
-    string name = "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
-    string comment;
-    
-    // 检查对象是否已存在，如果存在则直接返回
-    if (ObjectFind(0, name) != -1) return; 
-    
-    // 创建趋势线对象 (OBJ_TREND)
-    if (!ObjectCreate(0, name, OBJ_TREND, 0, time1, price1))
-    {
-        Print("无法创建 P1 趋势线对象: ", name, ", 错误: ", GetLastError());
-        return;
-    }
-    
-    // 设置趋势线的第二个锚点 (终点)
-    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
-    ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
-    
-    // ** 明确设置它不是射线 **
-    ObjectSetInteger(0, name, OBJPROP_RAY, false); 
-    
-    // 设置线条属性
-    ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrLimeGreen : clrDarkViolet); 
-    ObjectSetInteger(0, name, OBJPROP_WIDTH, 2); 
-    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID); // 实线 (P1)
-    ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景 (线在 K 线后面)
-    
-    // [V1.22 UPD] 设置注释/描述，包含 IB/DB 分类和 P2 价格
-    comment = classification + " P1 @" + DoubleToString(price1, Digits) + " (P2:" + DoubleToString(P2_price, Digits) + ")";
-    ObjectSetString(0, name, OBJPROP_TEXT, comment);
-    
-    // 将趋势线设置为不可选中
-    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-    
-    // [V1.22 NEW] 绘制 P2 辅助线
-    DrawSecondBaseline(target_index, breakout_index, P2_price, is_bullish);
-}
-*/
-
 /**
  * 根据看涨锚点的索引 和 P1 突破K线的索引  绘制趋势线，这是本程序绘制的第一条趋势线 非常关键
  * 绘制一条从 K-Target.Open (P1) 开始，价格水平延伸到突破 K 线
@@ -958,9 +710,6 @@ void DrawBreakoutTrendLine_v1(int target_index, int breakout_index, bool is_bull
     
     // 将趋势线设置为不可选中
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-    
-    // [V1.22 NEW] 绘制 P2 辅助线
-    //DrawSecondBaseline(target_index, breakout_index, P2_price, is_bullish);
 }
 
 
@@ -981,32 +730,6 @@ void DrawTargetTop(int target_index)
     // 将箭头标记在 K-Target 的最高价之上
     BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
 }
-
-/*
-//========================================================================
-// 14. FindFirstP1BreakoutIndex: 辅助函数 (V1.23 NEW) 辅助函数 (最终修正)
-//========================================================================
-// 查找第一个 P1 突破的 K 线索引 (用于确定水平线的绘制几何结构)
-int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish)
-{
-    for (int j = target_index - 1; j >= target_index - max_lookforward; j--)
-    {
-        if (j < 0) break;
-
-        if (is_bullish)
-        {
-            // 看涨突破 P1: Close > P1_price
-            if (Close[j] > P1_price) return j;
-        }
-        else
-        {
-            // 看跌突破 P1: Close < P1_price
-            if (Close[j] < P1_price) return j;
-        }
-    }
-    return -1; // 未找到 P1 突破
-}
-*/
 
 /**
  * 根据看涨K-target阴线锚点 寻找出收复P1的第一根K线的索引
