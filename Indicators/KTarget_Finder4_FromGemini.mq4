@@ -46,7 +46,7 @@
 #property indicator_plots   4 // 对应四个绘图
 
 // --- 外部可调参数 (输入) ---
-extern int Scan_Range = 500;              // 总扫描范围：向后查找 N 根 K 线
+extern int Scan_Range = 100;              // 总扫描范围：向后查找 N 根 K 线
 
 // --- 看涨 K-Target (底部) 锚点参数 ---
 extern int Lookahead_Bottom = 20;         // 看涨信号右侧检查周期 (未来/较新的K线)
@@ -57,7 +57,7 @@ extern int Lookahead_Top = 20;            // 看跌信号右侧检查周期
 extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 
 // --- 信号确认参数 ---
-extern int Max_Signal_Lookforward = 5;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
+extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
 extern int DB_Threshold_Candles = 3;      // [V1.22 NEW] DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
 // [V1.25 NEW] 调试控制
@@ -65,6 +65,10 @@ extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时�
 
 // --- 全局变量/静态标志 ---
 static bool initial_debug_prints_done = false; // [V1.25 NEW] 内部标志：是否已完成首次加载时的调试打印
+
+//限制运行次数
+extern bool Debug_LimitCalculations = true;
+static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
@@ -119,13 +123,15 @@ double FindSecondBaseline(int target_index, bool is_bullish, double P1_price); /
 void DrawSecondBaseline(int target_index, int breakout_index, double P2_price, bool is_bullish); // [V1.22 NEW] 绘制 P2
 void DrawBreakoutTrendLine(int target_index, int breakout_index, bool is_bullish, int breakout_candle_count, double P2_price); // [V1.22 UPD] 增加了参数
 
-int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish); // [V1.23 NEW] 辅助函数
+//int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish); // [V1.23 NEW] 辅助函数
 
+int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
 int OnInit()
 {
+    g_run_count = 0;
     // 缓冲区映射设置 (无变化)
     SetIndexBuffer(0, BullishTargetBuffer);
     SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, 1, clrBlue); 
@@ -182,6 +188,19 @@ int OnCalculate(const int rates_total,
                 const long& volume[],    
                 const int& spread[])     
 {
+
+    if (Debug_LimitCalculations)
+    {
+        if (g_run_count >= 3)
+        {
+            // 如果达到限制，阻止进一步计算，直接返回
+            return (rates_total);
+        }
+        g_run_count++; // 每次运行时增加计数
+        // 打印提示信息到日志，便于调试确认
+        Print("DEBUG LIMIT: OnCalculate Run #", g_run_count, " of 3");
+    }
+
     // 检查是否有 K 线存在
     if(rates_total < 1) return(0); 
 
@@ -348,7 +367,7 @@ void CheckBullishSignalConfirmation(int target_index)
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] > P1_price 的 K 线索引,K_Geo_Index 仅用于确定绘制 P1/P2 水平线的终点，以及 P1-DB 的箭头位置
-    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, P1_price, Max_Signal_Lookforward, true);
+    int K_Geo_Index = FindFirstP1BreakoutIndex_v1(target_index, true);
     
     if (K_Geo_Index == -1) return; // 未发生 P1 突破，函数退出。
 
@@ -460,7 +479,7 @@ void CheckBearishSignalConfirmation(int target_index)
 
     // --- 阶段 A: 几何结构绘制 (找到第一个 P1 突破点) ---
     // K_Geo_Index 是第一个 Close[j] < P1_price 的 K 线索引 [V1.23 FIX] 明确传入 is_bullish = false
-    int K_Geo_Index = FindFirstP1BreakoutIndex(target_index, P1_price, Max_Signal_Lookforward, false); // 辅助函数FindFirstP1BreakoutIndex也可以用于看跌信号
+    int K_Geo_Index = FindFirstP1BreakoutIndex_v1(target_index, false);
     
     if (K_Geo_Index == -1) return;
 
@@ -732,6 +751,7 @@ void DrawTargetTop(int target_index)
     BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
 }
 
+/*
 //========================================================================
 // 14. FindFirstP1BreakoutIndex: 辅助函数 (V1.23 NEW) 辅助函数 (最终修正)
 //========================================================================
@@ -739,6 +759,36 @@ void DrawTargetTop(int target_index)
 int FindFirstP1BreakoutIndex(int target_index, double P1_price, int max_lookforward, bool is_bullish)
 {
     for (int j = target_index - 1; j >= target_index - max_lookforward; j--)
+    {
+        if (j < 0) break;
+
+        if (is_bullish)
+        {
+            // 看涨突破 P1: Close > P1_price
+            if (Close[j] > P1_price) return j;
+        }
+        else
+        {
+            // 看跌突破 P1: Close < P1_price
+            if (Close[j] < P1_price) return j;
+        }
+    }
+    return -1; // 未找到 P1 突破
+}
+*/
+
+/**
+ * This function fulfills the will of the developer
+ * @param target_index: 看涨K-target阴线锚点
+ * @param is_bullish: Argument 2
+ * @return ( int )
+ */
+int FindFirstP1BreakoutIndex_v1(int target_index, bool is_bullish)
+{
+    double P1_price = Open[target_index];
+    Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
+
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
     {
         if (j < 0) break;
 
