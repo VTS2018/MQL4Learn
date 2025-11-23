@@ -147,10 +147,11 @@ int OnInit()
 {
     // [V1.32 NEW] 生成唯一的对象名前缀
     g_object_prefix = WindowExpertName() + StringFormat("_%d_", ChartID());
-    Print("-->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: ", g_object_prefix);
-
+    //2025.11.24 00:37:12.535	KTarget_Finder5 GBPUSD,H4: -->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: KTarget_Finder5_-73415027_
+    //Print("-->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: ", g_object_prefix);
 
     g_run_count = 0;
+
     // 缓冲区映射设置 (无变化)
     SetIndexBuffer(0, BullishTargetBuffer);
     SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, 1, clrBlue); 
@@ -296,10 +297,10 @@ void FindAndDrawTargetCandles(int total_bars)
 
             // --- V1.35 NEW: 绝对低点支撑线 ---
             int AbsLowIndex = FindAbsoluteLowIndex(i, 20, 20, true);
-            Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
+            //Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
 
             double lowprice = Low[AbsLowIndex];
-            Print("====>[KTarget_Finder4_FromGemini.mq4:301]: lowprice: ", lowprice);
+            //Print("====>[KTarget_Finder4_FromGemini.mq4:301]: lowprice: ", lowprice);
             
             if (AbsLowIndex != -1)
             {
@@ -974,7 +975,7 @@ void DrawTargetTop(int target_index)
 int FindFirstP1BreakoutIndex(int target_index, bool is_bullish)
 {
     double P1_price = Open[target_index];
-    Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
+    //Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
 
     //向右边寻找 初始索引减去1 然后到最大前瞻
     for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
@@ -1010,9 +1011,8 @@ int FindFirstP1BreakoutIndex(int target_index, bool is_bullish)
 int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish)
 {
     // 初始化
-    //double extreme_price = is_bullish ? High[target_index] : Low[target_index]; // 初始值使用 K-Target 本身的价格
     double extreme_price = is_bullish ? Low[target_index] : High[target_index]; // 初始值使用 K-Target 本身的价格
-    Print("-->[KTarget_Finder4_FromGemini.mq4:959]: extreme_price: ", extreme_price);//先测试看涨的是否能 找到最低价格
+    //Print("-->[KTarget_Finder4_FromGemini.mq4:959]: extreme_price: ", extreme_price);//先测试看涨的是否能 找到最低价格
     int extreme_index = target_index;
 
     // 1. 向右 (较新 K 线, i-k) 查找
@@ -1083,7 +1083,7 @@ void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, i
 
     // 确定线条的锚点价格
     double price = is_bullish ? Low[abs_index] : High[abs_index];
-    Print("===>[KTarget_Finder4_FromGemini.mq4:1048]: price: ", price);
+    //Print("===>[KTarget_Finder4_FromGemini.mq4:1048]: price: ", price);
 
     // 确定线条的起点和终点时间
     datetime time1 = Time[abs_index]; // 起点时间：绝对极值 K 线的时间
