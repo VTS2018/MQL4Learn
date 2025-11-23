@@ -132,6 +132,10 @@ void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, doubl
 
 int FindFirstP1BreakoutIndex(int target_index, bool is_bullish);
 int FindP2Index(int target_index, bool is_bullish);
+
+// 新的逻辑
+int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish);
+void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, int extend_bars);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -288,6 +292,21 @@ void FindAndDrawTargetCandles(int total_bars)
             // 调用信号标记器 (仅传入数据)
             CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
             // --- END V1.31 NEW ---
+
+            // --- V1.35 NEW: 绝对低点支撑线 ---
+            int AbsLowIndex = FindAbsoluteLowIndex(i, 20, 20, true);
+            Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
+
+            double lowprice = Low[AbsLowIndex];
+            Print("====>[KTarget_Finder4_FromGemini.mq4:301]: lowprice: ", lowprice);
+            
+            if (AbsLowIndex != -1)
+            {
+                // 绘制绝对低点支撑线，向右延伸 15 根 K 线
+                DrawAbsoluteSupportLine(i, AbsLowIndex, true, 15);
+            }
+            // --- END V1.35 NEW ---
+
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -317,6 +336,15 @@ void FindAndDrawTargetCandles(int total_bars)
             // 调用信号标记器 (仅传入数据)
             CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
             // --- END V1.31 NEW ---
+
+            // --- V1.35 NEW: 绝对高点阻力线 ---
+            int AbsHighIndex = FindAbsoluteLowIndex(i, 20, 20, false); // 查找绝对最高点
+            if (AbsHighIndex != -1)
+            {
+                // 绘制绝对高点阻力线，向右延伸 15 根 K 线
+                DrawAbsoluteSupportLine(i, AbsHighIndex, false, 15);
+            }
+            // --- END V1.35 NEW ---
         }
     }
 }
@@ -937,4 +965,140 @@ int FindFirstP1BreakoutIndex(int target_index, bool is_bullish)
         }
     }
     return -1; // 未找到 P1 突破
+}
+
+// ----------------------新的绘图逻辑开始了----------------------
+//========================================================================
+// 14. FindAbsoluteLowIndex: 查找指定范围内的绝对最低价/最高价K线索引 (V1.35 NEW)
+//========================================================================
+/**
+ * 查找以 target_index 为中心，左右两侧 K 线内的绝对最低价 K 线索引。
+ * * @param target_index: K-Target 锚点索引。
+ * @param lookback_range: 向左（历史）回溯的 K 线数量 (例如 20)。
+ * @param lookahead_range: 向右（较新）前瞻的 K 线数量 (例如 20)。
+ * @param is_bullish: 查找最低价 (true) 还是最高价 (false)。
+ * @return ( int ) 具有绝对最低/最高价的 K 线索引。
+ */
+int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish)
+{
+    // 初始化
+    //double extreme_price = is_bullish ? High[target_index] : Low[target_index]; // 初始值使用 K-Target 本身的价格
+    double extreme_price = is_bullish ? Low[target_index] : High[target_index]; // 初始值使用 K-Target 本身的价格
+    Print("-->[KTarget_Finder4_FromGemini.mq4:959]: extreme_price: ", extreme_price);//先测试看涨的是否能 找到最低价格
+    int extreme_index = target_index;
+
+    // 1. 向右 (较新 K 线, i-k) 查找
+    for (int k = 1; k <= lookahead_range; k++)
+    {
+        int current_index = target_index - k;
+        if (current_index < 0) break;
+
+        if (is_bullish) // 查找绝对最低价 (Lowest Low)
+        {
+            if (Low[current_index] < extreme_price)
+            {
+                extreme_price = Low[current_index];
+                extreme_index = current_index;
+            }
+        }
+        else // 查找绝对最高价 (Highest High)
+        {
+            if (High[current_index] > extreme_price)
+            {
+                extreme_price = High[current_index];
+                extreme_index = current_index;
+            }
+        }
+    }
+
+    // 2. 向左 (历史 K 线, i+k) 查找
+    for (int k = 1; k <= lookback_range; k++)
+    {
+        int current_index = target_index + k;
+        if (current_index >= Bars) break;
+
+        if (is_bullish) // 查找绝对最低价 (Lowest Low)
+        {
+            if (Low[current_index] < extreme_price)
+            {
+                extreme_price = Low[current_index];
+                extreme_index = current_index;
+            }
+        }
+        else // 查找绝对最高价 (Highest High)
+        {
+            if (High[current_index] > extreme_price)
+            {
+                extreme_price = High[current_index];
+                extreme_index = current_index;
+            }
+        }
+    }
+
+    return extreme_index;
+}
+
+//========================================================================
+// 15. DrawAbsoluteSupportLine: 绘制绝对支撑/阻力水平线 (V1.35 NEW)
+//========================================================================
+/**
+ * 在绝对低点/高点上绘制一条水平趋势线，并带文字说明。
+ * * @param target_index: K-Target 锚点索引 (用于命名)
+ * @param abs_index: 具有绝对低/高价的 K 线索引。
+ * @param is_bullish: 看涨 (支撑线) 还是看跌 (阻力线)。
+ * @param extend_bars: 向右延伸的 K 线数量 (例如 15)。
+ */
+void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, int extend_bars)
+{
+    if (abs_index < 0)
+        return;
+
+    // 确定线条的锚点价格
+    double price = is_bullish ? Low[abs_index] : High[abs_index];
+    Print("===>[KTarget_Finder4_FromGemini.mq4:1048]: price: ", price);
+
+    // 确定线条的起点和终点时间
+    datetime time1 = Time[abs_index]; // 起点时间：绝对极值 K 线的时间
+
+    // 终点 K 线索引：从 abs_index 向右（较新 K 线）移动 extend_bars
+    int end_bar_index = abs_index - extend_bars;
+    if (end_bar_index < 0)
+        end_bar_index = 0; // 边界检查
+
+    datetime time2 = Time[end_bar_index]; // 终点时间
+
+    // --- 对象创建与设置 ---
+    string name = g_object_prefix + (is_bullish ? "AbsLow_" : "AbsHigh_") + IntegerToString(target_index);
+
+    // 检查对象是否已存在
+    if (ObjectFind(0, name) != -1)
+        return;
+
+    // 创建趋势线对象 (OBJ_TREND)
+    if (!ObjectCreate(0, name, OBJ_TREND, 0, time1, price, time2, price))
+    {
+        Print("无法创建 绝对最低价对象: ", name, ", 错误: ", GetLastError());
+        return;
+    }
+
+    // 设置属性
+    ObjectSetInteger(0, name, OBJPROP_COLOR, clrBlack);
+    ObjectSetInteger(0, name, OBJPROP_WIDTH, 1); // 最细样式 (宽度 1)
+    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+    ObjectSetInteger(0, name, OBJPROP_BACK, true); // 背景
+    ObjectSetInteger(0, name, OBJPROP_RAY, false); // 确保是线段
+
+    // 设置文字说明 (可见文本)
+    string comment = is_bullish ? "Absolute Low Support" : "Absolute High Resistance";
+    ObjectSetString(0, name, OBJPROP_TEXT, comment);
+
+    // **确保文字可见性**：将文字附加在趋势线的一端，并调整其位置。
+    // 在 MQL4 中，OBJ_TREND 的 OBJPROP_TEXT 默认是可见的，我们只需要确保它没有被其他东西遮挡。
+
+    // 3. 更新位置
+    ObjectSetInteger(0, name, OBJPROP_TIME1, time1);
+    ObjectSetDouble(0, name, OBJPROP_PRICE1, price);
+    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, name, OBJPROP_PRICE2, price);
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
 }
