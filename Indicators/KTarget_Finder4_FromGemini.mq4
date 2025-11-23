@@ -124,8 +124,8 @@ void CheckBullishSignalConfirmation(int target_index);
 void CheckBearishSignalConfirmation(int target_index);
 
 // V1.31 UPD: 流程协调者模式，传入所有几何参数，实现解耦
-void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo);
-void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo);
+void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
+void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
 
 void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish);
 void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, double P2_price);
@@ -136,6 +136,9 @@ int FindP2Index(int target_index, bool is_bullish);
 // 新的逻辑
 int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish);
 void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, int extend_bars);
+
+// [V1.33 NEW] 绘制 P1 K线低价到 P2 K线收盘价的矩形区域
+void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -288,9 +291,6 @@ void FindAndDrawTargetCandles(int total_bars)
 
             // 绘制 P1 辅助线 (几何绘制职责)
             DrawP1Baseline(i, K_Geo_Index, true, P2_price);
-
-            // 调用信号标记器 (仅传入数据)
-            CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对低点支撑线 ---
@@ -307,6 +307,8 @@ void FindAndDrawTargetCandles(int total_bars)
             }
             // --- END V1.35 NEW ---
 
+            // 调用信号标记器 (仅传入数据)
+            CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -332,9 +334,6 @@ void FindAndDrawTargetCandles(int total_bars)
 
             // 绘制 P1 辅助线 (几何绘制职责)
             DrawP1Baseline(i, K_Geo_Index, false, P2_price);
-
-            // 调用信号标记器 (仅传入数据)
-            CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo);
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对高点阻力线 ---
@@ -345,6 +344,9 @@ void FindAndDrawTargetCandles(int total_bars)
                 DrawAbsoluteSupportLine(i, AbsHighIndex, false, 15);
             }
             // --- END V1.35 NEW ---
+
+            // 调用信号标记器 (仅传入数据)
+            CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
         }
     }
 }
@@ -515,7 +517,7 @@ void CheckBullishSignalConfirmation(int target_index)
  * @param K_Geo_Index: Argument 3
  * @param N_Geo: Argument 4
  */
-void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo)
+void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // K_Geo_Index 必须有效，否则协调者已经跳过了。
     // P2_price 必须有效，否则协调者已经跳过了。
@@ -541,6 +543,12 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                 // **绘制 P2 辅助线** (职责：只有在 P2 突破时才绘制 P2 线)
                 DrawP2Baseline(P2_index, j, true);
 
+                if (abs_lowindex != -1)
+                {
+                    /* 只有信号成立才绘制矩形 */
+                    DrawP1P2Rectangle(abs_lowindex, j, true);
+                }
+
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
                 return; // 找到最高级别信号，立即退出函数
@@ -556,6 +564,12 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
     {
         //**绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
         DrawP2Baseline(P2_index, K_Geo_Index, true);
+
+        if (abs_lowindex != -1)
+        {
+            /* 只有信号成立才绘制矩形 */
+            DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+        }
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
@@ -656,7 +670,7 @@ void CheckBearishSignalConfirmation(int target_index)
     return;
 }
 
-void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo)
+void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     double P1_price = Open[target_index];
     double P2_price = Close[P2_index];
@@ -674,6 +688,11 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
             {
                 // 绘制P2线
                 DrawP2Baseline(P2_index, j, false);
+                if (abs_hightindex != -1)
+                {
+                    /* code */
+                    DrawP1P2Rectangle(abs_hightindex, j, false);
+                }
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
                 BearishSignalBuffer[j] = High[j] + 30 * Point(); 
@@ -690,6 +709,12 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
     {
         // **绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
         DrawP2Baseline(P2_index, K_Geo_Index, false);
+
+        if (abs_hightindex != -1)
+        {
+            /* code */
+            DrawP1P2Rectangle(abs_hightindex, K_Geo_Index, false);
+        }
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
@@ -1101,4 +1126,81 @@ void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, i
     ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
     ObjectSetDouble(0, name, OBJPROP_PRICE2, price);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+}
+
+//========================================================================
+// 12. DrawP1P2Rectangle: 绘制 P1 K线低价到 P2 K线收盘价的矩形区域 (V1.33 NEW)
+// 修正绘制 看涨K-target 绝对最低价K的最低点  到 突破P1 K线 或者P2 K线满足 CB 信号的矩形
+//========================================================================
+/**
+ * 绘制从 P1 K线的低/高价 到 P2 K线的收盘价 的矩形区域。
+ *
+ * @param target_index: P1 K线索引 (K-Target 锚点)
+ * @param P2_index: P2 K线索引 (反转 K 线)
+ * @param is_bullish: 看涨或者看跌
+ */
+void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
+{
+    // --- 确保 P1/P2 索引有效 ---
+    if (target_index < 0 || P2_index < 0) return;
+
+    // --- 确定矩形的四个角点 ---
+    
+    // 角点 A (K-Target 锚点侧)
+    datetime time1 = Time[target_index];
+    double price1;
+    
+    // 角点 B (P2 侧)
+    datetime time2 = Time[P2_index];
+    double price2 = Close[P2_index]; // P2 侧的价格锚定 P2 K 线的收盘价
+
+    // 1. 根据看涨/看跌确定 P1 侧的价格锚定点
+    if (is_bullish)
+    {
+        // 看涨: 价格锚定 K-Target 的最低价 (Low)
+        price1 = Low[target_index];
+    }
+    else // is_bearish
+    {
+        // 看跌: 价格锚定 K-Target 的最高价 (High)
+        price1 = High[target_index];
+    }
+
+    // --- 对象创建与设置 ---
+    // 名称使用唯一的对象名前缀
+    string name = g_object_prefix + (is_bullish ? "Rect_B_" : "Rect_S_") + IntegerToString(target_index);
+    
+    // 检查对象是否已存在
+    if (ObjectFind(0, name) != -1) return;
+
+    // 创建对象 (使用矩形对象 OBJ_RECTANGLE)
+    // 矩形需要四个点: (时间1, 价格1) 和 (时间2, 价格2)
+    if (!ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price1, time2, price2))
+    {
+        Print("无法创建 P1/P2 矩形对象: ", name, ", 错误: ", GetLastError());
+        return;
+    }
+    
+    // 2. 设置属性 (更新)
+    // 确保矩形在 K 线后面 (背景)
+    ObjectSetInteger(0, name, OBJPROP_BACK, true); 
+    
+    // 设置颜色和透明度
+    color rect_color = is_bullish ? clrLightBlue : clrLightPink; // 浅蓝色/浅粉色
+    
+    ObjectSetInteger(0, name, OBJPROP_COLOR, rect_color);
+    
+    // 设置为半透明 (0-255, 0为完全透明, 255为不透明)
+    ObjectSetInteger(0, name, OBJPROP_BORDER_COLOR, clrNONE); // 移除边框
+    ObjectSetInteger(0, name, OBJPROP_FILL, 1); // 开启填充
+    //ObjectSetInteger(0, name, OBJPROP_LEVEL, 120); // 透明度设置 (例如 120)
+    
+    ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Area");
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false); // 不可选中
+    
+    // 3. 更新矩形位置 (用于 OnCalculate 循环更新)
+    ObjectSetInteger(0, name, OBJPROP_TIME1, time1);
+    ObjectSetDouble(0, name, OBJPROP_PRICE1, price1);
+    ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
+    ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
 }
