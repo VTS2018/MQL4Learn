@@ -139,6 +139,7 @@ void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, i
 
 // [V1.33 NEW] 绘制 P1 K线低价到 P2 K线收盘价的矩形区域
 void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish);
+void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -547,6 +548,8 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                 {
                     /* 只有信号成立才绘制矩形 */
                     DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                    DrawP1P2Fibonacci(abs_lowindex, j, true);
                 }
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
@@ -1203,4 +1206,165 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
     ObjectSetDouble(0, name, OBJPROP_PRICE1, price1);
     ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
     ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
+}
+
+//========================================================================
+// 13. DrawP1P2Fibonacci: 绘制 P1/P2 区域的斐波那契回调线 (V1.34 NEW)
+//========================================================================
+/**
+ * 绘制 P1 K线的低/高价 到 P2 K线的收盘价 的斐波那契回调线。
+ *
+ * @param target_index: P1 K线索引 (K-Target 锚点)
+ * @param P2_index: P2 K线索引 (反转 K 线)
+ * @param is_bullish: 看涨或者看跌
+ */
+void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
+{
+    // --- V1.38 内部硬编码自定义设置 ---
+    color FIBO_LINE_COLOR = clrBlack;
+
+    // 自定义斐波那契级别的值 (例如，添加了 78.6%)
+    double custom_values[] = {0.0, 1.0, 0.236, 0.382, 0.500, 0.618, 0.786, 0.880, 1.618, 1.786, 1.880, 2.618, 2.786, 2.880, 4.236, 4.786, 4.880, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    int FIBO_CUSTOM_LEVELS_COUNT = ArraySize(custom_values);
+    //Print("--->[KTarget_Finder4_FromGemini.mq4:1229]: FIBO_CUSTOM_LEVELS_COUNT: ", FIBO_CUSTOM_LEVELS_COUNT);
+
+    // 自定义斐波那契级别的说明 (与上面的值一一对应)
+    string custom_texts[] = {
+        "Base %$",  // k=0 (0.0)
+        "Setup %$", // k=1 (1.0)
+
+        "0.236 Major %$", // k=2 (0.236)
+        "0.382 Minor %$", // k=3 (0.382)
+        "50 %$",          // k=4 (0.500)
+
+        "0.618 PullBack %$", // k=5 (0.618)
+        "0.786 PullBack %$", // k=6 (0.786)
+        "0.880 PullBack %$",
+
+        "TP11-%$",
+        "1MAX-%$",
+        "1MAX-%$",
+
+        "TP21-%$",
+        "2MAX-%$",
+        "2MAX-%$",
+
+        "TP31-%$",
+        "3MAX-%$",
+        "3MAX-%$",
+
+        "1:1的位置-%$",
+        "1:2的位置-%$",
+        "1:3的位置-%$",
+        "1:4的位置-%$",
+        "1:5的位置-%$",
+        "1:6的位置-%$",
+        "1:7的位置-%$",
+        "1:8的位置-%$",
+        "1:9的位置-%$",
+        "1:10的位置-%$",
+        "1:11的位置-%$",
+        "1:12的位置-%$",
+        "1:13的位置-%$",
+        "1:14的位置-%$",
+        "1:15的位置-%$"};
+    //int FIBO_CUSTOM_LEVELS_COUNT_TEXTS = ArraySize(custom_texts);
+    //Print("-->[KTarget_Finder4_FromGemini.mq4:1272]: FIBO_CUSTOM_LEVELS_COUNT_TEXTS: ", FIBO_CUSTOM_LEVELS_COUNT_TEXTS);
+
+    // --- 确保 P1/P2 索引有效 ---
+    if (target_index < 0 || P2_index < 0) return;
+
+    // --- 确定斐波那契的两个锚点 ---
+    
+    // 锚点 1 (Fib 0 位置 - P1 K-Target 锚点侧)
+    datetime time1 = Time[target_index];
+    double price1;
+    
+    // 锚点 2 (Fib 1 位置 - P2 K 线侧)
+    datetime time2 = Time[P2_index];
+    double price2 = Close[P2_index]; // P2 K 线的收盘价即为 Fib 1 的价格
+
+    // 1. 根据看涨/看跌确定 P1 侧的价格 (Fib 0)
+    if (is_bullish)
+    {
+        // 看涨: 价格锚定 K-Target 的最低价 (Low) 作为 0% (支撑)
+        price1 = Low[target_index];
+    }
+    else // is_bearish
+    {
+        // 看跌: 价格锚定 K-Target 的最高价 (High) 作为 0% (阻力)
+        price1 = High[target_index];
+    }
+
+    // --- 对象创建与设置 ---
+    // 名称使用唯一的对象名前缀
+    string name = g_object_prefix + (is_bullish ? "Fibo_B_" : "Fibo_S_") + IntegerToString(target_index);
+    //Print(">>> DrawP1P2Fibonacci: Drawing Fibo ", name);
+
+    // 检查对象是否已存在
+    if (ObjectFind(0, name) != -1) return;
+
+    // 创建对象 (使用斐波那契回调线 OBJ_FIBO)
+    if (!ObjectCreate(0, name, OBJ_FIBO, 0, time2, price2, time1, price1))
+    {
+        Print("无法创建 P1/P2 使用斐波那契回调线: ", name, ", 错误: ", GetLastError());
+        return;
+    }
+    
+    // 2. 设置属性 (更新)
+
+    // 确保斐波那契线在 K 线后面 (背景)
+    ObjectSetInteger(0, name, OBJPROP_BACK, true);
+    ObjectSetInteger(0, name, OBJPROP_RAY, false);
+    // 不向未来延伸
+    // ObjectSetInteger(0, name, OBJPROP_FIBO_EXTEND, false);
+    // 确保斐波那契线不可选中
+    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+
+    // 设置线条颜色和宽度
+    color fibo_color = is_bullish ? clrGreen : clrMagenta;
+    ObjectSetInteger(0, name, OBJPROP_COLOR, fibo_color);
+    ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+    ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+    
+    // 3. 更新位置
+    ObjectSetInteger(0, name, OBJPROP_TIME1, time2);
+    ObjectSetDouble(0, name, OBJPROP_PRICE1, price2);
+    ObjectSetInteger(0, name, OBJPROP_TIME2, time1);
+    ObjectSetDouble(0, name, OBJPROP_PRICE2, price1);
+    
+    ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Fibo");
+
+    // 🚨 V1.48 关键修正: 显式设置斐波那契级别总数
+    ObjectSetInteger(0, name, OBJPROP_LEVELS, FIBO_CUSTOM_LEVELS_COUNT);
+    //Print(">>> DrawP1P2Fibonacci: Setting All 32 Levels for Fibo ", name);
+
+    // 4. V1.38 核心：设置自定义斐波那契级别、文本和颜色
+
+    // MT4 最多支持 32 个斐波那契级别 (索引 0 到 31)
+    for (int k = 0; k < 32; k++)
+    {
+        // (1) 设置自定义级别 步骤 A: 设置我们定义的 32 个级别 (k=0 到 k=6)
+        // if (k < FIBO_CUSTOM_LEVELS_COUNT)
+        // {
+            // 设置值 (百分比)
+            ObjectSetDouble(0, name, OBJPROP_LEVELVALUE, k, custom_values[k]);
+            // 设置说明文本
+            ObjectSetString(0, name, OBJPROP_LEVELTEXT, k, custom_texts[k]);
+            
+            // 🚨 强制设置级别颜色为硬编码的颜色 (解决了颜色被覆盖的问题)
+            ObjectSetInteger(0, name, OBJPROP_LEVELCOLOR, k, FIBO_LINE_COLOR);
+            
+            // 确保级别线条样式和宽度与主线一致
+            ObjectSetInteger(0, name, OBJPROP_LEVELSTYLE, k, STYLE_SOLID);
+            ObjectSetInteger(0, name, OBJPROP_LEVELWIDTH, k, 1);
+        // }
+        // // (2) 隐藏所有未使用的级别
+        // else
+        // {
+        //     // 设置值为 0.0 或一个空文本可有效隐藏级别
+        //     ObjectSetDouble(0, name, OBJPROP_LEVELVALUE, k, 0.0);
+        //     ObjectSetString(0, name, OBJPROP_LEVELTEXT, k, "");
+        // }
+    }
 }
