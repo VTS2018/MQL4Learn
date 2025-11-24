@@ -79,6 +79,14 @@ double BearishTargetBuffer[]; // 1: 用于标记看跌K-Target锚点 (顶部)
 double BullishSignalBuffer[]; // 2: 最终看涨信号 (P2 或 P1-DB突破确认)
 double BearishSignalBuffer[]; // 3: 最终看跌信号 (P2 或 P1-DB突破确认)
 
+// --- 辅助结构体：用于存储解析结果 ---
+struct ParsedRectInfo
+{
+    bool     is_bullish; // 看涨 (true) / 看跌 (false)
+    datetime P1_time;    // P1 K线开盘时间
+    datetime P2_time;    // P2 K线开盘时间
+};
+
 // --- 绘图属性 ---
 // Plot 1: K-Target Bottom (锚点)
 #property indicator_label1 "KTarget_Bottom"
@@ -142,6 +150,13 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish);
 
 string ShortenObjectName(string original_name);
 string GetBarTimeID(int bar_index);
+bool ParseRectangleName(const string rect_name, ParsedRectInfo &info);
+
+// 静态变量：用于检查两次点击之间的间隔，以模拟“双击” 将 LastClickTime 改为存储毫秒数 (unsigned long)
+static datetime LastClickTime = 0;
+static ulong LastClickTime_ms = 0;
+const ulong DOUBLE_CLICK_TIMEOUT_MS = 500; // 500 毫秒内算作双击
+
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
@@ -271,6 +286,130 @@ int OnCalculate(const int rates_total,
     return(rates_total);
 }
 
+//+------------------------------------------------------------------+
+//| ChartEvent function - 接收所有图表/对象事件的关键函数               |
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
+{
+    // 1. 打印所有事件的通用信息
+    Print("--- EVENT RECEIVED --- ID:", id, 
+          ", lparam:", lparam, 
+          ", dparam:", dparam, 
+          ", sparam (Name/Key):", sparam);
+
+    // --- 2. 针对特定事件进行处理和深入解析 ---
+    switch(id)
+    {
+        case CHARTEVENT_OBJECT_CLICK:
+        {
+            // sparam 包含了被点击对象的名称。
+            string object_name = sparam;
+            ParsedRectInfo info;
+
+            // 这是您的目标：用户点击了图表对象
+            Print("    *** 侦测到对象点击事件 (CHARTEVENT_OBJECT_CLICK) ***");
+            Print("    被点击对象名称 (sparam): ", sparam);
+
+            // 检查是否点击了我们创建的趋势线
+            // if (sparam == g_trendline_name)
+            // {
+            //     Print("    >>> 成功点击了我们的可交互趋势线！ <<<");
+            //     // 此时您可以执行 DrawP1P2Fibonacci() 等自定义操作
+            // }
+
+            // --- 3. 模拟双击检查 ---
+            /* 这种方式没有通过
+            datetime current_time = TimeCurrent();
+            Print("-->[KTarget_Finder5.mq4:308]: current_time: ", current_time);
+
+            Print("-->[KTarget_Finder5.mq4:313]: LastClickTime: ", LastClickTime);
+
+            long time_diff_ms = (current_time - LastClickTime) * 1000; // 转换为毫秒
+            Print("-->[KTarget_Finder5.mq4:311]: time_diff_ms: ", time_diff_ms);
+            */
+
+            // --- 2. 检查是否点击了我们的矩形对象 ---
+            // 矩形对象的名称应该以我们定义的 "Rect_B_" 或 "Rect_S_" 开头
+            if (StringFind(object_name, "Rect_B_", 0) != -1 || StringFind(object_name, "Rect_S_", 0) != -1)
+            {
+                // 1. 获取当前系统启动以来的毫秒数
+                ulong current_time_ms = GetTickCount();
+                Print("===>[KTarget_Finder5.mq4:320]: current_time_ms: ", current_time_ms);
+                Print("===>[KTarget_Finder5.mq4:321]: LastClickTime_ms: ", LastClickTime_ms);
+
+                // 2. 计算毫秒差（直接相减就是毫秒数）
+                // 注意：GetTickCount() 返回值可能循环，但对于 500ms 的短期差值是可靠的。
+                ulong time_diff_ms = current_time_ms - LastClickTime_ms;
+                Print("===>[KTarget_Finder5.mq4:326]: time_diff_ms: ", time_diff_ms);
+
+                if (time_diff_ms > 0 && time_diff_ms < DOUBLE_CLICK_TIMEOUT_MS)
+                {
+                    Print(">>> DEBUG: Detected Double Click on Rectangle: ", sparam);
+                    
+                    // 1. 检查是否点击了我们的矩形，并解析名称
+                    if (ParseRectangleName(object_name, info))
+                    {
+                        // 2. 🚨 核心步骤：将绝对时间转换为当前 K 线索引 🚨
+
+                        // iBarShift 查找给定时间对应的 K 线索引。
+                        // false 参数表示精确匹配 K 线开盘时间。
+                        int current_P1_index = iBarShift(NULL, 0, info.P1_time, false);
+                        int current_P2_index = iBarShift(NULL, 0, info.P2_time, false);
+
+                        // 检查索引是否有效 (通常 >= 0)
+                        if (current_P1_index >= 0 && current_P2_index >= 0)
+                        {
+                            Print("成功解析并转换时间到索引：P1索引=", current_P1_index, ", P2索引=", current_P2_index);
+
+                            // 3. 调用 DrawP1P2Fibonacci 函数绘制斐波那契线
+                            DrawP1P2Fibonacci(current_P1_index, current_P2_index, info.is_bullish);
+
+                            // 确保 Fibo 立即显示
+                            //ChartRedraw(0);
+                        }
+                        else
+                        {
+                            Print("错误: 无法找到匹配的 K 线索引，数据可能已过期或被移除。");
+                        }
+                    }
+
+                    // 强制重绘，以确保 Fibo 立即显示
+                    // ChartRedraw(0);
+
+                    // 重置 LastClickTime，避免三次点击被识别为双击
+                    // LastClickTime = 0;
+
+                    LastClickTime_ms = 0;
+                }
+                else
+                {
+                    // 记录第一次点击时间
+                    // LastClickTime = current_time;
+
+                    // 记录第一次点击时间 (必须大于 0，避免系统启动时记录 0)
+                    LastClickTime_ms = current_time_ms;
+                }
+            }
+            break;
+        }    
+        case CHARTEVENT_KEYDOWN:
+            // 用户按下了键盘上的键
+            Print("    侦测到键盘按下事件 (CHARTEVENT_KEYDOWN)");
+            Print("    按下的键代码 (lparam): ", lparam);
+            break;
+            
+        case CHARTEVENT_CHART_CHANGE:
+            // 图表变动：例如窗口大小改变、缩放、切换周期
+            Print("    图表变动事件 (CHARTEVENT_CHART_CHANGE) 发生。");
+            break;
+            
+        default:
+            // 其他事件，例如 CHARTEVENT_MOUSE_MOVE (需要显式开启)
+            // Print("    接收到其他事件...");
+            break;
+    }
+}
+//+------------------------------------------------------------------+
 
 //========================================================================
 // 4. FindAndDrawTargetCandles: 寻找 K-Target 的核心逻辑 (双向) (无变化)
@@ -563,7 +702,7 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                     /* 只有信号成立才绘制矩形 */
                     DrawP1P2Rectangle(abs_lowindex, j, true);
 
-                    DrawP1P2Fibonacci(abs_lowindex, j, true);
+                    //DrawP1P2Fibonacci(abs_lowindex, j, true); 这里会绘制出所有的 斐波所以我设置了一个开关 所以这里取消就行了
                 }
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
@@ -1186,9 +1325,23 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
 
     // --- 对象创建与设置 ---
     // 名称使用唯一的对象名前缀
-    string time_id_str = GetBarTimeID(target_index);
-    string name = g_object_prefix + (is_bullish ? "Rect_B_" : "Rect_S_") + time_id_str;
-    
+    // string time_id_str = GetBarTimeID(target_index);
+    // string name = g_object_prefix + (is_bullish ? "Rect_B_" : "Rect_S_") + time_id_str;
+
+    //---------2.0 升级矩形对象的名称 用来为 斐波绘制提供信息传送
+    // --- 获取 P1 和 P2 K线时间的格式化字符串 ---
+    // 例如: "2025_11_24_06_00_00"
+    string P1_time_id_str = GetBarTimeID(target_index);
+    string P2_time_id_str = GetBarTimeID(P2_index);
+    // 🚨 V3.00 核心修正：命名格式包含 P1 和 P2 时间，用 # 分隔
+    // 格式: [Prefix]_[Type]_[P1_TimeID]#[P2_TimeID]
+    string name = g_object_prefix +
+                  (is_bullish ? "Rect_B_" : "Rect_S_") +
+                  P1_time_id_str +
+                  "#" +
+                  P2_time_id_str;
+    //---------2.0 升级矩形对象的名称 用来为 斐波绘制提供信息传送
+
     // 检查对象是否已存在
     if (ObjectFind(0, name) != -1) return;
 
@@ -1465,4 +1618,68 @@ string GetBarTimeID(int bar_index)
         IntegerToString(dt.sec, 2, '0');
         
     return time_id_str;
+}
+
+//========================================================================
+// 18. ParseRectangleName: 解析矩形名称，提取 K 线时间 (V3.00)
+//========================================================================
+/**
+ * 从对象名称中解析出 K 线时间戳和看涨/看跌类型。
+ * @param rect_name 被点击的矩形对象的完整名称
+ * @param info 引用传递的结构体，用于存储解析结果
+ * @return (bool) 成功解析返回 true，否则返回 false
+ */
+bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
+{
+    // 1. 检查类型并确定字符串起始位置
+    int start_pos = -1;
+    if (StringFind(rect_name, "Rect_B_", 0) != -1)
+    {
+        info.is_bullish = true;
+        start_pos = StringFind(rect_name, "Rect_B_", 0) + StringLen("Rect_B_");
+    }
+    else if (StringFind(rect_name, "Rect_S_", 0) != -1)
+    {
+        info.is_bullish = false;
+        start_pos = StringFind(rect_name, "Rect_S_", 0) + StringLen("Rect_S_");
+    }
+    else
+    {
+        // 无法识别的名称类型
+        return false;
+    }
+    
+    // 2. 提取 P1 和 P2 时间字符串
+    string time_segment = StringSubstr(rect_name, start_pos);
+    int separator_pos = StringFind(time_segment, "#", 0);
+    
+    if (separator_pos == -1) return false; // 缺少分隔符
+    
+    string P1_time_str = StringSubstr(time_segment, 0, separator_pos);
+    string P2_time_str = StringSubstr(time_segment, separator_pos + 1);
+    
+    // 3. 将 "YYYY_MM_DD_HH_MM_SS" 格式转换成 MQL4 可识别的 "YYYY.MM.DD HH:MM:SS"
+    string P1_standard_format = 
+        StringSubstr(P1_time_str, 0, 4) + "." + // YYYY.
+        StringSubstr(P1_time_str, 5, 2) + "." + // MM.
+        StringSubstr(P1_time_str, 8, 2) + " " + // DD<space>
+        StringSubstr(P1_time_str, 11, 2) + ":" + // HH:
+        StringSubstr(P1_time_str, 14, 2) + ":" + // MM:
+        StringSubstr(P1_time_str, 17, 2);       // SS
+                                
+    string P2_standard_format = 
+        StringSubstr(P2_time_str, 0, 4) + "." + 
+        StringSubstr(P2_time_str, 5, 2) + "." + 
+        StringSubstr(P2_time_str, 8, 2) + " " + 
+        StringSubstr(P2_time_str, 11, 2) + ":" + 
+        StringSubstr(P2_time_str, 14, 2) + ":" + 
+        StringSubstr(P2_time_str, 17, 2); 
+
+    // 4. 执行转换
+    info.P1_time = StringToTime(P1_standard_format);
+    info.P2_time = StringToTime(P2_standard_format);
+    
+    if (info.P1_time == 0 || info.P2_time == 0) return false; // 转换失败
+    
+    return true;
 }
