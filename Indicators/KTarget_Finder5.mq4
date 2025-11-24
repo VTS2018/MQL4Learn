@@ -60,18 +60,17 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
 extern int DB_Threshold_Candles = 3;      // [V1.22 NEW] DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
-// --- 四个变量开始 将来可能会移除掉 ---
-// [V1.25 NEW] 调试控制
+// --- [V1.25 NEW] 调试控制 四个变量开始 将来可能会移除掉 ---
 extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
-// --- 全局变量/静态标志 ---
-static bool initial_debug_prints_done = false; // [V1.25 NEW] 内部标志：是否已完成首次加载时的调试打印
+static bool initial_debug_prints_done = false; // 内部标志：是否已完成首次加载时的调试打印
 
 extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
 static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 // --- 四个变量结束 将来可能会移除掉 ---
 
 string g_object_prefix = ""; // [V1.32 NEW] 唯一对象名前缀
-//--- 绘图控制开关
+
+//--- 绘图控制开关---
 extern bool Is_DrawFibonacciLines = false; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
 
 // --- 指标缓冲区 ---
