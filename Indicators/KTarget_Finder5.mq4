@@ -66,8 +66,7 @@ extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时�
 // --- 全局变量/静态标志 ---
 static bool initial_debug_prints_done = false; // [V1.25 NEW] 内部标志：是否已完成首次加载时的调试打印
 
-//限制运行次数
-extern bool Debug_LimitCalculations = true;
+extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
 static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 // --- 四个变量结束 将来可能会移除掉 ---
 
