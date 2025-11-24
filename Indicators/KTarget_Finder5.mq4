@@ -72,7 +72,8 @@ static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 // --- 四个变量结束 将来可能会移除掉 ---
 
 string g_object_prefix = ""; // [V1.32 NEW] 唯一对象名前缀
-
+//--- 绘图控制开关
+extern bool Is_DrawFibonacciLines = false; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
 
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
@@ -140,13 +141,15 @@ void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, i
 // [V1.33 NEW] 绘制 P1 K线低价到 P2 K线收盘价的矩形区域
 void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish);
 void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish);
+
+string ShortenObjectName(string original_name);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
 int OnInit()
 {
     // [V1.32 NEW] 生成唯一的对象名前缀
-    g_object_prefix = WindowExpertName() + StringFormat("_%d_", ChartID());
+    g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", ChartID());
     //2025.11.24 00:37:12.535	KTarget_Finder5 GBPUSD,H4: -->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: KTarget_Finder5_-73415027_
     //Print("-->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: ", g_object_prefix);
 
@@ -187,9 +190,9 @@ int OnInit()
 void OnDeinit(const int reason) 
 {
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
-    ObjectsDeleteAll(0, "IBDB_Line_"); 
+    //ObjectsDeleteAll(0, "IBDB_Line_"); 
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
-    ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
+    //ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
 
     // [V1.32 UPD] 使用唯一的 g_object_prefix 进行清理
     for (int i = ObjectsTotal() - 1; i >= 0; i--)
@@ -836,7 +839,7 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
     if (end_bar_index < 1) end_bar_index = 1;
     datetime time2 = Time[end_bar_index];
     
-    string name = "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    string name = g_object_prefix + "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
     string comment;
 
     // 检查对象是否已存在
@@ -913,7 +916,7 @@ void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, doubl
     string classification = breakout_candle_count < DB_Threshold_Candles ? "IB" : "DB";
     
     // 生成唯一的对象名称 
-    string name = "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    string name = g_object_prefix + "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
     string comment;
     
     // 检查对象是否已存在，如果存在则直接返回
@@ -1220,6 +1223,8 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
  */
 void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
 {
+    if (!Is_DrawFibonacciLines) return;
+    
     // --- V1.38 内部硬编码自定义设置 ---
     color FIBO_LINE_COLOR = clrBlack;
 
@@ -1367,4 +1372,28 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
         //     ObjectSetString(0, name, OBJPROP_LEVELTEXT, k, "");
         // }
     }
+}
+
+//========================================================================
+// 14. ShortenObjectName: 辅助函数，移除对象名中的指定字符串以缩短名称 (修正版)
+//========================================================================
+/**
+ * 从对象名称中移除 "arget_Finder" 字符串以缩短名称。
+ * @param original_name: 完整的对象名称字符串。
+ * @return (string) 缩短后的新名称。
+ */
+string ShortenObjectName(string original_name)
+{
+    // 定义要移除的子字符串
+    string substring_to_remove = "arget_Finder";
+    
+    // 1. 创建一个字符串副本，因为 StringReplace 会通过引用直接修改它的第一个参数。
+    string new_name = original_name; 
+    
+    // 2. 🚨 关键修正：直接调用 StringReplace，它会修改 new_name 变量，
+    //    并且我们忽略它的 INT 类型返回值。
+    StringReplace(new_name, substring_to_remove, "");
+    
+    // 3. 返回修改后的字符串。
+    return new_name;
 }
