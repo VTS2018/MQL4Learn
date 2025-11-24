@@ -135,22 +135,34 @@ int FindP2Index(int target_index, bool is_bullish);
 
 // 新的逻辑
 int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish);
-void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, int extend_bars);
+void DrawAbsoluteSupportLine(int abs_index, bool is_bullish, int extend_bars);
 
 // [V1.33 NEW] 绘制 P1 K线低价到 P2 K线收盘价的矩形区域
 void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish);
 void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish);
 
 string ShortenObjectName(string original_name);
+string GetBarTimeID(int bar_index);
 //========================================================================
 // 1. OnInit: 指标初始化
 //========================================================================
 int OnInit()
 {
+    // long cid = ChartID();
+    // Print("-->[KTarget_Finder5.mq4:152]: cid: ", cid);
+
+    // 1. 获取 ChartID 的绝对值 (long 类型)
+    long full_chart_id = MathAbs(ChartID());
+    // Print("-->[KTarget_Finder5.mq4:156]: full_chart_id: ", full_chart_id);
+
+    // 2. 强制截断 ChartID 到 32 位 int。
+    // 仅保留 ID 的低位部分，使其长度大幅缩短，但仍具有高度唯一性。
+    int short_chart_id = (int)full_chart_id;
+    // Print("-->[KTarget_Finder5.mq4:161]: short_chart_id: ", MathAbs(short_chart_id));
+
     // [V1.32 NEW] 生成唯一的对象名前缀
-    g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", ChartID());
-    //2025.11.24 00:37:12.535	KTarget_Finder5 GBPUSD,H4: -->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: KTarget_Finder5_-73415027_
-    //Print("-->[KTarget_Finder4_FromGemini.mq4:138]: g_object_prefix: ", g_object_prefix);
+    g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
+    // Print("-->[KTarget_Finder5.mq4:165]: g_object_prefix: ", g_object_prefix);
 
     g_run_count = 0;
 
@@ -307,7 +319,7 @@ void FindAndDrawTargetCandles(int total_bars)
             if (AbsLowIndex != -1)
             {
                 // 绘制绝对低点支撑线，向右延伸 15 根 K 线
-                DrawAbsoluteSupportLine(i, AbsLowIndex, true, 15);
+                DrawAbsoluteSupportLine(AbsLowIndex, true, 15);
             }
             // --- END V1.35 NEW ---
 
@@ -345,7 +357,7 @@ void FindAndDrawTargetCandles(int total_bars)
             if (AbsHighIndex != -1)
             {
                 // 绘制绝对高点阻力线，向右延伸 15 根 K 线
-                DrawAbsoluteSupportLine(i, AbsHighIndex, false, 15);
+                DrawAbsoluteSupportLine(AbsHighIndex, false, 15);
             }
             // --- END V1.35 NEW ---
 
@@ -838,7 +850,8 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
     if (end_bar_index < 1) end_bar_index = 1;
     datetime time2 = Time[end_bar_index];
     
-    string name = g_object_prefix + "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    string time_id_str = GetBarTimeID(target_index);
+    string name = g_object_prefix + "IBDB_P2_Line_" + (is_bullish ? "B_" : "S_") + time_id_str;
     string comment;
 
     // 检查对象是否已存在
@@ -915,7 +928,8 @@ void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, doubl
     string classification = breakout_candle_count < DB_Threshold_Candles ? "IB" : "DB";
     
     // 生成唯一的对象名称 
-    string name = g_object_prefix + "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + IntegerToString(target_index);
+    string time_id_str = GetBarTimeID(target_index);
+    string name = g_object_prefix + "IBDB_Line_" + classification + (is_bullish ? "B_" : "S_") + time_id_str;
     string comment;
     
     // 检查对象是否已存在，如果存在则直接返回
@@ -1073,12 +1087,11 @@ int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_ran
 //========================================================================
 /**
  * 在绝对低点/高点上绘制一条水平趋势线，并带文字说明。
- * * @param target_index: K-Target 锚点索引 (用于命名)
  * @param abs_index: 具有绝对低/高价的 K 线索引。
  * @param is_bullish: 看涨 (支撑线) 还是看跌 (阻力线)。
  * @param extend_bars: 向右延伸的 K 线数量 (例如 15)。
  */
-void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, int extend_bars)
+void DrawAbsoluteSupportLine(int abs_index, bool is_bullish, int extend_bars)
 {
     if (abs_index < 0)
         return;
@@ -1098,7 +1111,8 @@ void DrawAbsoluteSupportLine(int target_index, int abs_index, bool is_bullish, i
     datetime time2 = Time[end_bar_index]; // 终点时间
 
     // --- 对象创建与设置 ---
-    string name = g_object_prefix + (is_bullish ? "AbsLow_" : "AbsHigh_") + IntegerToString(target_index);
+    string time_id_str = GetBarTimeID(abs_index);
+    string name = g_object_prefix + (is_bullish ? "AbsLow_" : "AbsHigh_") + time_id_str;
 
     // 检查对象是否已存在
     if (ObjectFind(0, name) != -1)
@@ -1173,7 +1187,8 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
 
     // --- 对象创建与设置 ---
     // 名称使用唯一的对象名前缀
-    string name = g_object_prefix + (is_bullish ? "Rect_B_" : "Rect_S_") + IntegerToString(target_index);
+    string time_id_str = GetBarTimeID(target_index);
+    string name = g_object_prefix + (is_bullish ? "Rect_B_" : "Rect_S_") + time_id_str;
     
     // 检查对象是否已存在
     if (ObjectFind(0, name) != -1) return;
@@ -1302,7 +1317,8 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
 
     // --- 对象创建与设置 ---
     // 名称使用唯一的对象名前缀
-    string name = g_object_prefix + (is_bullish ? "Fibo_B_" : "Fibo_S_") + IntegerToString(target_index);
+    string time_id_str = GetBarTimeID(target_index);
+    string name = g_object_prefix + (is_bullish ? "Fibo_B_" : "Fibo_S_") + time_id_str;
     //Print(">>> DrawP1P2Fibonacci: Drawing Fibo ", name);
 
     // 检查对象是否已存在
@@ -1395,4 +1411,59 @@ string ShortenObjectName(string original_name)
     
     // 3. 返回修改后的字符串。
     return new_name;
+}
+
+//========================================================================
+// 16. GetBarTimeID: 获取 K 线时间戳作为唯一对象标识符 (V2.07)
+//========================================================================
+/**
+ * 根据 K 线索引获取其开盘时间，并格式化为 "YYYY_MM_DD_HH_MM_SS" 格式的字符串。
+ * 如果索引无效，则使用当前服务器时间。
+ * * @param bar_index 要获取时间的 K 线索引 (0 为当前 K线)
+ * @return (string) 格式化后的唯一时间标识符，例如 "2025_11_24_06_00_00"
+ */
+string GetBarTimeID(int bar_index)
+{
+    datetime target_time;
+    
+    // --- 1. 确定目标时间 ---
+    
+    // 检查索引是否有效。如果索引无效 (例如 < 0)，则使用当前服务器时间。
+    if (bar_index < 0 || bar_index >= Bars)
+    {
+        target_time = TimeCurrent();
+        // Print("DEBUG: GetBarTimeID used TimeCurrent() due to invalid index: ", bar_index);
+    }
+    else
+    {
+        // 索引有效，使用 K 线的开盘时间
+        target_time = Time[bar_index];
+    }
+    
+    // --- 2. 将 datetime 转换为结构体，方便格式化 ---
+    MqlDateTime dt;
+    TimeToStruct(target_time, dt);
+
+    // --- 3. 构造 "YYYY_MM_DD_HH_MM_SS" 格式的字符串 ---
+    
+    string time_id_str = 
+        // 年份 (例如 2025)
+        IntegerToString(dt.year) + "_" + 
+        
+        // 月份 (确保两位数，例如 01)
+        IntegerToString(dt.mon, 2, '0') + "_" + 
+        
+        // 日期 (确保两位数)
+        IntegerToString(dt.day, 2, '0') + "_" + 
+        
+        // 小时 (确保两位数)
+        IntegerToString(dt.hour, 2, '0') + "_" + 
+        
+        // 分钟 (确保两位数)
+        IntegerToString(dt.min, 2, '0') + "_" + 
+        
+        // 秒钟 (确保两位数)
+        IntegerToString(dt.sec, 2, '0');
+        
+    return time_id_str;
 }
