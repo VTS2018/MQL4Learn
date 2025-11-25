@@ -45,6 +45,9 @@
 #property indicator_buffers 4 // 两个锚点 + 两个最终信号
 #property indicator_plots   4 // 对应四个绘图
 
+// 配置 数据 工具函数
+#include <K_Data.mqh>
+
 // --- 外部可调参数 (输入) ---
 extern int Scan_Range = 100;              // 总扫描范围：向后查找 N 根 K 线
 
@@ -78,14 +81,6 @@ double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
 double BearishTargetBuffer[]; // 1: 用于标记看跌K-Target锚点 (顶部)
 double BullishSignalBuffer[]; // 2: 最终看涨信号 (P2 或 P1-DB突破确认)
 double BearishSignalBuffer[]; // 3: 最终看跌信号 (P2 或 P1-DB突破确认)
-
-// --- 辅助结构体：用于存储解析结果 ---
-struct ParsedRectInfo
-{
-    bool     is_bullish; // 看涨 (true) / 看跌 (false)
-    datetime P1_time;    // P1 K线开盘时间
-    datetime P2_time;    // P2 K线开盘时间
-};
 
 // --- 绘图属性 ---
 // Plot 1: K-Target Bottom (锚点)
