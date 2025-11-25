@@ -175,10 +175,10 @@ int OnInit()
     SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
     
     // 初始化所有缓冲区数据为 0.0
-    ArrayInitialize(BullishTargetBuffer, 0.0);
-    ArrayInitialize(BearishTargetBuffer, 0.0);
-    ArrayInitialize(BullishSignalBuffer, 0.0);
-    ArrayInitialize(BearishSignalBuffer, 0.0);
+    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
     
     // 指标简称
     string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.23"; // [V1.22 UPD] 更新版本号
@@ -242,10 +242,10 @@ int OnCalculate(const int rates_total,
     if(rates_total < 1) return(0); 
 
     // 清除缓冲区中的所有旧标记
-    ArrayInitialize(BullishTargetBuffer, 0.0);
-    ArrayInitialize(BearishTargetBuffer, 0.0);
-    ArrayInitialize(BullishSignalBuffer, 0.0);
-    ArrayInitialize(BearishSignalBuffer, 0.0);
+    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
     
     // 寻找并绘制所有符合条件的 K-Target 及突破信号
     FindAndDrawTargetCandles(rates_total);

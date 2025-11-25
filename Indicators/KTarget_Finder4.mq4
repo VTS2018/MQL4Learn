@@ -132,13 +132,14 @@ int OnInit()
     SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
     
     // 初始化所有缓冲区数据为 0.0
-    ArrayInitialize(BullishTargetBuffer, 0.0);
-    ArrayInitialize(BearishTargetBuffer, 0.0);
-    ArrayInitialize(BullishSignalBuffer, 0.0);
-    ArrayInitialize(BearishSignalBuffer, 0.0);
+    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
     
     // 指标简称
     string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.21";
+    Print("---->[KTarget_Finder4.mq4:142]: shortName: ", shortName);
     IndicatorShortName(shortName);
     return(INIT_SUCCEEDED);
 }
@@ -151,6 +152,7 @@ void OnDeinit(const int reason)
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象
     ObjectsDeleteAll(0, "IBDB_Line_"); 
     ChartRedraw();
+    Print("---->[KTarget_Finder4.mq4:142]: OnDeinit ");
 }
 
 
@@ -172,10 +174,10 @@ int OnCalculate(const int rates_total,
     if(rates_total < 1) return(0); 
 
     // 清除缓冲区中的所有旧标记
-    ArrayInitialize(BullishTargetBuffer, 0.0);
-    ArrayInitialize(BearishTargetBuffer, 0.0);
-    ArrayInitialize(BullishSignalBuffer, 0.0);
-    ArrayInitialize(BearishSignalBuffer, 0.0);
+    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
     
     // 寻找并绘制所有符合条件的 K-Target 及突破信号
     FindAndDrawTargetCandles(rates_total);
@@ -300,7 +302,7 @@ void CheckBullishSignalConfirmation(int target_index)
             BullishSignalBuffer[j] = Low[j] - 20 * Point(); 
             
             // 2. 绘制水平延伸的趋势突破线 (Start: target_index, Breakthrough index: j)
-            DrawBreakoutTrendLine(target_index, j, true);
+            // DrawBreakoutTrendLine(target_index, j, true);
             
             // 找到第一个突破后，IB/DB 确认完成，立即退出循环
             return;
@@ -328,7 +330,7 @@ void CheckBearishSignalConfirmation(int target_index)
             BearishSignalBuffer[j] = High[j] + 20 * Point();
             
             // 2. 绘制水平延伸的趋势突破线 (Start: target_index, Breakthrough index: j)
-            DrawBreakoutTrendLine(target_index, j, false);
+            // DrawBreakoutTrendLine(target_index, j, false);
             
             // 找到第一个突破后，确认完成，立即退出循环
             return;
