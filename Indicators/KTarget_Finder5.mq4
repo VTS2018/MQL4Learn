@@ -531,6 +531,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                             // 3. 调用 DrawP1P2Fibonacci 函数绘制斐波那契线
                             DrawP1P2Fibonacci(current_P1_index, current_P2_index, info.is_bullish);
 
+                            // 绘制斐波高亮的反转区域
+                            DrawFiboHighlightRectangles(current_P1_index, current_P2_index, info.is_bullish);
+
                             // 确保 Fibo 立即显示
                             //ChartRedraw(0);
                         }

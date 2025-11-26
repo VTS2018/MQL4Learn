@@ -563,3 +563,138 @@ void ClearSignalRectangle_v2(int target_index, bool is_bullish)
         }
     }
 }
+//------------------------
+void DrawFiboHighlightRectangles(int target_index, int P2_index, bool is_bullish)
+{
+    // 根据信号类型，将对应的全局数组传递给核心函数
+    // MQL4 会自动处理引用传递，没有复杂的语法
+    
+    if (is_bullish)
+    {
+        ExecuteDrawFiboRects(target_index, P2_index, is_bullish, BULLISH_HIGHLIGHT_ZONES);
+    }
+    else
+    {
+        ExecuteDrawFiboRects(target_index, P2_index, is_bullish, BEARISH_HIGHLIGHT_ZONES);
+    }
+}
+
+/**
+ * 绘制斐波那契扩展区域的高亮矩形
+ * @param target_index: P1 (锚点K线) 索引
+ * @param P2_index: P2 K线索引
+ * @param is_bullish: 是否为看涨斐波那契
+ */
+void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const FiboZone &zones[])
+{
+    // 获取 P1 和 P2 的价格和时间
+    double P1_price; // 假设 P1 价格是锚点的 Open
+
+    // 1. 根据看涨/看跌确定 P1 侧的价格锚定点
+    if (is_bullish)
+    {
+        // 看涨: 价格锚定 K-Target 的最低价 (Low)
+        P1_price = Low[target_index];
+    }
+    else // is_bearish
+    {
+        // 看跌: 价格锚定 K-Target 的最高价 (High)
+        P1_price = High[target_index];
+    }
+
+    double P2_price = Close[P2_index]; // 假设 P2 价格是 P2 K线的 Close
+
+    // 确定矩形在时间上的跨度 (从 P1 锚点开始，到当前最新 K线)
+    datetime time1 = Time[target_index];
+
+    // 矩形应一直延伸到最新 K线
+    datetime time2 = Time[0];
+
+    //--------------------------------------------
+    // 先调试价格
+    Print("-->[K_Drawing_Funcs.mqh:600]: P1_price: ", P1_price);
+    Print("-->[K_Drawing_Funcs.mqh:601]: P2_price: ", P2_price);
+    Print("-->[K_Drawing_Funcs.mqh:602]: time1: ", time1);
+    Print("-->[K_Drawing_Funcs.mqh:603]: time2: ", time2);
+    //return; 价格全部对应得上 测试通过
+    //--------------------------------------------
+
+    // 确定要遍历的区域数组
+    //const FiboZone& zones[] = is_bullish ? BULLISH_HIGHLIGHT_ZONES : BEARISH_HIGHLIGHT_ZONES;
+    int zones_count = ArraySize(zones);
+    
+    // 确定颜色
+    color rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
+    
+    // 遍历所有高亮区域并绘制矩形
+    for (int i = 0; i < zones_count; i++)
+    {
+        double level1 = zones[i].level1;
+        double level2 = zones[i].level2;
+        
+        // 1. 计算价格坐标
+        double price_start = CalculateFiboPrice(P1_price, P2_price, level1);
+        Print("===>[K_Drawing_Funcs.mqh:622]: price_start: ", price_start," level1: ",level1);
+
+        double price_end   = CalculateFiboPrice(P1_price, P2_price, level2);
+        Print("===>[K_Drawing_Funcs.mqh:624]: price_end: ", price_end," level2: ",level2);
+
+        //
+        // 2. 命名对象，使用特殊标记 "_FiboHL_" 满足周期切换不删除需求
+        string name = g_object_prefix + "Rect_FiboHL_" + (is_bullish ? "B_" : "S_") + GetBarTimeID(target_index) + "#" + DoubleToString(level1, 3) + "_" + DoubleToString(level2, 3);
+        Print("•>[K_Drawing_Funcs.mqh:624]: name: ", name);
+
+        /*
+        // 3. 创建/更新矩形
+        if (ObjectFind(0, name) != -1)
+        {
+            ObjectDelete(0, name); // 如果已存在，先删除，再重新绘制
+        }
+        
+        if (ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price_start, time2, price_end))
+        {
+            // 设置属性
+            ObjectSetInteger(0, name, OBJPROP_COLOR, rect_color);
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+            
+            // 🚨 设置填充和背景 (FILL and BACK)
+            ObjectSetInteger(0, name, OBJPROP_FILL, true);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true); // 矩形在 K 线后面
+            
+            // 🚨 设置透明度 (MQL4/MT4 颜色函数)
+            ObjectSetInteger(0, name, OBJPROP_COLOR, (int)rect_color | (HIGHLIGHT_ALPHA << 24)); // ARGB格式
+            
+            // 将对象设置为不可选中
+            ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+            
+            // ** 关键设置：仅在当前周期可见 **
+            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, GetTimeframeFlag(_Period)); 
+        }
+        */
+
+        if (ObjectFind(0, name) != -1) ObjectDelete(0, name);
+
+        if (ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price_start, time2, price_end))
+        {
+            ObjectSetInteger(0, name, OBJPROP_COLOR, (int)rect_color | (HIGHLIGHT_ALPHA << 24));
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, name, OBJPROP_FILL, true);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true);
+            ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+
+            // 设置周期可见性
+            int tf_flag = GetTimeframeFlag(_Period);
+            if (tf_flag != 0)
+                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_flag);
+            else
+                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+        }
+        else
+        {
+            Print("无法创建 高亮 矩形对象: ", name, ", 错误: ", GetLastError());
+            return;
+        }
+    }
+}

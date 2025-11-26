@@ -225,3 +225,16 @@ string GetTimeframeName(int timeframe_period)
     // 如果是自定义周期或无法识别的周期
     return("Custom/Unknown"); 
 }
+//-----
+/**
+ * 辅助函数：计算斐波那契水平线的价格
+ * @param P1_price: 斐波那契起始价格 (Open[target_index])
+ * @param P2_price: 斐波那契结束价格 (Close[P2_index])
+ * @param level: 斐波那契级别 (例如 1.618)
+ * @return 对应的价格水平
+ */
+double CalculateFiboPrice(double P1_price, double P2_price, double level)
+{
+    // 斐波那契价格公式: P_level = P1 + level * (P2 - P1)
+    return P1_price + level * (P2_price - P1_price);
+}
