@@ -64,7 +64,7 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 
 // --- 信号确认参数 ---
 extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
-extern int DB_Threshold_Candles = 3;      // [V1.22 NEW] DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
+extern int DB_Threshold_Candles = 3;      // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
 // --- [V1.25 NEW] 调试控制 四个变量开始 将来可能会移除掉 ---
 extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
@@ -284,8 +284,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             ParsedRectInfo info;
 
             // 这是您的目标：用户点击了图表对象
-            Print("    *** 侦测到对象点击事件 (CHARTEVENT_OBJECT_CLICK) ***");
-            Print("    被点击对象名称 (sparam): ", sparam);
+            // Print("    *** 侦测到对象点击事件 (CHARTEVENT_OBJECT_CLICK) ***");
+            // Print("    被点击对象名称 (sparam): ", sparam);
 
             // 检查是否点击了我们创建的趋势线
             // if (sparam == g_trendline_name)
@@ -353,7 +353,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                     // 强制重绘，以确保 Fibo 立即显示
                     // ChartRedraw(0);
 
-                    // 重置 LastClickTime，避免三次点击被识别为双击
+                    // 重置 LastClickTime，避免三次点击被识别为双击 -- 第一次编写的时候 使用 LastClickTime 没有成功 所以注销了
                     // LastClickTime = 0;
 
                     LastClickTime_ms = 0;
@@ -370,15 +370,19 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             break;
         }    
         case CHARTEVENT_KEYDOWN:
+        {
             // 用户按下了键盘上的键
             Print("    侦测到键盘按下事件 (CHARTEVENT_KEYDOWN)");
             Print("    按下的键代码 (lparam): ", lparam);
             break;
+        }
             
         case CHARTEVENT_CHART_CHANGE:
+        {
             // 图表变动：例如窗口大小改变、缩放、切换周期
-            Print("    图表变动事件 (CHARTEVENT_CHART_CHANGE) 发生。");
+            // Print("    图表变动事件 (CHARTEVENT_CHART_CHANGE) 发生。");
             break;
+        }
             
         default:
             // 其他事件，例如 CHARTEVENT_MOUSE_MOVE (需要显式开启)
