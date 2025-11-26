@@ -693,6 +693,10 @@ bool CheckKTargetTopCondition(int i, int total_bars)
  */
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    ClearSignalRectangle(target_index, true); 
+    // ***************************************************************
+
     // K_Geo_Index 必须有效，否则协调者已经跳过了。
     // P2_price 必须有效，否则协调者已经跳过了。
 
@@ -760,6 +764,10 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    ClearSignalRectangle(target_index, true); 
+    // ***************************************************************
+    
     double P1_price = Open[target_index];
     double P2_price = Close[P2_index];
 

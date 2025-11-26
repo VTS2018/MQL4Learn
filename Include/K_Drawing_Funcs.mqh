@@ -492,3 +492,20 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
         // }
     }
 }
+
+// K_Drawing_Funcs.mqh
+void ClearSignalRectangle(int target_index, bool is_bullish)
+{
+    // 构建可能存在的旧矩形名称
+    string name_prefix = g_object_prefix + "Rect_" + (is_bullish ? "B_" : "S_");
+    
+    // 查找并删除唯一匹配该锚点时间戳的对象
+    string target_name = name_prefix + GetBarTimeID(target_index);
+    
+    // 假设 ObjectDelete 函数已在 MQL4 环境中可用 (通常是 ObjectDelete(0, name))
+    if (ObjectFind(0, target_name) != -1)
+    {
+        ObjectDelete(0, target_name);
+        Print("DEBUG: Cleared old signal rectangle for target index: ", target_name);
+    }
+}
