@@ -493,7 +493,12 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
     }
 }
 
-// K_Drawing_Funcs.mqh
+
+/**
+ * 清理旧有的信号绘制的矩形对象
+ * @param target_index: Argument 1
+ * @param is_bullish: Argument 2
+ */
 void ClearSignalRectangle(int target_index, bool is_bullish)
 {
     // 构建可能存在的旧矩形名称
