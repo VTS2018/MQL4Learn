@@ -183,6 +183,7 @@ int OnInit()
     // 指标简称
     string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.23"; // [V1.22 UPD] 更新版本号
     IndicatorShortName(shortName);
+    Print("---->[KTarget_Finder5.mq4:186]: OnInit 指标初始化完成 ");
     return(INIT_SUCCEEDED);
 }
 
@@ -208,6 +209,7 @@ void OnDeinit(const int reason)
     }
     
     ChartRedraw();
+    Print("---->[KTarget_Finder5.mq4:212]: OnDeinit 指标卸载 ");
 }
 
 
@@ -269,10 +271,10 @@ int OnCalculate(const int rates_total,
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
     // 1. 打印所有事件的通用信息
-    Print("--- EVENT RECEIVED --- ID:", id, 
-          ", lparam:", lparam, 
-          ", dparam:", dparam, 
-          ", sparam (Name/Key):", sparam);
+    // Print("--- EVENT RECEIVED --- ID:", id, 
+    //       ", lparam:", lparam, 
+    //       ", dparam:", dparam, 
+    //       ", sparam (Name/Key):", sparam);
 
     // --- 2. 针对特定事件进行处理和深入解析 ---
     switch(id)
