@@ -491,6 +491,17 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
         //     ObjectSetString(0, name, OBJPROP_LEVELTEXT, k, "");
         // }
     }
+
+    Print("--->[K_Drawing_Funcs.mqh:497]: _Period: ", _Period);
+    // 1. 获取当前周期的正确位标志 (例如：传入 43200，返回 256)
+    int current_tf_flag = GetTimeframeFlag(_Period);
+    Print("--->[K_Drawing_Funcs.mqh:498]: current_tf_flag: ", current_tf_flag);
+    
+    if (current_tf_flag != 0)
+    {
+        // 🚨 最终修正：使用转换后的正确的位标志 🚨
+        ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, current_tf_flag);
+    }
 }
 
 

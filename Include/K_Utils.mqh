@@ -177,3 +177,25 @@ bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
     
     return true;
 }
+
+// K_Drawing_Funcs.mqh 或 K_Utils.mqh
+
+// 这是一个辅助函数，将 _Period 的分钟数转换为 MT4 期望的位标志
+int GetTimeframeFlag(int timeframe_period)
+{
+    // MQL4 中 _Period 返回的值是分钟数
+    if (timeframe_period == 1)      return(1);       // M1
+    if (timeframe_period == 5)      return(2);       // M5
+    if (timeframe_period == 15)     return(4);       // M15
+    if (timeframe_period == 30)     return(8);       // M30
+    if (timeframe_period == 60)     return(16);      // H1
+    if (timeframe_period == 240)    return(32);      // H4
+    
+    // 🚨 核心修正：避免使用 43200 这种数值作为位标志 🚨
+    if (timeframe_period == 1440)   return(64);      // D1
+    if (timeframe_period == 10080)  return(128);     // W1
+    if (timeframe_period == 43200)  return(256);     // MN1 (月线)
+    
+    // 如果是自定义周期或其他未知周期，返回 0 (表示所有周期可见或不设置)
+    return(0); 
+}
