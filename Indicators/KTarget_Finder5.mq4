@@ -229,12 +229,14 @@ void OnDeinit(const int reason)
     // 清除图表上的 Comment 输出
     Comment("");
 
+    // ------------------- 1.0 清理对象的迭代代码 -------------------
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
     //ObjectsDeleteAll(0, "IBDB_Line_"); 
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
     //ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
 
-    // [V1.32 UPD] 使用唯一的 g_object_prefix 进行清理
+    /** 
+    // 使用唯一的 g_object_prefix 进行清理
     for (int i = ObjectsTotal() - 1; i >= 0; i--)
     {
         string object_name = ObjectName(i);
@@ -244,7 +246,63 @@ void OnDeinit(const int reason)
             ObjectDelete(0, object_name);
         }
     }
-    
+    */
+
+    // ------------------- 2.0 清理对象的迭代代码 -------------------
+    // 在切换周期的时候 只保留斐波对象 其他的对象全部要清除
+    string obj_name;
+
+    // 遍历图表上的所有对象，从后向前删除
+    for (int i = ObjectsTotal() - 1; i >= 0; i--)
+    {
+        // obj_name = ObjectGetString(0, i, OBJPROP_NAME);
+        // 🚨 修正：使用 MQL4 正确的 ObjectName(index) 获取对象名称 🚨
+        obj_name = ObjectName(i);
+
+        // 1. 检查对象是否由本指标创建 (g_object_prefix 必须从名称的第 0 位开始匹配)
+        // 这样做更安全，防止误删。
+        if (StringFind(obj_name, g_object_prefix, 0) == 0)
+        {
+            // --- 清理逻辑分支 ---
+
+            // 场景 A: 切换周期 (REASON_CHARTCHANGE = 5)
+            if (reason == REASON_CHARTCHANGE)
+            {
+                // 仅删除非 Fibo 对象
+                // 如果对象名称中不包含 "_Fibo_"，则删除。
+                if (StringFind(obj_name, "_Fibo_", 0) == -1)
+                {
+                    ObjectDelete(0, obj_name);
+                }
+            }
+            // 场景 B: 手动删除 (REASON_REMOVE = 1) 或 图表关闭 (REASON_CLOSE = 2)
+            // 此时应该无条件删除所有本指标对象 (包括 Fibo 对象)
+            else if (reason == REASON_REMOVE || reason == REASON_CLOSE)
+            {
+                ObjectDelete(0, obj_name);
+            }
+            // 场景 C: 其他原因 (例如 REASON_RECOMPILE)，通常不操作或无条件删除。
+            // 默认情况下，我们不处理其他原因，或者让它执行无条件删除（即上面的 else if 捕获）
+
+            // 注意：如果您的代码没有捕获所有情况，可以简化为：
+            /*
+            // 如果是切换周期，我们只保留 Fibo 对象
+            bool is_fibo = (StringFind(obj_name, "_Fibo_", 0) != -1);
+            if (reason == REASON_CHARTCHANGE)
+            {
+                // 切换周期时：如果是 Fibo，则保留；如果不是 Fibo，则删除
+                if (!is_fibo) ObjectDelete(0, obj_name);
+            }
+            // 如果是手动删除或关闭图表，则无条件删除
+            else if (reason == REASON_REMOVE || reason == REASON_CLOSE)
+            {
+                ObjectDelete(0, obj_name);
+            }
+            */
+        }
+    }
+
+    // ------------------- 0.0 下面的代码保持不变 -------------------
     ChartRedraw();
     Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
 }
