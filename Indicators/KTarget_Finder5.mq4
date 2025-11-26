@@ -838,7 +838,7 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    ClearSignalRectangle_v2(abs_hightindex, true); 
+    ClearSignalRectangle_v2(abs_hightindex, false); 
     // ***************************************************************
     
     double P1_price = Open[target_index];

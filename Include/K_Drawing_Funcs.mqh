@@ -642,7 +642,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         //
         // 2. 命名对象，使用特殊标记 "_FiboHL_" 满足周期切换不删除需求
         string name = g_object_prefix + "Rect_FiboHL_" + (is_bullish ? "B_" : "S_") + GetBarTimeID(target_index) + "#" + DoubleToString(level1, 3) + "_" + DoubleToString(level2, 3);
-        Print("•>[K_Drawing_Funcs.mqh:624]: name: ", name);
+        Print("===>[K_Drawing_Funcs.mqh:624]: name: ", name);
 
         /*
         // 3. 创建/更新矩形
@@ -685,11 +685,13 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
 
             // 设置周期可见性
-            int tf_flag = GetTimeframeFlag(_Period);
-            if (tf_flag != 0)
-                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_flag);
-            else
-                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+            // int tf_flag = GetTimeframeFlag(_Period);
+            // if (tf_flag != 0)
+            //     ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_flag);
+            // else
+            //     ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+
+            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
         }
         else
         {
