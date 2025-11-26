@@ -136,10 +136,10 @@ int FindP2Index(int target_index, bool is_bullish)
     }
 
     // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
-    if (Debug_Print_Info_Once && !initial_debug_prints_done)
-    {
-        Print("FindP2Index Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
-    }
+    // if (Debug_Print_Info_Once && !initial_debug_prints_done)
+    // {
+    //     Print("FindP2Index Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
+    // }
     
     return P2_index; 
 }

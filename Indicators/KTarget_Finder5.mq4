@@ -66,13 +66,28 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
 extern int DB_Threshold_Candles = 3;      // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
-// --- [V1.25 NEW] 调试控制 四个变量开始 将来可能会移除掉 ---
+// --- 四个变量开始 将来可能会移除掉 调试控制---
 extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
 static bool initial_debug_prints_done = false; // 内部标志：是否已完成首次加载时的调试打印
 
 extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
 static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 // --- 四个变量结束 将来可能会移除掉 ---
+
+// --- V1.31 NEW: 专门研究 (OnCalculate) ---
+
+extern int Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
+
+static datetime last_bar_time = 0;   // 记录上次计算时的 K 线时间
+static datetime last_tick_time = 0;  // 记录上次 OnCalculate 触发的时间 (用于区分Tick)
+static int on_calculate_count = 0;   // OnCalculate 【触发次数计数】
+static bool is_initial_load = true;  // 标记是否为首次历史数据加载
+
+// 两个字符串变量用于 OnCalculate 和 OnTimer 之间的通信
+static string on_calc_output_segment = ""; // 存储 OnCalculate 的计算结果部分
+static string on_timer_output_segment = ""; // 存储 OnTimer 的输出结果部分
+
+// --- V1.31 END: 专门研究 (OnCalculate) ---
 
 string g_object_prefix = ""; // [V1.32 NEW] 唯一对象名前缀
 
@@ -183,7 +198,23 @@ int OnInit()
     // 指标简称
     string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.23"; // [V1.22 UPD] 更新版本号
     IndicatorShortName(shortName);
-    Print("---->[KTarget_Finder5.mq4:186]: OnInit 指标初始化完成 ");
+
+    // --- V1.31 NEW: 专门研究 (OnCalculate) ---
+    // 2. 启动定时器：用于演示 OnTimer 函数的独立运行
+    EventSetTimer(Timer_Interval_Seconds);
+
+    // 3. 在图表上输出初始化信息 (使用 Comment 替代 Print 以获得图表反馈)
+    string init_message =
+        "*** INDICATOR INITIALIZED ***\n" +
+        "Function: OnInit() executed.\n" +
+        "Time: " + TimeToString(TimeCurrent(), TIME_SECONDS) + "\n" +
+        "Timer set to: " + IntegerToString(Timer_Interval_Seconds) + " seconds.";
+
+    Comment(init_message);
+    Print("---->[KTarget_Finder5:214]: init_message: ", init_message);
+    // --- V1.31 NEW: 专门研究 (OnCalculate) ---
+
+    Print("---->[KTarget_Finder5.mq4:217]: OnInit 指标初始化完成 ");
     return(INIT_SUCCEEDED);
 }
 
@@ -192,6 +223,12 @@ int OnInit()
 //========================================================================
 void OnDeinit(const int reason) 
 {
+    // 停止定时器，避免内存泄漏
+    EventKillTimer();
+
+    // 清除图表上的 Comment 输出
+    Comment("");
+
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
     //ObjectsDeleteAll(0, "IBDB_Line_"); 
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
@@ -209,7 +246,7 @@ void OnDeinit(const int reason)
     }
     
     ChartRedraw();
-    Print("---->[KTarget_Finder5.mq4:212]: OnDeinit 指标卸载 ");
+    Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
 }
 
 
@@ -228,6 +265,7 @@ int OnCalculate(const int rates_total,
                 const int& spread[])     
 {
 
+    /** 如果将来调试代码，就将这里的注释去掉，让代码进入到Tick的执行模式 并开启上面的四个变量
     if (Debug_LimitCalculations)
     {
         if (g_run_count >= 3)
@@ -263,6 +301,98 @@ int OnCalculate(const int rates_total,
     
     // 返回 rates_total 用于下一次调用
     return(rates_total);
+    */
+
+    // ----------------- NEW 切换到真是环境 可以区分Tick触发类型的执行-----------------
+
+    // --- 逻辑判断与计数 ---
+    string trigger_type = "UNKNOWN";
+    datetime current_time = TimeCurrent();
+    on_calculate_count++;
+    
+    // 1. 判断是否是历史数据加载
+    if (prev_calculated == 0 || is_initial_load)
+    {
+        trigger_type = "History Load/Initial Run";
+        is_initial_load = false;
+
+        // 清除缓冲区中的所有旧标记
+        ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+        ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+        ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+        ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
+
+        // 寻找并绘制所有符合条件的 K-Target 及突破信号
+        FindAndDrawTargetCandles(rates_total);
+    }
+    // 2. 判断是否是新 K 线触发
+    else if (time[0] > last_bar_time) 
+    {
+        trigger_type = "NEW BAR (收线触发)";
+        Print("--->[KTarget_Finder5.mq4:332]: trigger_type: ", trigger_type);
+
+        // 清除缓冲区中的所有旧标记
+        ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+        ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+        ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+        ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
+
+        // 寻找并绘制所有符合条件的 K-Target 及突破信号
+        FindAndDrawTargetCandles(rates_total);
+    }
+    // 3. 判断是否是 Tick 触发
+    else if (current_time > last_tick_time && rates_total == prev_calculated)
+    {
+        trigger_type = "TICK Update (Tick触发)";
+    }
+    else
+    {
+        trigger_type = "Tick Update (Same Time)";
+    }
+        
+    // 4. 更新全局静态变量
+    last_bar_time = time[0];
+    last_tick_time = current_time;
+
+    // 5. 构建 OnCalculate 的输出段，并存储到全局变量
+    on_calc_output_segment = 
+        "*** OnCalculate Status ***\n" +
+        "Count: " + IntegerToString(on_calculate_count) + "\n" +
+        "Trigger: " + trigger_type + "\n" +
+        "Trigger Time: " + TimeToString(current_time, TIME_SECONDS) + "\n" +
+        "--------------------------------------\n" +
+        "K[0] Start Time: " + TimeToString(time[0], TIME_MINUTES) + "\n" +
+        "Current Bid: " + DoubleToString(Bid, Digits) + "\n" +
+        "Current Ask: " + DoubleToString(Ask, Digits) + "\n" +
+        "K-Line Total: " + IntegerToString(rates_total) + "\n" +
+        "Last Calculated: " + IntegerToString(prev_calculated) + "\n";
+
+    // 6. 将 OnCalculate 的结果和 OnTimer 的结果合并显示
+    Comment(on_calc_output_segment + "\n" + on_timer_output_segment);
+    return(rates_total);    
+
+    // ----------------- END 切换到真是环境 可以区分Tick触发类型的执行-----------------
+}
+
+//+------------------------------------------------------------------+
+//| 4. 定时器函数 (OnTimer)                                          |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+    // OnTimer 独立运行，不依赖Tick或K线收盘
+    string timer_output = 
+        "**OnTimer Status**\n" +
+        "Function: OnTimer() executed.\n" +
+        "Time: " + TimeToString(TimeCurrent(), TIME_SECONDS) + "\n" +
+        "Current Bid: " + DoubleToString(Bid, Digits) + "\n" +
+        "Note: OnTimer runs independently of OnCalculate.";
+    
+    // 1. 更新 OnTimer 的输出段，并存储到全局变量
+    on_timer_output_segment = timer_output;
+    
+    // 2. 将 OnCalculate 的最新结果和 OnTimer 的结果合并显示
+    // 即使 OnCalculate 触发频繁，我们总是用最新的两段信息进行组合
+    Comment(on_calc_output_segment + "\n" + on_timer_output_segment);
 }
 
 //+------------------------------------------------------------------+
