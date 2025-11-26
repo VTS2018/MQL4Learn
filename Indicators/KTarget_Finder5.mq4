@@ -67,11 +67,11 @@ extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数�
 extern int DB_Threshold_Candles = 3;      // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 
 // --- 四个变量开始 将来可能会移除掉 调试控制---
-extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
-static bool initial_debug_prints_done = false; // 内部标志：是否已完成首次加载时的调试打印
+// extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
+// static bool initial_debug_prints_done = false; // 内部标志：是否已完成首次加载时的调试打印
 
-extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
-static int g_run_count = 0; // 记录 OnCalculate 的运行次数
+// extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
+// static int g_run_count = 0; // 记录 OnCalculate 的运行次数
 // --- 四个变量结束 将来可能会移除掉 ---
 
 // --- V1.31 NEW: 专门研究 (OnCalculate) ---
@@ -92,7 +92,7 @@ static string on_timer_output_segment = ""; // 存储 OnTimer 的输出结果部
 string g_object_prefix = ""; // [V1.32 NEW] 唯一对象名前缀
 
 //--- 绘图控制开关---
-extern bool Is_DrawFibonacciLines = false; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
+extern bool Is_DrawFibonacciLines = true; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
 
 // 静态变量：用于检查两次点击之间的间隔，以模拟“双击” 将 LastClickTime 改为存储毫秒数 (unsigned long)
 // static datetime LastClickTime = 0;
@@ -170,7 +170,7 @@ int OnInit()
     g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
     // Print("-->[KTarget_Finder5.mq4:165]: g_object_prefix: ", g_object_prefix);
 
-    g_run_count = 0;
+    // g_run_count = 0;
 
     // 缓冲区映射设置 (无变化)
     SetIndexBuffer(0, BullishTargetBuffer);
@@ -268,12 +268,24 @@ void OnDeinit(const int reason)
             // 场景 A: 切换周期 (REASON_CHARTCHANGE = 5)
             if (reason == REASON_CHARTCHANGE)
             {
+                // 1.0
                 // 仅删除非 Fibo 对象
                 // 如果对象名称中不包含 "_Fibo_"，则删除。
-                if (StringFind(obj_name, "_Fibo_", 0) == -1)
+                // if (StringFind(obj_name, "_Fibo_", 0) == -1)
+                // {
+                //     ObjectDelete(0, obj_name);
+                // }
+
+                // 2.0
+                // 2. 关键判断：如果对象名称中不包含 "_Fibo_" 且 不包含 "_FiboHL_"，则删除
+                bool is_fibo_line = (StringFind(obj_name, "_Fibo_", 0) != -1);
+                bool is_fibo_highlight = (StringFind(obj_name, "_FiboHL_", 0) != -1);
+                if (!is_fibo_line && !is_fibo_highlight)
                 {
+                    // 删除非 Fibo 对象（如矩形、基准线等）
                     ObjectDelete(0, obj_name);
                 }
+                // 否则，保留对象
             }
             // 场景 B: 手动删除 (REASON_REMOVE = 1) 或 图表关闭 (REASON_CLOSE = 2)
             // 此时应该无条件删除所有本指标对象 (包括 Fibo 对象)
@@ -755,7 +767,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    // ClearSignalRectangle(target_index, true); 
+    ClearSignalRectangle_v2(abs_lowindex, true); 
     // ***************************************************************
 
     // K_Geo_Index 必须有效，否则协调者已经跳过了。
@@ -826,7 +838,7 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    // ClearSignalRectangle(target_index, true); 
+    ClearSignalRectangle_v2(abs_hightindex, true); 
     // ***************************************************************
     
     double P1_price = Open[target_index];
@@ -847,7 +859,6 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                 DrawP2Baseline(P2_index, j, false);
                 if (abs_hightindex != -1)
                 {
-                    /* code */
                     DrawP1P2Rectangle(abs_hightindex, j, false);
                 }
 
@@ -869,7 +880,6 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 
         if (abs_hightindex != -1)
         {
-            /* code */
             DrawP1P2Rectangle(abs_hightindex, K_Geo_Index, false);
         }
 

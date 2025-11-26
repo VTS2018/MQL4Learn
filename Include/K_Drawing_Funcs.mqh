@@ -555,11 +555,11 @@ void ClearSignalRectangle_v2(int target_index, bool is_bullish)
         if (StringFind(obj_name, target_unique_id) != -1) 
         {
             // 找到了，执行删除。这个 obj_name 必然是完整的名称，例如 KT5_...#2025_...
-            ObjectDelete(0, obj_name);
-            Print("DEBUG: Cleared signal rectangle: ", obj_name);
+            // ObjectDelete(0, obj_name);
+            Print("--->DEBUG: Cleared signal rectangle 559: ", obj_name);
             
             // 找到即可退出，因为每个锚点只应有一个矩形需要清除
-            return;
+            // return;
         }
     }
 }
