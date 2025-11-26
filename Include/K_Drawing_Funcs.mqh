@@ -457,7 +457,8 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
     ObjectSetInteger(0, name, OBJPROP_TIME2, time1);
     ObjectSetDouble(0, name, OBJPROP_PRICE2, price1);
     
-    ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Fibo");
+    string time_p = GetTimeframeName(_Period);
+    ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Fibo " + time_p + (is_bullish ? " 多 " : " 空 "));
 
     // 🚨 V1.48 关键修正: 显式设置斐波那契级别总数
     ObjectSetInteger(0, name, OBJPROP_LEVELS, FIBO_CUSTOM_LEVELS_COUNT);
@@ -523,5 +524,42 @@ void ClearSignalRectangle(int target_index, bool is_bullish)
     {
         ObjectDelete(0, target_name);
         Print("DEBUG: Cleared old signal rectangle for target index: ", target_name);
+    }
+}
+
+/**
+ * 清理旧有的信号绘制的矩形对象
+ * @param target_index: 锚点K线的索引，不是锚点的索引 而是最低价和最高价K线的索引 这个函数先放到这里以后再解决
+ * @param is_bullish: 是否为看涨信号 (true=看涨, false=看跌)
+ */
+void ClearSignalRectangle_v2(int target_index, bool is_bullish)
+{
+    // 1. 构建要查找的矩形名称的唯一标识 (即 '#' 符号之前的所有部分)
+    string name_prefix = g_object_prefix + "Rect_" + (is_bullish ? "B_" : "S_");
+    
+    // target_unique_id 示例：KT5_..._Rect_B_2025_11_26_04_31_00
+    // 这是您保证唯一的、不带 '#' 的部分。
+    string target_unique_id = name_prefix + GetBarTimeID(target_index); 
+    
+    // 2. 遍历图表对象并查找名称中包含该唯一标识的对象
+    int total_objects = ObjectsTotal();
+    string obj_name;
+
+    for (int i = total_objects - 1; i >= 0; i--)
+    {
+        // 🚨 使用 MQL4 的 ObjectName(index) 获取名称 🚨
+        obj_name = ObjectName(i);
+
+        // 检查对象名称是否包含我们构建的 target_unique_id
+        // 如果 StringFind 返回非 -1 的值，说明找到了包含该唯一标识的对象
+        if (StringFind(obj_name, target_unique_id) != -1) 
+        {
+            // 找到了，执行删除。这个 obj_name 必然是完整的名称，例如 KT5_...#2025_...
+            ObjectDelete(0, obj_name);
+            Print("DEBUG: Cleared signal rectangle: ", obj_name);
+            
+            // 找到即可退出，因为每个锚点只应有一个矩形需要清除
+            return;
+        }
     }
 }

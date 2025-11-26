@@ -199,3 +199,29 @@ int GetTimeframeFlag(int timeframe_period)
     // 如果是自定义周期或其他未知周期，返回 0 (表示所有周期可见或不设置)
     return(0); 
 }
+
+// K_Drawing_Funcs.mqh (新增函数)
+
+/**
+ * 将 _Period 的分钟数值转换为对应的周期名称字符串 (例如 M1, H4, MN1)。
+ * @param timeframe_period: _Period 的整数值 (例如 1, 60, 43200)。
+ * @return 对应的周期名称字符串。
+ */
+string GetTimeframeName(int timeframe_period)
+{
+    // MQL4 中 _Period 返回的值是分钟数
+    if (timeframe_period == 1)      return("M1");
+    if (timeframe_period == 5)      return("M5");
+    if (timeframe_period == 15)     return("M15");
+    if (timeframe_period == 30)     return("M30");
+    if (timeframe_period == 60)     return("H1");
+    if (timeframe_period == 240)    return("H4");
+    
+    // 日线、周线、月线 (使用它们的分钟数进行匹配)
+    if (timeframe_period == 1440)   return("D1");
+    if (timeframe_period == 10080)  return("W1");
+    if (timeframe_period == 43200)  return("MN1"); // 月线
+    
+    // 如果是自定义周期或无法识别的周期
+    return("Custom/Unknown"); 
+}
