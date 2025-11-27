@@ -717,8 +717,9 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             // 🚨 核心修正：设置 OBJPROP_TEXT 作为对象列表的“说明” 🚨
             ObjectSetString(0, name, OBJPROP_TEXT, description_text);
 
+            string description_text_level = description_text + " " + DoubleToString(level1, 3);
             // 3. 🚨 调用新函数绘制图表文本 🚨
-            DrawFiboHighlightText(text_name, description_text, time1, price_top, 0);
+            DrawFiboHighlightText(text_name, description_text_level, time1, price_top, 0);
         }
         else
         {
