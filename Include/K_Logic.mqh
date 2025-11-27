@@ -212,3 +212,48 @@ int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_ran
 
     return extreme_index;
 }
+
+//------------------------------------------
+// K_Drawing_Funcs.mqh (新增函数)
+
+/**
+ * 根据当前图表周期和信号类型，返回高亮矩形应使用的颜色。
+ * 颜色选择注重与黑色字体的高对比度。
+ * @param is_bullish: 是否为看涨信号 (true=看涨, false=看跌)。
+ * @return 最终确定的颜色常量。
+ */
+color GetHighlightColorByPeriod(bool is_bullish)
+{
+    color rect_color;
+    int current_period = _Period; // 获取当前周期 (分钟数)
+    
+    // 1. 默认颜色
+    rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
+
+    // 2. 周期特定颜色覆盖
+    if (current_period == PERIOD_D1) // 日周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_D1_B : HIGHLIGHT_COLOR_D1_S;
+    }
+    else if (current_period == PERIOD_H4) // 4H 周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_H4_B : HIGHLIGHT_COLOR_H4_S;
+    }
+    else if (current_period == PERIOD_H1) // 1H 周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_H1_B : HIGHLIGHT_COLOR_H1_S;
+    }
+    // 3. 未来扩展区域 (例如 W1, MN1)
+    /*
+    else if (current_period == PERIOD_W1) // 周周期
+    {
+        // rect_color = is_bullish ? HIGHLIGHT_COLOR_W1_B : HIGHLIGHT_COLOR_W1_S;
+    }
+    else if (current_period == PERIOD_MN1) // 月周期
+    {
+        // rect_color = is_bullish ? HIGHLIGHT_COLOR_MN1_B : HIGHLIGHT_COLOR_MN1_S;
+    }
+    */
+    
+    return rect_color;
+}

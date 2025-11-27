@@ -624,7 +624,8 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
     int zones_count = ArraySize(zones);
     
     // 确定颜色
-    color rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
+    // color rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
+    color rect_color = GetHighlightColorByPeriod(is_bullish);
     
     // 遍历所有高亮区域并绘制矩形
     for (int i = 0; i < zones_count; i++)

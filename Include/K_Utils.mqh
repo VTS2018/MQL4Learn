@@ -235,6 +235,16 @@ string GetTimeframeName(int timeframe_period)
  */
 double CalculateFiboPrice(double P1_price, double P2_price, double level)
 {
+    // 1.0
     // 斐波那契价格公式: P_level = P1 + level * (P2 - P1)
-    return P1_price + level * (P2_price - P1_price);
+    // return P1_price + level * (P2_price - P1_price);
+
+    // 2.0
+    // 1. 计算原始斐波那契价格
+    double price_diff = P2_price - P1_price;
+    double raw_fibo_price = P1_price + price_diff * level;
+    
+    // 2. 🚨 优化细节：根据当前品种的精度进行四舍五入和修正 🚨
+    // _Digits 变量自动返回当前图表品种的实际小数位数
+    return NormalizeDouble(raw_fibo_price, _Digits);
 }
