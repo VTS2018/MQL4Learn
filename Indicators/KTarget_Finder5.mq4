@@ -154,6 +154,11 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 //========================================================================
 int OnInit()
 {
+
+    // 🚨 关键修正：显式地启用图形对象删除事件监听 🚨
+    // 只有设置这个，OnChartEvent 才能接收到 CHARTEVENT_OBJECT_DELETE 事件
+    ChartSetInteger(0, CHART_EVENT_OBJECT_DELETE, true);
+
     // long cid = ChartID();
     // Print("-->[KTarget_Finder5.mq4:152]: cid: ", cid);
 
@@ -587,6 +592,68 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         {
             // 图表变动：例如窗口大小改变、缩放、切换周期
             // Print("    图表变动事件 (CHARTEVENT_CHART_CHANGE) 发生。");
+            break;
+        }
+
+        case CHARTEVENT_OBJECT_DELETE:
+        {
+
+            string deleted_name = sparam;
+            // Print("--->[KTarget_Finder5.mq4:595]: deleted_name: ", deleted_name);
+
+            // 1. 过滤：检查被删除的对象是否为我们指标绘制的 '主' 斐波那契线
+            // 条件：a) 必须包含指标前缀 g_object_prefix
+            //       b) 必须包含 "_Fibo_" (斐波那契主线的标记)
+            //       c) 必须不包含 "_FiboHL_" (排除高亮矩形本身)
+            if (StringFind(deleted_name, g_object_prefix) != -1 &&
+                StringFind(deleted_name, "_Fibo_") != -1 &&
+                StringFind(deleted_name, "_FiboHL_") == -1)
+            {
+                // 2. 提取唯一的锚点 ID 部分: [B/S]_[LongTimeID]
+
+                // 查找 "_Fibo_" 在名称中的起始位置
+                int start_pos = StringFind(deleted_name, "_Fibo_");
+
+                if (start_pos != -1)
+                {
+                    // 查找 "_Fibo_" 后面的下划线的位置，即 Fibo_ 后面的下划线
+                    int id_start = StringFind(deleted_name, "_", start_pos + 5);
+
+                    if (id_start != -1)
+                    {
+                        // 提取唯一的锚点 ID，例如 "B_2025_11_20_04_00_00"
+                        // 从下划线后一位开始截取到字符串末尾
+                        string unique_anchor_id = StringSubstr(deleted_name, id_start + 1);
+                        Print("--->[KTarget_Finder5.mq4:627]: unique_anchor_id: ", unique_anchor_id);
+
+                        // 3. 遍历图表对象并删除所有包含此 ID 的关联子对象
+                        int total_objects = ObjectsTotal(0,0);
+                        string obj_name;
+
+                        for (int i = total_objects - 1; i >= 0; i--)
+                        {
+                            obj_name = ObjectName(0, i);
+                            //Print("--->[KTarget_Finder5.mq4:636]: obj_name: ", obj_name);
+
+
+                            // 检查条件：
+                            // a) 必须是 FiboHL 相关的对象 (Rect_FiboHL_...)
+                            // b) 必须包含被删除主线对象的唯一锚点 ID (unique_anchor_id)
+
+                            if (StringFind(obj_name, "_FiboHL_") != -1 &&
+                                StringFind(obj_name, unique_anchor_id) != -1)
+                            {
+                                Print("--->[KTarget_Finder5.mq4:646]: obj_name: ", obj_name);
+                                // 找到了关联的矩形或文本 (因为文本名称是矩形名称 + _TXT)
+                                ObjectDelete(0, obj_name);
+                            }
+                        }
+
+                        Print("INFO: Fibo主线手动删除，自动清理相关对象: ", deleted_name);
+                    }
+                }
+            }
+
             break;
         }
             
