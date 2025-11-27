@@ -626,7 +626,19 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
     // 确定颜色
     // color rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
     color rect_color = GetHighlightColorByPeriod(is_bullish);
-    
+
+    //-----
+    // 1. 获取周期名称 (例如 "H4", "D1")
+    string tf_name = GetTimeframeName(_Period);
+
+    // 2. 确定区域类型描述
+    string area_type = is_bullish ? "看涨斐波反转-做空-区域" : "看跌斐波反转-做多-区域";
+
+    // 3. 组合最终的说明文本
+    // 示例: "H4 看跌斐波反转区域"
+    string description_text = tf_name + " " + area_type;
+    //-----
+
     // 遍历所有高亮区域并绘制矩形
     for (int i = 0; i < zones_count; i++)
     {
@@ -693,6 +705,8 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             //     ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
 
             ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+            // 🚨 核心修正：设置 OBJPROP_TEXT 作为对象列表的“说明” 🚨
+            ObjectSetString(0, name, OBJPROP_TEXT, description_text);
         }
         else
         {
