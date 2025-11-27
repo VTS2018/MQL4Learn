@@ -519,13 +519,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             {
                 // 1. 获取当前系统启动以来的毫秒数
                 ulong current_time_ms = GetTickCount();
-                Print("===>[KTarget_Finder5.mq4:320]: current_time_ms: ", current_time_ms);
-                Print("===>[KTarget_Finder5.mq4:321]: LastClickTime_ms: ", LastClickTime_ms);
+                // Print("===>[KTarget_Finder5.mq4:320]: current_time_ms: ", current_time_ms);
+                // Print("===>[KTarget_Finder5.mq4:321]: LastClickTime_ms: ", LastClickTime_ms);
 
                 // 2. 计算毫秒差（直接相减就是毫秒数）
                 // 注意：GetTickCount() 返回值可能循环，但对于 500ms 的短期差值是可靠的。
                 ulong time_diff_ms = current_time_ms - LastClickTime_ms;
-                Print("===>[KTarget_Finder5.mq4:326]: time_diff_ms: ", time_diff_ms);
+                // Print("===>[KTarget_Finder5.mq4:326]: time_diff_ms: ", time_diff_ms);
 
                 if (time_diff_ms > 0 && time_diff_ms < DOUBLE_CLICK_TIMEOUT_MS)
                 {
@@ -624,7 +624,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                         // 提取唯一的锚点 ID，例如 "B_2025_11_20_04_00_00"
                         // 从下划线后一位开始截取到字符串末尾
                         string unique_anchor_id = StringSubstr(deleted_name, id_start + 1);
-                        Print("--->[KTarget_Finder5.mq4:627]: unique_anchor_id: ", unique_anchor_id);
+                        // Print("--->[KTarget_Finder5.mq4:627]: unique_anchor_id: ", unique_anchor_id);
 
                         // 3. 遍历图表对象并删除所有包含此 ID 的关联子对象
                         int total_objects = ObjectsTotal(0,0);
@@ -643,7 +643,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                             if (StringFind(obj_name, "_FiboHL_") != -1 &&
                                 StringFind(obj_name, unique_anchor_id) != -1)
                             {
-                                Print("--->[KTarget_Finder5.mq4:646]: obj_name: ", obj_name);
+                                // Print("--->[KTarget_Finder5.mq4:646]: obj_name: ", obj_name);
                                 // 找到了关联的矩形或文本 (因为文本名称是矩形名称 + _TXT)
                                 ObjectDelete(0, obj_name);
                             }
