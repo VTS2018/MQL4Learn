@@ -280,7 +280,8 @@ void OnDeinit(const int reason)
                 // 2. 关键判断：如果对象名称中不包含 "_Fibo_" 且 不包含 "_FiboHL_"，则删除
                 bool is_fibo_line = (StringFind(obj_name, "_Fibo_", 0) != -1);
                 bool is_fibo_highlight = (StringFind(obj_name, "_FiboHL_", 0) != -1);
-                if (!is_fibo_line && !is_fibo_highlight)
+                bool is_fibo_text = (StringFind(obj_name, "_TXT", 0) != -1);
+                if (!is_fibo_line && !is_fibo_highlight && !is_fibo_text)
                 {
                     // 删除非 Fibo 对象（如矩形、基准线等）
                     ObjectDelete(0, obj_name);

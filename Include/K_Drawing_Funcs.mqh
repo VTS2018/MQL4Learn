@@ -624,7 +624,6 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
     int zones_count = ArraySize(zones);
     
     // 确定颜色
-    // color rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
     color rect_color = GetHighlightColorByPeriod(is_bullish);
 
     //-----
@@ -639,6 +638,11 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
     string description_text = tf_name + " " + area_type;
     //-----
 
+    // 获取周期可见性标志
+    // int tf_flag = GetTimeframeFlag(_Period);
+    // Print("--->[K_Drawing_Funcs.mqh:643]: tf_flag: ", tf_flag);
+
+
     // 遍历所有高亮区域并绘制矩形
     for (int i = 0; i < zones_count; i++)
     {
@@ -652,10 +656,14 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         double price_end   = CalculateFiboPrice(P1_price, P2_price, level2);
         Print("===>[K_Drawing_Funcs.mqh:624]: price_end: ", price_end," level2: ",level2);
 
-        //
+        // 矩形的顶部价格 (作为文本锚定点)
+        double price_top = price_end;
+
         // 2. 命名对象，使用特殊标记 "_FiboHL_" 满足周期切换不删除需求
         string name = g_object_prefix + "Rect_FiboHL_" + (is_bullish ? "B_" : "S_") + GetBarTimeID(target_index) + "#" + DoubleToString(level1, 3) + "_" + DoubleToString(level2, 3);
         Print("===>[K_Drawing_Funcs.mqh:624]: name: ", name);
+
+        string text_name = name + "_TXT";
 
         /*
         // 3. 创建/更新矩形
@@ -687,6 +695,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         */
 
         if (ObjectFind(0, name) != -1) ObjectDelete(0, name);
+        if (ObjectFind(0, text_name) != -1) ObjectDelete(0, text_name); // 确保旧文本对象被删除
 
         if (ObjectCreate(0, name, OBJ_RECTANGLE, 0, time1, price_start, time2, price_end))
         {
@@ -707,11 +716,56 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
             // 🚨 核心修正：设置 OBJPROP_TEXT 作为对象列表的“说明” 🚨
             ObjectSetString(0, name, OBJPROP_TEXT, description_text);
+
+            // 3. 🚨 调用新函数绘制图表文本 🚨
+            DrawFiboHighlightText(text_name, description_text, time1, price_top, 0);
         }
         else
         {
             Print("无法创建 高亮 矩形对象: ", name, ", 错误: ", GetLastError());
             return;
         }
+    }
+}
+//--------------------------------
+/**
+ * 绘制斐波那契高亮区域的文本说明 (OBJ_TEXT)
+ * @param text_name: 文本对象的唯一名称 (应包含父矩形名称)
+ * @param text_content: 要显示的文本内容 (例如 "H4 看跌斐波反转区域")
+ * @param anchor_time: 文本的锚定时间 (矩形左侧时间)
+ * @param anchor_price: 文本的锚定价格 (矩形顶部价格)
+ * @param tf_flag: 文本对象的周期可见性位标志
+ */
+void DrawFiboHighlightText(string text_name, string text_content, datetime anchor_time, double anchor_price, int tf_flag)
+{
+    // 确保旧文本对象被删除
+    if (ObjectFind(0, text_name) != -1) ObjectDelete(0, text_name);
+
+    // 创建 OBJ_TEXT 对象
+    if (ObjectCreate(0, text_name, OBJ_TEXT, 0, anchor_time, anchor_price))
+    {
+        ObjectSetString(0, text_name, OBJPROP_TEXT, text_content);
+        
+        // 设置颜色：确保与高亮背景色形成强烈对比 (使用黑色)
+        ObjectSetInteger(0, text_name, OBJPROP_COLOR, clrBlack); 
+        
+        // 设置字体和大小 (可根据需求调整)
+        ObjectSetString(0, text_name, OBJPROP_FONT, "Arial"); 
+        ObjectSetInteger(0, text_name, OBJPROP_FONTSIZE, 8); 
+        
+        // 设置锚点：左上角
+        ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER); 
+        ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER); 
+        
+        // 关键优化：设置文本位置微调，稍微远离边角，以避免与边框重叠
+        ObjectSetInteger(0, text_name, OBJPROP_XDISTANCE, 5); // 稍微右移 5 像素
+        ObjectSetInteger(0, text_name, OBJPROP_YDISTANCE, 5); // 稍微下移 5 像素
+        
+        // 设置周期可见性
+        if (tf_flag != 0) ObjectSetInteger(0, text_name, OBJPROP_TIMEFRAMES, tf_flag);
+        else ObjectSetInteger(0, text_name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+        
+        // 确保文本对象不可选中
+        ObjectSetInteger(0, text_name, OBJPROP_SELECTABLE, false);
     }
 }
