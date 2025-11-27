@@ -68,7 +68,7 @@ string ShortenObjectName(string original_name)
  * * @param bar_index 要获取时间的 K 线索引 (0 为当前 K线)
  * @return (string) 格式化后的唯一时间标识符，例如 "2025_11_24_06_00_00"
  */
-string GetBarTimeID(int bar_index)
+string GetBarTimeID_v1(int bar_index)
 {
     datetime target_time;
     
@@ -123,7 +123,7 @@ string GetBarTimeID(int bar_index)
  * @param info 引用传递的结构体，用于存储解析结果
  * @return (bool) 成功解析返回 true，否则返回 false
  */
-bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
+bool ParseRectangleName_v1(const string rect_name, ParsedRectInfo &info)
 {
     // 1. 检查类型并确定字符串起始位置
     int start_pos = -1;
@@ -247,4 +247,123 @@ double CalculateFiboPrice(double P1_price, double P2_price, double level)
     // 2. 🚨 优化细节：根据当前品种的精度进行四舍五入和修正 🚨
     // _Digits 变量自动返回当前图表品种的实际小数位数
     return NormalizeDouble(raw_fibo_price, _Digits);
+}
+
+//-----------------------------------
+string GetBarTimeID(int bar_index)
+{
+    datetime target_time;
+    
+    // --- 1. 确定目标时间 ---
+    
+    // 检查索引是否有效。如果索引无效 (例如 < 0)，则使用当前服务器时间。
+    if (bar_index < 0 || bar_index >= Bars)
+    {
+        target_time = TimeCurrent();
+        // Print("DEBUG: GetBarTimeID used TimeCurrent() due to invalid index: ", bar_index);
+    }
+    else
+    {
+        // 索引有效，使用 K 线的开盘时间
+        target_time = Time[bar_index];
+    }
+    
+    // --- 2. 将 datetime 转换为结构体，方便格式化 ---
+    MqlDateTime dt;
+    TimeToStruct(target_time, dt);
+
+    // --- 3. 🚨 修正：构造 "YYMMDD_HHMM" 格式的短字符串 ID 🚨
+    
+    // 使用 StringFormat 进行格式化，%02d 保证两位数并用 0 填充。
+    // 去除了世纪年份、秒，以及所有的下划线，只保留一个分隔符。
+    string time_id_str = 
+        StringFormat("%02d%02d%02d_%02d%02d",
+            dt.year % 100,      // 年份后两位 (YY)
+            dt.mon,             // 月份 (MM)
+            dt.day,             // 日期 (DD)
+            dt.hour,            // 小时 (HH)
+            dt.min);            // 分钟 (MM)
+            
+    // 示例返回: "251120_0400"
+    return time_id_str;
+}
+//----------------------------------
+bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
+{
+    // 1. 检查类型并确定字符串起始位置
+    int start_pos = -1;
+    // 注意：假设此函数仅用于解析 Rect_B_ / Rect_S_ 类型的矩形
+    if (StringFind(rect_name, "Rect_B_", 0) != -1)
+    {
+        info.is_bullish = true;
+        start_pos = StringFind(rect_name, "Rect_B_", 0) + StringLen("Rect_B_");
+    }
+    else if (StringFind(rect_name, "Rect_S_", 0) != -1)
+    {
+        info.is_bullish = false;
+        start_pos = StringFind(rect_name, "Rect_S_", 0) + StringLen("Rect_S_");
+    }
+    else
+    {
+        // 无法识别的名称类型
+        return false;
+    }
+    
+    // 2. 提取 P1 和 P2 时间字符串
+    string time_segment = StringSubstr(rect_name, start_pos);
+    int separator_pos = StringFind(time_segment, "#", 0);
+    
+    if (separator_pos == -1) return false; // 缺少分隔符
+    
+    // P1_time_str = "251120_0400" (新的短格式)
+    string P1_time_str = StringSubstr(time_segment, 0, separator_pos);
+    // P2_time_str = "251120_0600" (新的短格式)
+    string P2_time_str = StringSubstr(time_segment, separator_pos + 1);
+    
+    // -----------------------------------------------------------------
+    // 🚨 修正 3：将 "YYMMDD_HHMM" 格式转换成 MQL4 可识别的 "YYYY.MM.DD HH:MM:SS" 格式 🚨
+    // -----------------------------------------------------------------
+    
+    // 确保 P1 时间字符串长度符合预期 (11: YYMMDD_HHMM)
+    if (StringLen(P1_time_str) != 11)
+    {
+        return false; 
+    }
+    
+    // P1 Time String 转换：转换为 "20YY.MM.DD HH:MM:00"
+    string P1_standard_format = 
+        "20" + StringSubstr(P1_time_str, 0, 2) + "." +   // 20YY.
+        StringSubstr(P1_time_str, 2, 2) + "." +          // MM.
+        StringSubstr(P1_time_str, 4, 2) + " " +          // DD<space>
+        StringSubstr(P1_time_str, 7, 2) + ":" +          // HH:
+        StringSubstr(P1_time_str, 9, 2) + ":00";         // MM:00 (补充秒数)
+        
+    // P2 Time String 转换
+    string P2_standard_format = "";
+    if (StringLen(P2_time_str) == 11) // 检查 P2 是否也是新的短时间 ID 格式
+    {
+        P2_standard_format = 
+            "20" + StringSubstr(P2_time_str, 0, 2) + "." + 
+            StringSubstr(P2_time_str, 2, 2) + "." + 
+            StringSubstr(P2_time_str, 4, 2) + " " + 
+            StringSubstr(P2_time_str, 7, 2) + ":" + 
+            StringSubstr(P2_time_str, 9, 2) + ":00";
+    }
+    
+    // 4. 执行转换
+    info.P1_time = StringToTime(P1_standard_format);
+    
+    if (StringLen(P2_standard_format) > 0)
+    {
+        info.P2_time = StringToTime(P2_standard_format);
+    }
+    else
+    {
+        // P2 不是时间格式 (例如可能是 Fibo Level)
+        info.P2_time = 0; 
+    }
+    
+    if (info.P1_time == 0) return false; // P1 转换失败则返回
+    
+    return true;
 }
