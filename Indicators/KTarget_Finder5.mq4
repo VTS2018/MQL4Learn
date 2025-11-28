@@ -51,6 +51,8 @@
 #include <K_Logic.mqh>
 #include <K_Drawing_Funcs.mqh>
 
+// 所有的指标打印日志行为 只能在!Is_EA_Mode 模式下运行
+extern bool Is_EA_Mode = false; // 新增：是否以EA后台模式运行 (关闭所有绘图和对象创建) true：EA静默模式；false：绘图模式
 extern bool Smart_Tuning_Enabled = false;        // 【新增】启动智能周期调优
 
 // --- 外部可调参数 (输入) ---
@@ -178,7 +180,7 @@ int OnInit()
         Max_Signal_Lookforward = tuned_params.Max_Signal_Lookforward;
 
         // 可选：打印日志确认
-        Print("INFO: Smart Tuning Enabled. Parameters adjusted for Period ", GetTimeframeName(_Period));
+        // Print("INFO: Smart Tuning Enabled. Parameters adjusted for Period ", GetTimeframeName(_Period));
     }
     //------------------------------
 
@@ -198,6 +200,7 @@ int OnInit()
     g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
     // Print("-->[KTarget_Finder5.mq4:165]: g_object_prefix: ", g_object_prefix);
 
+    // 初始运行次数为0
     // g_run_count = 0;
 
     // 缓冲区映射设置 (无变化)
@@ -227,22 +230,27 @@ int OnInit()
     string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.23"; // [V1.22 UPD] 更新版本号
     IndicatorShortName(shortName);
 
-    // --- V1.31 NEW: 专门研究 (OnCalculate) ---
-    // 2. 启动定时器：用于演示 OnTimer 函数的独立运行
-    EventSetTimer(Timer_Interval_Seconds);
+    // 非EA模式下 才启用 定时器和相关的打印逻辑
+    if (!Is_EA_Mode)
+    {
+        // --- V1.31 NEW: 专门研究 (OnCalculate) ---
+        // 2. 启动定时器：用于演示 OnTimer 函数的独立运行
+        EventSetTimer(Timer_Interval_Seconds);
 
-    // 3. 在图表上输出初始化信息 (使用 Comment 替代 Print 以获得图表反馈)
-    string init_message =
-        "*** INDICATOR INITIALIZED ***\n" +
-        "Function: OnInit() executed.\n" +
-        "Time: " + TimeToString(TimeCurrent(), TIME_SECONDS) + "\n" +
-        "Timer set to: " + IntegerToString(Timer_Interval_Seconds) + " seconds.";
+        // 3. 在图表上输出初始化信息 (使用 Comment 替代 Print 以获得图表反馈)
+        string init_message =
+            "*** INDICATOR INITIALIZED ***\n" +
+            "Function: OnInit() executed.\n" +
+            "Time: " + TimeToString(TimeCurrent(), TIME_SECONDS) + "\n" +
+            "Timer set to: " + IntegerToString(Timer_Interval_Seconds) + " seconds.";
 
-    Comment(init_message);
-    Print("---->[KTarget_Finder5:214]: init_message: ", init_message);
-    // --- V1.31 NEW: 专门研究 (OnCalculate) ---
+        // Comment(init_message);
+        Print("---->[KTarget_Finder5:214]: init_message: ", init_message);
+        // --- V1.31 NEW: 专门研究 (OnCalculate) ---
 
-    Print("---->[KTarget_Finder5.mq4:217]: OnInit 指标初始化完成 ");
+        Print("---->[KTarget_Finder5.mq4:217]: ----OnInit 指标初始化完成---- ");
+    }
+
     return(INIT_SUCCEEDED);
 }
 
