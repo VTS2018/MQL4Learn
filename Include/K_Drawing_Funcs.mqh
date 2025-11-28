@@ -54,6 +54,7 @@
  */
 void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, double P2_price)
 {
+    if (Is_EA_Mode) return;
     // K_Geo_Index 这个值在函数调用之前 需要检查 如果是-1 就不执行了，通过这个值确定是 DB 还是IB
     int breakout_candle_count = target_index - breakout_index;
 
@@ -123,6 +124,7 @@ void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, doubl
  */
 void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
 {
+    if (Is_EA_Mode) return;
     if (target_index == -1)
     {
         return;
@@ -183,8 +185,8 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
  */
 void DrawAbsoluteSupportLine(int abs_index, bool is_bullish, int extend_bars)
 {
-    if (abs_index < 0)
-        return;
+    if (Is_EA_Mode) return;
+    if (abs_index < 0) return;
 
     // 确定线条的锚点价格
     double price = is_bullish ? Low[abs_index] : High[abs_index];
@@ -250,6 +252,7 @@ void DrawAbsoluteSupportLine(int abs_index, bool is_bullish, int extend_bars)
  */
 void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
 {
+    if (Is_EA_Mode) return;
     // --- 确保 P1/P2 索引有效 ---
     if (target_index < 0 || P2_index < 0) return;
 
@@ -341,6 +344,7 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
  */
 void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
 {
+    if (Is_EA_Mode) return;
     if (!Is_DrawFibonacciLines) return;
     
     // --- V1.38 内部硬编码自定义设置 ---
@@ -587,6 +591,7 @@ void DrawFiboHighlightRectangles(int target_index, int P2_index, bool is_bullish
  */
 void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const FiboZone &zones[])
 {
+    if (Is_EA_Mode) return;
     // 获取 P1 和 P2 的价格和时间
     double P1_price; // 假设 P1 价格是锚点的 Open
 
@@ -739,6 +744,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
  */
 void DrawFiboHighlightText(string text_name, string text_content, datetime anchor_time, double anchor_price, int tf_flag)
 {
+    if (Is_EA_Mode) return;
     // 确保旧文本对象被删除
     if (ObjectFind(0, text_name) != -1) ObjectDelete(0, text_name);
 
