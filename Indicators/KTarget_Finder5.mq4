@@ -504,6 +504,9 @@ if (!Is_EA_Mode)
 //+------------------------------------------------------------------+
 void OnTimer()
 {
+
+if (!Is_EA_Mode)
+{
     // OnTimer 独立运行，不依赖Tick或K线收盘
     string timer_output = 
         "**OnTimer Status**\n" +
@@ -520,11 +523,19 @@ void OnTimer()
     Comment(on_calc_output_segment + "\n" + on_timer_output_segment);
 }
 
+}
+
 //+------------------------------------------------------------------+
 //| ChartEvent function - 接收所有图表/对象事件的关键函数               |
 //+------------------------------------------------------------------+
 void OnChartEvent(const int id, const long &lparam, const double &dparam, const string &sparam)
 {
+    // 🚨 核心修正：在 EA 模式下，立即退出函数，不做任何处理 🚨
+    if (Is_EA_Mode)
+    {
+        return; 
+    }
+    
     // 1. 打印所有事件的通用信息
     // Print("--- EVENT RECEIVED --- ID:", id, 
     //       ", lparam:", lparam, 
