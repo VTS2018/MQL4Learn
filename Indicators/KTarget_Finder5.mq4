@@ -51,6 +51,7 @@
 #include <K_Logic.mqh>
 #include <K_Drawing_Funcs.mqh>
 
+// ----------------------------------------------------------------------------------------------------------------------------
 // 所有的指标打印日志行为 只能在!Is_EA_Mode 模式下运行
 extern bool Is_EA_Mode = false; // 新增：是否以EA后台模式运行 (关闭所有绘图和对象创建) true：EA静默模式；false：绘图模式
 extern bool Smart_Tuning_Enabled = false;        // 【新增】启动智能周期调优
@@ -102,6 +103,7 @@ extern bool Is_DrawFibonacciLines = true; // 控制是否绘制 信号的 斐波
 // static datetime LastClickTime = 0;
 static ulong LastClickTime_ms = 0;
 const ulong DOUBLE_CLICK_TIMEOUT_MS = 500; // 500 毫秒内算作双击
+// ----------------------------------------------------------------------------------------------------------------------------
 
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
@@ -141,6 +143,7 @@ double BearishSignalBuffer[]; // 3: 最终看跌信号 (P2 或 P1-DB突破确认
 #property indicator_style4 STYLE_SOLID
 #property indicator_width4 2
 #define ARROW_CODE_SIGNAL_DOWN 234
+// ----------------------------------------------------------------------------------------------------------------------------
 
 // --- 函数原型 ---
 void FindAndDrawTargetCandles(int total_bars);
@@ -152,6 +155,7 @@ void DrawTargetTop(int target_index);
 // V1.31 UPD: 流程协调者模式，传入所有几何参数，实现解耦
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
+// ----------------------------------------------------------------------------------------------------------------------------
 
 //========================================================================
 // 1. OnInit: 指标初始化
@@ -257,13 +261,16 @@ int OnInit()
 //========================================================================
 // 2. OnDeinit: 指标卸载时调用 (清理图表对象)
 //========================================================================
-void OnDeinit(const int reason) 
+void OnDeinit(const int reason)
 {
-    // 停止定时器，避免内存泄漏
-    EventKillTimer();
+    if (!Is_EA_Mode)
+    {
+        // 停止定时器，避免内存泄漏
+        EventKillTimer();
 
-    // 清除图表上的 Comment 输出
-    Comment("");
+        // 清除图表上的 Comment 输出
+        Comment("");
+    }
 
     // ------------------- 1.0 清理对象的迭代代码 -------------------
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
@@ -330,6 +337,7 @@ void OnDeinit(const int reason)
             {
                 ObjectDelete(0, obj_name);
             }
+
             // 场景 C: 其他原因 (例如 REASON_RECOMPILE)，通常不操作或无条件删除。
             // 默认情况下，我们不处理其他原因，或者让它执行无条件删除（即上面的 else if 捕获）
 
