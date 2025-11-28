@@ -278,6 +278,8 @@ void OnDeinit(const int reason)
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
     //ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
 
+    if (!Is_EA_Mode)
+{
     /** 
     // 使用唯一的 g_object_prefix 进行清理
     for (int i = ObjectsTotal() - 1; i >= 0; i--)
@@ -362,6 +364,7 @@ void OnDeinit(const int reason)
     // ------------------- 0.0 下面的代码保持不变 -------------------
     ChartRedraw();
     Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
+}
 }
 
 
