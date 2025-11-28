@@ -421,7 +421,7 @@ int OnCalculate(const int rates_total,
     return(rates_total);
     */
 
-    // ----------------- NEW 切换到真是环境 可以区分Tick触发类型的执行-----------------
+    // ----------------- NEW 切换到真实环境 可以区分Tick触发类型的执行-----------------
 
     // --- 逻辑判断与计数 ---
     string trigger_type = "UNKNOWN";
@@ -447,7 +447,10 @@ int OnCalculate(const int rates_total,
     else if (time[0] > last_bar_time) 
     {
         trigger_type = "NEW BAR (收线触发)";
-        Print("--->[KTarget_Finder5.mq4:332]: trigger_type: ", trigger_type);
+        if (!Is_EA_Mode)
+        {
+            Print("--->[KTarget_Finder5.mq4:332]: trigger_type: ", trigger_type);
+        }
 
         // 清除缓冲区中的所有旧标记
         ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
@@ -472,6 +475,8 @@ int OnCalculate(const int rates_total,
     last_bar_time = time[0];
     last_tick_time = current_time;
 
+if (!Is_EA_Mode)
+{
     // 5. 构建 OnCalculate 的输出段，并存储到全局变量
     on_calc_output_segment = 
         "*** OnCalculate Status ***\n" +
@@ -487,9 +492,11 @@ int OnCalculate(const int rates_total,
 
     // 6. 将 OnCalculate 的结果和 OnTimer 的结果合并显示
     Comment(on_calc_output_segment + "\n" + on_timer_output_segment);
-    return(rates_total);    
+}
 
-    // ----------------- END 切换到真是环境 可以区分Tick触发类型的执行-----------------
+    return(rates_total);  
+
+    // ----------------- END 切换到真实环境 可以区分Tick触发类型的执行-----------------
 }
 
 //+------------------------------------------------------------------+
