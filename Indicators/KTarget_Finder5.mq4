@@ -725,7 +725,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对低点支撑线 ---
-            int AbsLowIndex = FindAbsoluteLowIndex(i, 20, 20, true);
+            int AbsLowIndex = FindAbsoluteLowIndex(i, 3, 3, true);
             //Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
 
             double lowprice = Low[AbsLowIndex];
@@ -768,7 +768,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对高点阻力线 ---
-            int AbsHighIndex = FindAbsoluteLowIndex(i, 20, 20, false); // 查找绝对最高点
+            int AbsHighIndex = FindAbsoluteLowIndex(i, 3, 3, false); // 查找绝对最高点
             if (AbsHighIndex != -1)
             {
                 // 绘制绝对高点阻力线，向右延伸 15 根 K 线
