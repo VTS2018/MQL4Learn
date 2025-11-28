@@ -39,7 +39,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, MQL Developer"
 #property link      "https://www.mql5.com"
-#property version   "1.23" 
+#property version   "1.5" 
 #property strict
 #property indicator_chart_window // 绘制在主图表窗口
 #property indicator_buffers 4 // 两个锚点 + 两个最终信号
@@ -51,8 +51,10 @@
 #include <K_Logic.mqh>
 #include <K_Drawing_Funcs.mqh>
 
+extern bool Smart_Tuning_Enabled = false;        // 【新增】启动智能周期调优
+
 // --- 外部可调参数 (输入) ---
-extern int Scan_Range = 100;              // 总扫描范围：向后查找 N 根 K 线
+extern int Scan_Range = 500;              // 总扫描范围：向后查找 N 根 K 线
 
 // --- 看涨 K-Target (底部) 锚点参数 ---
 extern int Lookahead_Bottom = 20;         // 看涨信号右侧检查周期 (未来/较新的K线)
@@ -158,6 +160,27 @@ int OnInit()
     // 🚨 关键修正：显式地启用图形对象删除事件监听 🚨
     // 只有设置这个，OnChartEvent 才能接收到 CHARTEVENT_OBJECT_DELETE 事件
     ChartSetInteger(0, CHART_EVENT_OBJECT_DELETE, true);
+
+    //------------------------------
+    // 🚨 检查是否启用智能调优 🚨
+    if (Smart_Tuning_Enabled)
+    {
+        // 1. 获取周期调优后的参数集
+        TuningParameters tuned_params = GetTunedParameters();
+
+        // 2. 将全局外部变量的值覆盖为调优后的值
+        // 这样，主逻辑中所有对这些变量的引用都将自动使用新值。
+        Scan_Range = tuned_params.Scan_Range;
+        Lookahead_Bottom = tuned_params.Lookahead_Bottom;
+        Lookback_Bottom = tuned_params.Lookback_Bottom;
+        Lookahead_Top = tuned_params.Lookahead_Top;
+        Lookback_Top = tuned_params.Lookback_Top;
+        Max_Signal_Lookforward = tuned_params.Max_Signal_Lookforward;
+
+        // 可选：打印日志确认
+        Print("INFO: Smart Tuning Enabled. Parameters adjusted for Period ", GetTimeframeName(_Period));
+    }
+    //------------------------------
 
     // long cid = ChartID();
     // Print("-->[KTarget_Finder5.mq4:152]: cid: ", cid);
@@ -835,7 +858,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    ClearSignalRectangle_v2(abs_lowindex, true); 
+    // ClearSignalRectangle_v2(abs_lowindex, true); 
     // ***************************************************************
 
     // K_Geo_Index 必须有效，否则协调者已经跳过了。
@@ -906,7 +929,7 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    ClearSignalRectangle_v2(abs_hightindex, false); 
+    // ClearSignalRectangle_v2(abs_hightindex, false); 
     // ***************************************************************
     
     double P1_price = Open[target_index];

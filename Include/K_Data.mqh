@@ -79,3 +79,15 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 // 1H 周期 (H1) 特有颜色
 #define HIGHLIGHT_COLOR_H1_B clrLightBlue     // 看涨使用浅蓝色
 #define HIGHLIGHT_COLOR_H1_S clrHotPink       // 看跌使用亮粉色
+//------------------
+
+// 定义用于智能调优的参数结构体
+struct TuningParameters
+{
+    int Scan_Range;
+    int Lookahead_Bottom;
+    int Lookback_Bottom;
+    int Lookahead_Top;
+    int Lookback_Top;
+    int Max_Signal_Lookforward;
+};

@@ -257,3 +257,93 @@ color GetHighlightColorByPeriod(bool is_bullish)
     
     return rect_color;
 }
+//-------------------------------
+/**
+ * 根据当前图表周期 (_Period) 返回一组优化的参数。
+ * 调优逻辑：在短周期增加K线数，在长周期减少K线数，以使时间范围更合理。
+ */
+TuningParameters GetTunedParameters()
+{
+    TuningParameters p;
+    
+    // 设置默认值 (如果周期不匹配，则使用 M15/H1 附近的基准值)
+    p.Scan_Range             = 500;
+    p.Lookahead_Bottom       = 20;
+    p.Lookback_Bottom        = 20;
+    p.Lookahead_Top          = 20;
+    p.Lookback_Top           = 20;
+    p.Max_Signal_Lookforward = 20;
+    
+    // 根据周期动态调整参数
+    switch (_Period)
+    {
+        case PERIOD_M1: // M1：波动极快，需要更多的K线来定义结构
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 30;
+            p.Lookahead_Top = p.Lookback_Top = 30;
+            p.Max_Signal_Lookforward = 30;
+            break;
+            
+        case PERIOD_M5: // M5：比 M1 稳定，但仍需比默认值大一些
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 25;
+            p.Lookahead_Top = p.Lookback_Top = 25;
+            p.Max_Signal_Lookforward = 25;
+            break;
+            
+        case PERIOD_M15: // M15：基准周期，略低于默认值，专注于近期结构
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 18;
+            p.Lookahead_Top = p.Lookback_Top = 18;
+            p.Max_Signal_Lookforward = 18;
+            break;
+            
+        case PERIOD_M30: // M30：更稳定，可进一步减少
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 15;
+            p.Lookahead_Top = p.Lookback_Top = 15;
+            p.Max_Signal_Lookforward = 15;
+            break;
+
+        case PERIOD_H1: // H1：稳定的中周期
+            p.Scan_Range = 2160;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 12;
+            p.Lookahead_Top = p.Lookback_Top = 12;
+            p.Max_Signal_Lookforward = 12;
+            break;
+            
+        case PERIOD_H4: // H4：长周期开始，K线代表的市场意义大增
+            // 扫描范围覆盖约 2-3 周
+            p.Scan_Range = 1260; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 8;
+            p.Lookahead_Top = p.Lookback_Top = 8;
+            p.Max_Signal_Lookforward = 8;
+            break;
+            
+        case PERIOD_D1: // D1：日周期，遵循您的思路 (约 1-1.5 周)
+            // 扫描范围覆盖约 1 个月
+            p.Scan_Range = 1825; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 7;
+            p.Lookahead_Top = p.Lookback_Top = 7;
+            p.Max_Signal_Lookforward = 7;
+            break;
+            
+        case PERIOD_W1: // W1：周周期，只需要关注最近几周或几个月的结构
+            // 扫描范围覆盖约 3 个月
+            p.Scan_Range = 260; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 5;
+            p.Lookahead_Top = p.Lookback_Top = 5;
+            p.Max_Signal_Lookforward = 5;
+            break;
+            
+        case PERIOD_MN1: // MN1：月周期，只需关注最近半年
+            // 扫描范围覆盖约 6 个月
+            p.Scan_Range = 100; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 3;
+            p.Lookahead_Top = p.Lookback_Top = 3;
+            p.Max_Signal_Lookforward = 3;
+            break;
+    }
+    
+    return p;
+}
