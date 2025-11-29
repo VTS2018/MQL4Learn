@@ -69,7 +69,8 @@ extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
 
 // --- 信号确认参数 ---
 extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数量 (P1 突破检查范围)
-extern int DB_Threshold_Candles = 3;      // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
+extern int DB_Threshold_Candles = 3;       // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
+extern int Look_LLHH_Candles = 3;          // 寻找绝对最低和最高价的K线范围查找数量(FindAbsoluteLowIndex)
 
 // --- 四个变量开始 将来可能会移除掉 调试控制---
 // extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
@@ -182,6 +183,7 @@ int OnInit()
         Lookahead_Top = tuned_params.Lookahead_Top;
         Lookback_Top = tuned_params.Lookback_Top;
         Max_Signal_Lookforward = tuned_params.Max_Signal_Lookforward;
+        Look_LLHH_Candles = tuned_params.Look_LLHH_Candles;
 
         // 可选：打印日志确认
         // Print("INFO: Smart Tuning Enabled. Parameters adjusted for Period ", GetTimeframeName(_Period));
@@ -762,7 +764,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对低点支撑线 ---
-            int AbsLowIndex = FindAbsoluteLowIndex(i, 3, 3, true);
+            int AbsLowIndex = FindAbsoluteLowIndex(i, Look_LLHH_Candles, Look_LLHH_Candles, true);
             //Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
 
             // double lowprice = Low[AbsLowIndex];
@@ -817,7 +819,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.31 NEW ---
 
             // --- V1.35 NEW: 绝对高点阻力线 ---
-            int AbsHighIndex = FindAbsoluteLowIndex(i, 3, 3, false); // 查找绝对最高点
+            int AbsHighIndex = FindAbsoluteLowIndex(i, Look_LLHH_Candles, Look_LLHH_Candles, false); // 查找绝对最高点
             if (AbsHighIndex != -1)
             {
                 // 绘制绝对高点阻力线，向右延伸 15 根 K 线

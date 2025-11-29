@@ -282,6 +282,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 30;
             p.Lookahead_Top = p.Lookback_Top = 30;
             p.Max_Signal_Lookforward = 30;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_M5: // M5：比 M1 稳定，但仍需比默认值大一些
@@ -289,6 +290,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 25;
             p.Lookahead_Top = p.Lookback_Top = 25;
             p.Max_Signal_Lookforward = 25;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_M15: // M15：基准周期，略低于默认值，专注于近期结构
@@ -296,6 +298,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 18;
             p.Lookahead_Top = p.Lookback_Top = 18;
             p.Max_Signal_Lookforward = 18;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_M30: // M30：更稳定，可进一步减少
@@ -303,6 +306,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 15;
             p.Lookahead_Top = p.Lookback_Top = 15;
             p.Max_Signal_Lookforward = 15;
+            p.Look_LLHH_Candles = 3;
             break;
 
         case PERIOD_H1: // H1：稳定的中周期
@@ -310,6 +314,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 12;
             p.Lookahead_Top = p.Lookback_Top = 12;
             p.Max_Signal_Lookforward = 12;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_H4: // H4：长周期开始，K线代表的市场意义大增
@@ -318,6 +323,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 8;
             p.Lookahead_Top = p.Lookback_Top = 8;
             p.Max_Signal_Lookforward = 8;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_D1: // D1：日周期，遵循您的思路 (约 1-1.5 周)
@@ -326,6 +332,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 7;
             p.Lookahead_Top = p.Lookback_Top = 7;
             p.Max_Signal_Lookforward = 7;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_W1: // W1：周周期，只需要关注最近几周或几个月的结构
@@ -334,6 +341,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 5;
             p.Lookahead_Top = p.Lookback_Top = 5;
             p.Max_Signal_Lookforward = 5;
+            p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_MN1: // MN1：月周期，只需关注最近半年
@@ -342,6 +350,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 3;
             p.Lookahead_Top = p.Lookback_Top = 3;
             p.Max_Signal_Lookforward = 3;
+            p.Look_LLHH_Candles = 3;
             break;
     }
     

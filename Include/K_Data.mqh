@@ -90,4 +90,5 @@ struct TuningParameters
     int Lookahead_Top;
     int Lookback_Top;
     int Max_Signal_Lookforward;
+    int Look_LLHH_Candles;
 };
