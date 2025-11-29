@@ -53,7 +53,7 @@
 
 // ----------------------------------------------------------------------------------------------------------------------------
 // 所有的指标打印日志行为 只能在!Is_EA_Mode 模式下运行
-extern bool Is_EA_Mode = false; // 新增：是否以EA后台模式运行 (关闭所有绘图和对象创建) true：EA静默模式；false：绘图模式
+extern bool Is_EA_Mode = false; // 是否以EA后台模式运行 (关闭所有绘图和对象创建) true：EA静默模式；false：绘图模式
 extern bool Smart_Tuning_Enabled = false;        // 【新增】启动智能周期调优
 
 // --- 外部可调参数 (输入) ---
@@ -765,7 +765,7 @@ void FindAndDrawTargetCandles(int total_bars)
             int AbsLowIndex = FindAbsoluteLowIndex(i, 3, 3, true);
             //Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
 
-            double lowprice = Low[AbsLowIndex];
+            // double lowprice = Low[AbsLowIndex];
             //Print("====>[KTarget_Finder4_FromGemini.mq4:301]: lowprice: ", lowprice);
             
             if (AbsLowIndex != -1)
@@ -774,6 +774,18 @@ void FindAndDrawTargetCandles(int total_bars)
                 DrawAbsoluteSupportLine(AbsLowIndex, true, 15);
             }
             // --- END V1.35 NEW ---
+
+            // --- DrawTargetBottom 的真正逻辑 其实转到了这里
+            if (Is_EA_Mode)
+            {
+                BullishTargetBuffer[i] = Low[AbsLowIndex];
+            }
+            else
+            {
+                BullishTargetBuffer[i] = Low[i] - 10 * Point();
+            }
+
+            // --- 结束 DrawTargetBottom
 
             // 调用信号标记器 (仅传入数据)
             CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
@@ -812,6 +824,17 @@ void FindAndDrawTargetCandles(int total_bars)
                 DrawAbsoluteSupportLine(AbsHighIndex, false, 15);
             }
             // --- END V1.35 NEW ---
+
+            // --- DrawTargetTop 的真正逻辑 其实转到了这里
+            if (Is_EA_Mode)
+            {
+                BearishTargetBuffer[i] = High[AbsHighIndex];
+            }
+            else
+            {
+                BearishTargetBuffer[i] = High[i] + 10 * Point();
+            }
+            // --- 结束DrawTargetTop
 
             // 调用信号标记器 (仅传入数据)
             CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
@@ -1023,11 +1046,13 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 
 //========================================================================
 // 12. DrawTargetBottom: 绘图函数，用向上箭头标记 K-Target Bottom (无变化)
+// BullishTargetBuffer[] 函数如果存储最低价格以后 本质上这两个函数就没用了
 //========================================================================
 void DrawTargetBottom(int target_index)
 {
+    if (Is_EA_Mode) return;
     // 将箭头标记在 K-Target 的最低价之下
-    BullishTargetBuffer[target_index] = Low[target_index] - 10 * Point(); 
+    // BullishTargetBuffer[target_index] = Low[target_index] - 10 * Point(); 
 }
 
 //========================================================================
@@ -1035,6 +1060,7 @@ void DrawTargetBottom(int target_index)
 //========================================================================
 void DrawTargetTop(int target_index)
 {
+    if (Is_EA_Mode) return;
     // 将箭头标记在 K-Target 的最高价之上
-    BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
+    // BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
 }
