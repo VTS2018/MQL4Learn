@@ -92,3 +92,24 @@ struct TuningParameters
     int Max_Signal_Lookforward;
     int Look_LLHH_Candles;
 };
+
+//----------------------
+//+------------------------------------------------------------------+
+//| 批量 K 线信号数据结构体 (Indicator Data Structure)                   |
+//+------------------------------------------------------------------+
+struct KBarSignal
+{
+    // Buffer 0: 看涨锚点价格 (SL 参照)
+    double BullishStopLossPrice;
+    
+    // Buffer 1: 看跌锚点价格 (SL 参照)
+    double BearishStopLossPrice;
+    
+    // Buffer 2: 最终看涨信号价格 (开仓触发)
+    double BullishReferencePrice;
+    
+    // Buffer 3: 最终看跌信号价格 (开仓触发)
+    double BearishReferencePrice;
+
+    datetime OpenTime;
+};

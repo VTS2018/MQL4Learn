@@ -780,7 +780,10 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- DrawTargetBottom 的真正逻辑 其实转到了这里
             if (Is_EA_Mode)
             {
-                BullishTargetBuffer[i] = Low[AbsLowIndex];
+                // 目标： 在 $\text{EA}$ 模式下，停止在锚点 $\mathbf{i}$ 处写入 $\text{SL}$ 价格，仅保留人工模式下的绘图价格赋值。
+                // 🚨 修正：移除 EA 模式下的 BullishTargetBuffer[i] 赋值 🚨
+                // 即EA模式下 不需要对看涨锚点和看跌锚点进行 缓冲区写入，只保留人工模式下的写入
+                // BullishTargetBuffer[i] = Low[AbsLowIndex];
             }
             else
             {
@@ -830,7 +833,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- DrawTargetTop 的真正逻辑 其实转到了这里
             if (Is_EA_Mode)
             {
-                BearishTargetBuffer[i] = High[AbsHighIndex];
+                //BearishTargetBuffer[i] = High[AbsHighIndex];
             }
             else
             {
@@ -956,7 +959,22 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                 }
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
-                BullishSignalBuffer[j] = Low[j] - 30 * Point(); 
+
+                if (Is_EA_Mode)
+                {
+                    // 🚨 修正：Buffer 0 和 Buffer 2 赋值必须同步且在 j 索引上 🚨
+                    if (abs_lowindex != -1)
+                    {
+                        // 1. 写入 SL 价格 (Buffer 0) 到确认 K 线索引 'j'
+                        BullishTargetBuffer[j] = Low[abs_lowindex];
+                    }
+                    BullishSignalBuffer[j] = 3.0;
+                }
+                else
+                {
+                    BullishSignalBuffer[j] = Low[j] - 30 * Point();
+                }
+
                 return; // 找到最高级别信号，立即退出函数
             }
         }
@@ -979,7 +997,21 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
-        BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point(); 
+        if (Is_EA_Mode)
+        {
+            // 🚨 修正：Buffer 0 和 Buffer 2 赋值必须同步且在 K_Geo_Index 索引上 🚨
+            if (abs_lowindex != -1)
+            {
+                // 1. 写入 SL 价格 (Buffer 0) 到确认 K 线索引 K_Geo_Index
+                BullishTargetBuffer[K_Geo_Index] = Low[abs_lowindex];
+            }
+            BullishSignalBuffer[K_Geo_Index] = 2.0;
+        }
+        else
+        {
+            BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point();
+        }
+
         return; // 找到次高级别信号，立即退出函数
     }
     
@@ -1016,7 +1048,20 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
                 }
 
                 // 找到 K_P2。绘制 P2 箭头 (高偏移)
-                BearishSignalBuffer[j] = High[j] + 30 * Point(); 
+                if (Is_EA_Mode)
+                {
+                    if (abs_hightindex != -1)
+                    {
+                        BearishTargetBuffer[j] = High[abs_hightindex];
+                    }
+
+                    BearishSignalBuffer[j] = 3.0;
+                }
+                else
+                {
+                    BearishSignalBuffer[j] = High[j] + 30 * Point();
+                }
+
                 return; // 找到最高级别信号，立即退出函数
             }
         }
@@ -1038,7 +1083,19 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 
         // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
         // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
-        BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point(); 
+        if (Is_EA_Mode)
+        {
+            if (abs_hightindex != -1)
+            {
+                BearishTargetBuffer[K_Geo_Index] = High[abs_hightindex];
+            }
+            BearishSignalBuffer[K_Geo_Index] = 2.0;
+        }
+        else
+        {
+            BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point();
+        }
+        
         return; // 找到次高级别信号，立即退出函数
     }
 
