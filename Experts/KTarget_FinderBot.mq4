@@ -8,6 +8,7 @@
 #property version "1.00"
 #property strict
 #include <K_Data.mqh>
+#include <KBot_Logic.mqh>
 
 //====================================================================
 // 1. 策略参数设置 (Strategy Inputs)
@@ -46,18 +47,10 @@ datetime g_last_bar_time = 0; // 用于新K线检测
 
 input int    Indi_LastScan_Range      = 100;      // 扫描最近多少根 K 线 (Bot 1.0 逻辑)
 
+KBarSignal GetIndicatorBarData(int shift);
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
-// int OnInit()
-// {
-//   //--- create timer
-//   EventSetTimer(60);
-
-//   //---
-//   return (INIT_SUCCEEDED);
-// }
-
 int OnInit()
 {
    // 检查能否找到指标文件
@@ -89,14 +82,6 @@ void OnDeinit(const int reason)
 }
 
 //+------------------------------------------------------------------+
-//| Expert tick function                                             |
-//+------------------------------------------------------------------+
-// void OnTick()
-// {
-//   //---
-// }
-
-//+------------------------------------------------------------------+
 //| OnTick: 核心逻辑循环 (每次报价跳动触发)
 //+------------------------------------------------------------------+
 void OnTick()
@@ -105,7 +90,66 @@ void OnTick()
    // 我们只在 K 线收盘时交易，避免在一根 K 线上反复开仓
    if(Time[0] == g_last_bar_time) return; 
    g_last_bar_time = Time[0]; // 更新时间
-  
+
+   // 开始执行订单逻辑  两个价格 当前新k[0] 的开盘价格；上一根K线的 收盘价格 K[1]; 如果发生跳空 两个价格可能会不一样
+
+   double p1 = Close[1];
+   Print("--->[KTarget_FinderBot.mq4:97]: 上一根K线的 收盘价格: ", p1);
+
+   double p2 = Open[0];
+   Print("--->[KTarget_FinderBot.mq4:100]: 新一根K线的 开盘价格: ", p2);
+
+   // -----------------------------------------------------------------------
+
+   // 2.0 使用结构体版本 需要测试 是否能和1.0的版本同样执行下单功能 本质上其实和1.0 一样；1.0的FindStructuralSL
+   // 函数 其实循环扫描K线 主要还是为了找到止损点，它和我们信号扫描是不一样的
+   
+   // --- 3. 批量获取信号数据 (集中 iCustom 调用) ---
+   // 🚨 只需要调用一次，获取 shift=1 (已收盘 K 线) 的所有数据 🚨
+   KBarSignal last_bar_data = GetIndicatorBarData(1);
+
+   // --- 4. 执行交易逻辑 ---
+   // 4.1 处理买入信号 (使用 ReferencePrice 判断信号存在)
+   if (last_bar_data.BullishReferencePrice != (double)EMPTY_VALUE && last_bar_data.BullishReferencePrice != 0.0)
+   {
+      Print(">>> 侦测到看涨信号 @ ", Time[1], "。SL Price: ", last_bar_data.BullishStopLossPrice);
+
+      // A. 止损价直接读取 Buffer 0 (绝对 SL 价)
+      double sl_price = last_bar_data.BullishStopLossPrice;
+
+      // B. 入场价：新 K 线的开盘价 (Close[1] == Open[0])
+      double entry_price = Open[0];
+
+      // C. 计算止盈
+      double risk = entry_price - sl_price;
+      double tp_price = entry_price + (risk * RewardRatio);
+
+      // D. 执行开仓
+      ExecuteTrade(OP_BUY, FixedLot, sl_price, tp_price, "K-Target Buy");
+   }
+
+   // 4.2 处理卖出信号 (使用 ReferencePrice 判断信号存在)
+   if (last_bar_data.BearishReferencePrice != (double)EMPTY_VALUE && last_bar_data.BearishReferencePrice != 0.0)
+   {
+      Print(">>> 侦测到看跌信号 @ ", Time[1], "。SL Price: ", last_bar_data.BearishStopLossPrice);
+
+      // A. 止损价直接读取 Buffer 1 (绝对 SL 价)
+      double sl_price = last_bar_data.BearishStopLossPrice;
+
+      // B. 入场价：新 K 线的开盘价 (Close[1] == Open[0])
+      double entry_price = Open[0];
+
+      // C. 计算止盈
+      double risk = sl_price - entry_price;
+      double tp_price = entry_price - (risk * RewardRatio);
+
+      // D. 执行开仓
+      ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, "K-Target Sell");
+   }
+
+   // 3.0 版本 必须使用扫描逻辑
+
+   /** 1.0 版本
    // --- 2. 获取信号 (Communication) ---
    // 读取上根已收盘 K 线 (index 1) 的信号
    double buy_signal  = GetIndicatorSignal(2, 1); // Buffer 2 = Bullish Signal
@@ -115,7 +159,7 @@ void OnTick()
    // --- 3. 执行交易逻辑 ---
    
    // 3.1 处理买入信号
-   if(buy_signal != (double)EMPTY_VALUE && buy_signal != 0)
+   if(buy_signal != (double)EMPTY_VALUE && buy_signal != 0.0)
    {
       Print(">>> 侦测到看涨信号 @ ", Time[1]);
       
@@ -134,7 +178,7 @@ void OnTick()
    }
 
    // 3.2 处理卖出信号
-   if(sell_signal != (double)EMPTY_VALUE && sell_signal != 0)
+   if(sell_signal != (double)EMPTY_VALUE && sell_signal != 0.0)
    {
       Print(">>> 侦测到看跌信号 @ ", Time[1]);
       
@@ -150,6 +194,9 @@ void OnTick()
       // C. 执行开仓
       ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, "K-Target Sell");
    }
+   */
+
+
 }
 
 //+------------------------------------------------------------------+
@@ -194,21 +241,30 @@ void OnChartEvent(const int id,
 //+------------------------------------------------------------------+
 double GetIndicatorSignal(int buffer_index, int shift)
 {
-   // 注意：这里的参数列表必须非常精确，少一个都会导致读不到数据
-   return iCustom(_Symbol, _Period, IndicatorName, 
-                  Indi_Is_EA_Mode,
-                  Indi_Smart_Tuning, 
-                  Indi_Scan_Range, 
-                  Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
-                  Indi_Lookahead_Top, Indi_Lookback_Top,
-                  Indi_Max_Signal_Look, 
-                  Indi_DB_Threshold, 
-                  Indi_LLHH_Candles,
-                  Indi_Timer_Interval_Seconds,
-                  Indi_DrawFibonacci, // 即使不画线，为了函数签名匹配也要传
+   // iCustom 必须按照指标的输入参数顺序传递
+   return iCustom(
+       _Symbol,
+       _Period,
+       IndicatorName,
 
-                  buffer_index, // 读取哪个缓冲区
-                  shift);       // 读取哪根K线
+       // --- 传递 KTarget_Finder5 的所有输入参数 ---
+       Indi_Is_EA_Mode,
+       Indi_Smart_Tuning,
+       Indi_Scan_Range,
+       Indi_Lookahead_Bottom,
+       Indi_Lookback_Bottom,
+       Indi_Lookahead_Top,
+       Indi_Lookback_Top,
+       Indi_Max_Signal_Look,
+       Indi_DB_Threshold,
+       Indi_LLHH_Candles,
+       Indi_Timer_Interval_Seconds,
+       Indi_DrawFibonacci, // 即使不画线，为了函数签名匹配也要传
+       // ... (在这里添加您指标所需的其他关键参数) ...
+
+       // --- 缓冲区和 K 线位移 ---
+       buffer_index, // 读取哪个缓冲区
+       shift);       // 读取哪根K线
 }
 
 //+------------------------------------------------------------------+
@@ -303,3 +359,22 @@ void ExecuteTrade(int type, double lots, double sl, double tp, string comment)
       Print("订单执行失败! 错误代码: ", GetLastError());
    }
 }
+
+// -------------------------------------------------------
+//+------------------------------------------------------------------+
+//| 批量获取 KTarget_Finder5 所有缓冲区数据                          |
+//+------------------------------------------------------------------+
+KBarSignal GetIndicatorBarData(int shift)
+{
+    KBarSignal data;
+    
+    // 依次调用 iCustom 获取所有 4 个缓冲区的数据 (4次 iCustom 调用)
+    data.BullishStopLossPrice = GetIndicatorSignal(0, shift); // Buffer 0
+    data.BearishStopLossPrice = GetIndicatorSignal(1, shift); // Buffer 1
+    data.BullishReferencePrice = GetIndicatorSignal(2, shift); // Buffer 2
+    data.BearishReferencePrice = GetIndicatorSignal(3, shift); // Buffer 3
+    
+    data.OpenTime = Time[shift];
+    return data;
+}
+

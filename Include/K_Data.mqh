@@ -99,17 +99,20 @@ struct TuningParameters
 //+------------------------------------------------------------------+
 struct KBarSignal
 {
-    // Buffer 0: 看涨锚点价格 (SL 参照)
+    // Buffer 0: 最终看涨绝对止损价 (SL Price)
     double BullishStopLossPrice;
     
-    // Buffer 1: 看跌锚点价格 (SL 参照)
+    // Buffer 1: 最终看跌绝对止损价 (SL Price)
     double BearishStopLossPrice;
     
-    // Buffer 2: 最终看涨信号价格 (开仓触发)
+    // Buffer 2: 最终看涨信号质量代码
     double BullishReferencePrice;
     
-    // Buffer 3: 最终看跌信号价格 (开仓触发)
+    // Buffer 3: 最终看跌信号质量代码
     double BearishReferencePrice;
 
     datetime OpenTime;
+
+    // 我们可以增加一个字段来存储开仓价 (即信号K线的收盘价)
+    // double SignalClosePrice; // 存储 Close[shift] 这里看看如何更加精确的获取
 };
