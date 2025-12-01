@@ -6,11 +6,17 @@
 #property strict
 #property description "用于测试 KTarget_Finder5 指标 BullishTargetBuffer(0) 和 BearishTargetBuffer(1) 的绝对止损价是否正确传输。"
 #include <K_Data.mqh>
+
+
+//+------------------------------------------------------------------+
+// --- Bot Core Settings ---
+input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 false 时，EA 不执行任何操作
+//+------------------------------------------------------------------+
 // --- 外部输入参数 (请确保与您的 KTarget_Finder5.mq4 中的参数匹配) ---
 // ‼️ 重要: 您的指标必须有一个名为 Is_EA_Mode 的 bool 类型外部输入参数 ‼️
 input string IndicatorName          = "KTarget_Finder5";
 
-// ----------------------------------------------------------------------------------------------------
+//+------------------------------------------------------------------+
 // 对应 KTarget_Finder5.mq4 的输入参数
 input bool     Indi_Is_EA_Mode        = true;  // 必须设置为 TRUE，以触发指标写入 SL 价格
 
@@ -27,7 +33,7 @@ input int      Indi_DB_Threshold      = 3;     // DB_Threshold_Candles
 input int      Indi_LLHH_Candles      = 3;     // FindAbsoluteLowIndex
 input int      Indi_Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
 input bool     Indi_DrawFibonacci     = false;  // Is_DrawFibonacciLines
-// ----------------------------------------------------------------------------------------------------
+//+------------------------------------------------------------------+
 
 // --- 全局变量 ---
 datetime g_last_bar_time = 0;
@@ -75,6 +81,14 @@ double GetIndicatorSignal(int buffer_index, int shift)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // 🚨 1. 全局开关控制 🚨
+   if (!EA_Master_Switch)
+   {
+      // 可以在这里添加一个可选的日志，但频繁打印会影响性能
+      // Print("EA Master Switch is OFF. Operations suspended.");
+      return; // 开关未启用，立即退出 OnTick，不执行任何逻辑。
+   }
+
     // --- 1. 新 K 线检测 (仅在新 K 线收盘时执行读取) ---
     if(Time[0] == g_last_bar_time) return; 
     g_last_bar_time = Time[0]; 
@@ -205,3 +219,4 @@ KBarSignal GetIndicatorBarData(int shift)
     data.OpenTime = Time[shift];
     return data;
 }
+//+------------------------------------------------------------------+
