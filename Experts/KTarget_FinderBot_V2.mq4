@@ -13,6 +13,7 @@
 //====================================================================
 // 1. 策略参数设置 (Strategy Inputs)
 //====================================================================
+input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 false 时，EA 不执行任何操作
 input string   __STRATEGY_SETTINGS__ = "--- Strategy Settings ---";
 input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
 input double   FixedLot       = 0.01;        // 固定交易手数
@@ -86,6 +87,14 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // 🚨 1. 全局开关控制 🚨
+   if (!EA_Master_Switch)
+   {
+      // 可以在这里添加一个可选的日志，但频繁打印会影响性能
+      // Print("EA Master Switch is OFF. Operations suspended.");
+      return; // 开关未启用，立即退出 OnTick，不执行任何逻辑。
+   }
+
    // --- 1. 新K线检测机制 (New Bar Check) ---
    // 我们只在 K 线收盘时交易，避免在一根 K 线上反复开仓
    if(Time[0] == g_last_bar_time) return; 
@@ -94,7 +103,7 @@ void OnTick()
    // 开始执行订单逻辑  两个价格 当前新k[0] 的开盘价格；上一根K线的 收盘价格 K[1]; 如果发生跳空 两个价格可能会不一样
 
    double p1 = Close[1];
-   Print("--->[KTarget_FinderBot.mq4:97]: 上一根K线的 收盘价格: ", p1);
+   Print("--->[KTarget_FinderBot.mq4:100]: 上一根K线的 收盘价格: ", p1);
 
    double p2 = Open[0];
    Print("--->[KTarget_FinderBot.mq4:100]: 新一根K线的 开盘价格: ", p2);
@@ -271,6 +280,7 @@ double GetIndicatorSignal(int buffer_index, int shift)
 //| 函数: 寻找最近的结构性止损 (锚点价格)
 //| buffer_index: 0=看涨锚点, 1=看跌锚点
 //+------------------------------------------------------------------+
+/*
 double FindStructuralSL_v1(int buffer_index, int start_shift)
 {
    // 向左回溯查找最近的一个锚点
@@ -290,9 +300,10 @@ double FindStructuralSL_v1(int buffer_index, int start_shift)
    }
    return 0; // 未找到
 }
+*/
 
 // KTarget_FinderBot.mq4 (兼容 Bot 1.0 架构的修正)
-
+/*
 double FindStructuralSL(int buffer_index, int start_shift)
 {
     // 确定要读取的 SL 价格缓冲区和信号质量缓冲区
@@ -323,6 +334,7 @@ double FindStructuralSL(int buffer_index, int start_shift)
     
     return 0.0; // 未找到有效的 SL 价格
 }
+*/
 
 //+------------------------------------------------------------------+
 //| 函数: 执行交易 (OrderSend 封装)
@@ -377,4 +389,3 @@ KBarSignal GetIndicatorBarData(int shift)
     data.OpenTime = Time[shift];
     return data;
 }
-
