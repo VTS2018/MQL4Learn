@@ -7,8 +7,17 @@
 #property link "https://www.mql5.com"
 #property version "1.00"
 #property strict
+
+#define OP_NONE -1
+
 #include <K_Data.mqh>
 #include <KBot_Logic.mqh>
+
+//+------------------------------------------------------------------+
+// --- Bot Core Settings ---
+input string EA_Version_Tag = "V3";     // 版本信息标签，用于订单注释追踪
+input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 false 时，EA 不执行任何操作
+//+------------------------------------------------------------------+
 
 //====================================================================
 // 1. 策略参数设置 (Strategy Inputs)
@@ -45,7 +54,7 @@ input bool     Indi_DrawFibonacci     = false;  // Is_DrawFibonacciLines
 //====================================================================
 datetime g_last_bar_time = 0; // 用于新K线检测
 
-input int Indi_LastScan_Range = 100; // 扫描最近多少根 K 线 (Bot 1.0 逻辑)
+input int Indi_LastScan_Range = 300; // 扫描最近多少根 K 线 (Bot 1.0 逻辑)
 
 input int Trade_Start_Hour = 8; // 开始交易小时 (例如 8)
 input int Trade_End_Hour = 20;  // 结束交易小时 (例如 20)
@@ -100,24 +109,35 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // L3: 动态止盈追踪 (在每个 Tick 上运行 - 尚未实现)
-   if (CountOpenTrades(MagicNumber) >= 1)
+
+   //+------------------------------------------------------------------+
+   // 🚨 1. 全局开关控制 🚨
+   if (!EA_Master_Switch)
    {
-      ManageOpenTrades(); // (下一步要实现的函数)
+      // 可以在这里添加一个可选的日志，但频繁打印会影响性能
+      // Print("EA Master Switch is OFF. Operations suspended.");
+      return; // 开关未启用，立即退出 OnTick，不执行任何逻辑。
    }
+
+   // L3: 动态止盈追踪 (在每个 Tick 上运行 - 尚未实现)
+   // if (CountOpenTrades(MagicNumber) >= 1)
+   // {
+   //    ManageOpenTrades(); // (下一步要实现的函数)
+   // }
 
    // --- 1. 新K线检测机制 (New Bar Check) ---
    // 我们只在 K 线收盘时交易，避免在一根 K 线上反复开仓
    if(Time[0] == g_last_bar_time) return; 
    g_last_bar_time = Time[0]; // 更新时间
 
-   // 开始执行订单逻辑  两个价格 当前新k[0] 的开盘价格；上一根K线的 收盘价格 K[1]; 如果发生跳空 两个价格可能会不一样
+   // 开始执行订单逻辑  两个价格 当前新k[0] 的开盘价格；上一根K线的 收盘价格 K[1]; 如果发生跳空 两个价格可能会不一样 上一个收盘价格确定斐波那契计算
 
-   double p1 = Close[1];
-   Print("--->[KTarget_FinderBot.mq4:97]: 上一根K线的 收盘价格: ", p1);
+   // double p1 = Close[1];
+   // Print("--->[KTarget_FinderBot.mq4:100]: 上一根K线的 收盘价格: ", p1);
 
-   double p2 = Open[0];
-   Print("--->[KTarget_FinderBot.mq4:100]: 新一根K线的 开盘价格: ", p2);
+   // double p2 = Open[0];
+   // Print("--->[KTarget_FinderBot.mq4:100]: 新一根K线的 开盘价格: ", p2);
+   //+------------------------------------------------------------------+
 
    // --- 2. 🚨 交易管理政策：防止重复开仓 🚨
    // if (CountOpenTrades(MagicNumber) >= 1)
@@ -128,7 +148,7 @@ void OnTick()
    // L3: 每日风控重置 (Placeholder)
    // CheckDailyReset();
 
-   // -----------------------------------------------------------------------
+   //+------------------------------------------------------------------+
    
    /** 2.0 版本
    // 2.0 使用结构体版本 需要测试 是否能和1.0的版本同样执行下单功能 本质上其实和1.0 一样；1.0的FindStructuralSL
@@ -178,16 +198,21 @@ void OnTick()
    }
    */
 
+   //+------------------------------------------------------------------+
    // 3.0 版本 必须使用扫描逻辑
 
    // 🚨 核心扫描逻辑：寻找最新的有效信号 🚨
-   for (int shift = 1; shift <= Indi_Scan_Range; shift++)
+   for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
    {
       // 1. 批量读取当前 shift 的数据 (iCustom 循环在此发生)
       KBarSignal data = GetIndicatorBarData(shift);
 
       // 2. 核心决策：检查信号并执行所有 L2/L3 过滤
       int trade_command = CheckSignalAndFilter(data, shift);
+
+      Print("---->[KTarget_FinderBot.mq4:223]: shift: ", shift, "---trade_command:", trade_command, "--",
+            data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--",
+            data.BullishReferencePrice, "--", data.BearishReferencePrice);
 
       if (trade_command != OP_NONE)
       {
@@ -196,6 +221,8 @@ void OnTick()
          return; // 找到最新信号，立即停止扫描和决策
       }
    }
+
+   //+------------------------------------------------------------------+
 
    /** 1.0 版本
    // --- 2. 获取信号 (Communication) ---
@@ -243,6 +270,7 @@ void OnTick()
       ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, "K-Target Sell");
    }
    */
+  //+------------------------------------------------------------------+
 
 
 }
@@ -316,76 +344,20 @@ double GetIndicatorSignal(int buffer_index, int shift)
 }
 
 //+------------------------------------------------------------------+
-//| 函数: 寻找最近的结构性止损 (锚点价格)
-//| buffer_index: 0=看涨锚点, 1=看跌锚点
-//+------------------------------------------------------------------+
-double FindStructuralSL_v1(int buffer_index, int start_shift)
-{
-   // 向左回溯查找最近的一个锚点
-   // 限制回溯 Scan_Range 根，避免死循环
-   for(int i = start_shift; i < start_shift + Indi_Scan_Range; i++)
-   {
-      double val = GetIndicatorSignal(buffer_index, i);
-      
-      if(val != (double)EMPTY_VALUE && val != 0)
-      {
-         // 找到了！
-         // Buffer 0 存的是 Low - 偏移，Buffer 1 存的是 High + 偏移
-         // 为了精确，我们直接取那一根K线的 Low 或 High
-         if(buffer_index == 0) return Low[i];  // 看涨结构低点
-         if(buffer_index == 1) return High[i]; // 看跌结构高点
-      }
-   }
-   return 0; // 未找到
-}
-
-// KTarget_FinderBot.mq4 (兼容 Bot 1.0 架构的修正)
-
-double FindStructuralSL(int buffer_index, int start_shift)
-{
-    // 确定要读取的 SL 价格缓冲区和信号质量缓冲区
-    int sl_price_buffer = buffer_index;      // 0 或 1
-    int quality_buffer = buffer_index + 2;   // 2 或 3
-
-    // 限制回溯 Scan_Range 根
-    for(int i = start_shift; i < start_shift + Indi_Scan_Range; i++)
-    {
-        // 1. 读取信号质量 (Buffer 2 或 Buffer 3)
-        // val 现在代表信号质量代码 (3.0, 2.0, 或 EMPTY_VALUE)
-        double signal_quality = GetIndicatorSignal(quality_buffer, i); 
-        
-        // 2. 检查信号是否存在 (即质量代码已写入)
-        if (signal_quality != (double)EMPTY_VALUE && signal_quality >= 2.0) // 假设我们只关心 P2 和 P1-DB 信号 (2.0/3.0)
-        {
-            // 3. 信号存在！现在读取已计算好的 SL 绝对价格 (Buffer 0 或 Buffer 1)
-            double sl_price = GetIndicatorSignal(sl_price_buffer, i);
-            
-            // 4. 检查 SL 价格是否有效 (必须大于 0.0)
-            if (sl_price != (double)EMPTY_VALUE && sl_price != 0.0)
-            {
-                // 找到了！返回绝对 SL 价格
-                return sl_price; 
-            }
-        }
-    }
-    
-    return 0.0; // 未找到有效的 SL 价格
-}
-
-//+------------------------------------------------------------------+
 //| 函数: 执行交易 (OrderSend 封装)
 //+------------------------------------------------------------------+
-void ExecuteTrade(int type, double lots, double sl, double tp, string comment)
+void ExecuteTrade_V1(int type, double lots, double sl, double tp, string comment)
 {
    // 1. 规范化价格 (防止小数位错误)
-   sl = NormalizeDouble(sl, Digits);
-   tp = NormalizeDouble(tp, Digits);
-   
+   sl = NormalizeDouble(sl, _Digits);
+   tp = NormalizeDouble(tp, _Digits);
+
    double open_price = (type == OP_BUY) ? Ask : Bid;
-   open_price = NormalizeDouble(open_price, Digits);
-   
+   open_price = NormalizeDouble(open_price, _Digits);
+
    // 2. 发送订单
-   int ticket = OrderSend(Symbol(), type, lots, open_price, Slippage, sl, tp, comment, MagicNumber, 0, clrNONE);
+   int ticket = OrderSend(_Symbol, type, lots, open_price, Slippage, sl, tp, comment, MagicNumber, 0, clrNONE);
+
    Print("--->[KTarget_FinderBot.mq4:252]: clrNONE: ", clrNONE);
    Print("--->[KTarget_FinderBot.mq4:252]: MagicNumber: ", MagicNumber);
    Print("--->[KTarget_FinderBot.mq4:252]: comment: ", comment);
@@ -394,17 +366,63 @@ void ExecuteTrade(int type, double lots, double sl, double tp, string comment)
    Print("--->[KTarget_FinderBot.mq4:252]: Slippage: ", Slippage);
    Print("--->[KTarget_FinderBot.mq4:252]: open_price: ", open_price);
    Print("--->[KTarget_FinderBot.mq4:252]: lots: ", lots);
-   Print("--->[KTarget_FinderBot.mq4:252]: Symbol: ", Symbol());
+   Print("--->[KTarget_FinderBot.mq4:252]: Symbol: ", _Symbol);
    Print("--->[KTarget_FinderBot.mq4:252]: type: ", type);
-   
+
    // 3. 结果检查
-   if(ticket > 0)
+   if (ticket > 0)
    {
-      Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type==OP_BUY?"BUY":"SELL"), " SL: ", sl, " TP: ", tp);
+      Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type == OP_BUY ? "BUY" : "SELL"), " SL: ", sl, " TP: ", tp);
    }
    else
    {
       Print("订单执行失败! 错误代码: ", GetLastError());
+   }
+}
+
+// 🚨 修正后的函数签名：增加 entry_price 参数 🚨
+void ExecuteTrade(int type, double lots, double sl, double tp, double entry_price, string comment)
+{
+   // Print("DEBUG: Comment长度=", StringLen(comment), ", 内容='", comment, "'");
+
+   // 1. 规范化价格
+   sl = NormalizeDouble(sl, _Digits);
+   tp = NormalizeDouble(tp, _Digits);
+
+   // 2. 确定实际开仓价 (仍然使用市价 Ask/Bid)
+   double open_price = (type == OP_BUY) ? Ask : Bid;
+   open_price = NormalizeDouble(open_price, _Digits);
+
+   // 🚨 3. 可选：滑点检查 (如果实际开仓价 open_price 偏离预期入场价 entry_price 太远，则拒绝交易)
+   /*
+   if (MathAbs(open_price - entry_price) > Max_Allowed_Slippage * Point())
+   {
+       Print("交易被拒绝: 实际开仓价 (", open_price, ") 滑点过大，预期价 (", entry_price, ")");
+       return;
+   }
+   */
+
+   // 4. 发送订单 (使用 Ask/Bid 作为市价单 price)
+   int ticket = OrderSend(_Symbol,
+                          type,
+                          lots,
+                          open_price, // 实际开仓价
+                          Slippage,   // 使用 input 定义的滑点
+                          sl,
+                          tp,
+                          comment,
+                          MagicNumber,
+                          0,
+                          (type == OP_BUY) ? clrGreen : clrRed);
+
+   // 5. 结果检查 (使用 _Symbol 替代 Symbol()，使用 _Digits 替代 Digits)
+   if (ticket > 0)
+   {
+      Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type == OP_BUY ? "BUY" : "SELL"), " SL: ", sl, " TP: ", tp);
+   }
+   else
+   {
+      Print("订单执行失败! 错误代码: ", GetLastError(), ", 预期入场价: ", entry_price);
    }
 }
 
@@ -443,7 +461,7 @@ int CountOpenTrades(int magic)
          // 2. 必须是当前图表品种的订单 (Symbol)
          // 3. 必须是持仓订单 (OP_BUY 或 OP_SELL，排除挂单 OP_BUYSTOP 等)
          if (OrderMagicNumber() == magic &&
-             OrderSymbol() == Symbol() &&
+             OrderSymbol() == _Symbol &&
              (OrderType() == OP_BUY || OrderType() == OP_SELL))
          {
             total++;
@@ -458,47 +476,16 @@ int CountOpenTrades(int magic)
 //| 职责: 协调所有内部和外部过滤规则
 //| 返回: OP_BUY, OP_SELL, 或 0 (OP_NONE)
 //+------------------------------------------------------------------+
-int CheckSignalAndFilter(KBarSignal data)
+int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
 {
-    int trade_command = OP_NONE;
-
-    // --- 1. 检查看涨信号 ---
-    // 使用 ReferencePrice (现在是质量代码) 进行判断
-    if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
-    {
-        // A. 内部过滤：检查信号质量是否满足最低要求
-        if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
-        {
-            // B. 外部过滤：检查矩形区域、MA等外部条件 (暂未实现，默认通过)
-            // if (IsExternalConditionMet(OP_BUY)) 
-            // {
-                trade_command = OP_BUY;
-            // }
-        }
-    }
-
-    // --- 2. 检查看跌信号 ---
-    if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
-    {
-        // A. 内部过滤：检查信号质量是否满足最低要求
-        if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
-        {
-            // B. 外部过滤：检查矩形区域、MA等外部条件 (暂未实现，默认通过)
-            // if (IsExternalConditionMet(OP_SELL)) 
-            // {
-                trade_command = OP_SELL;
-            // }
-        }
-    }
-    
-    return trade_command;
+   return -1;
 }
 
 //+------------------------------------------------------------------+
 //| 函数: 计算 SL/TP 并执行交易 (L3)
 //| 职责: 最终的计算和 OrderSend 调用
 //+------------------------------------------------------------------+
-void CalculateTradeAndExecute(KBarSignal data, int type)
+void CalculateTradeAndExecute(const KBarSignal &data, int type)
 {
     double sl_price = 0;
     double entry_price = Open[0]; // 始终在新K线开盘时入场
@@ -549,13 +536,26 @@ void CalculateTradeAndExecute(KBarSignal data, int type)
         tp_price = entry_price - (risk * tp_level);
     }
 
+    // 1. 生成信号 ID (用于防重复和追踪)
+    // string signal_id = TimeToString(data.OpenTime, TIME_DATE | TIME_MINUTES);
+    string signal_id = GenerateSignalID(data.OpenTime);
+
+    // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态 (State 0: 刚开仓)
+    // string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 | Risk:" + DoubleToString(Max_Risk_Per_Trade * 100, 2) + "%";
+    // string oldcomment = "Q" + IntegerToString((int)data.BullishReferencePrice) + " Trade";
+    // string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 ";
+
+    // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态
+    string comment = "[" + EA_Version_Tag + 
+                     "|ID:" + signal_id;
+
     // 4. 执行交易 (此处使用固定手数，未来需要加入资金管理)
-    ExecuteTrade(type, FixedLot, sl_price, tp_price, entry_price, "Q" + IntegerToString((int)data.BullishReferencePrice) + " Trade"); 
-    
-    Print("交易执行: ", (type == OP_BUY ? "BUY" : "SELL"), 
-          " | SL:", DoubleToString(sl_price, Digits), 
-          " | TP(1.618):", DoubleToString(tp_price, Digits),
-          " | 质量:", IntegerToString((int)data.BullishReferencePrice));
+    ExecuteTrade(type, FixedLot, sl_price, tp_price, entry_price, comment);
+
+    Print("交易执行: ", (type == OP_BUY ? "BUY" : "SELL"),
+          " | SL:", DoubleToString(sl_price, _Digits),
+          " | TP(1.618):", DoubleToString(tp_price, _Digits),
+          " | 质量:", IntegerToString((int)((type == OP_BUY) ? data.BullishReferencePrice : data.BearishReferencePrice)));
 }
 
 //+------------------------------------------------------------------+
@@ -572,16 +572,16 @@ bool IsTimeWindowAllowed()
    // 功能说明：比如我是北京时间，我输入的是我北京时间，这时候 可能要考虑冬令时和夏令时的差别
    // 比如我想让EA 在上午时间段 北京时间 8-12 开始交易；和 下午 四点--6点 ；或者晚上 9-凌晨4点 ；一次性输入这几个时间段
    // EA只有在这些时间段里，才开始运行并交易
-   int current_hour = Hour();
+   // int current_hour = Hour();
 
-   // 检查是否在允许的时间窗口内
-   if (current_hour >= Trade_Start_Hour && current_hour < Trade_End_Hour)
-   {
-      return true;
-   }
+   // // 检查是否在允许的时间窗口内
+   // if (current_hour >= Trade_Start_Hour && current_hour < Trade_End_Hour)
+   // {
+   //    return true;
+   // }
 
-   // 如果不在允许时间内，打印日志并禁止交易
-   Print("风控过滤: 当前时间 ", current_hour, " 不在交易时间窗口 (", Trade_Start_Hour, "-", Trade_End_Hour, ")。");
+   // // 如果不在允许时间内，打印日志并禁止交易
+   // Print("风控过滤: 当前时间 ", current_hour, " 不在交易时间窗口 (", Trade_Start_Hour, "-", Trade_End_Hour, ")。");
    return false;
 }
 
@@ -600,16 +600,16 @@ bool IsTimeWindowAllowed()
 //+------------------------------------------------------------------+
 void CheckDailyReset()
 {
-    datetime current_date = iTime(NULL, PERIOD_D1, 0); // 获取当前交易日
+   //  datetime current_date = iTime(NULL, PERIOD_D1, 0); // 获取当前交易日
     
-    if (current_date != g_last_date)
-    {
-        // 跨日，执行重置
-        g_today_profit_pips = 0;
-        g_today_trades = 0;
-        g_last_date = current_date;
-        Print("--- 每日统计已重置 ---");
-    }
+   //  if (current_date != g_last_date)
+   //  {
+   //      // 跨日，执行重置
+   //      g_today_profit_pips = 0;
+   //      g_today_trades = 0;
+   //      g_last_date = current_date;
+   //      Print("--- 每日统计已重置 ---");
+   //  }
 }
 
 //+------------------------------------------------------------------+
@@ -618,25 +618,160 @@ void CheckDailyReset()
 bool IsDailyRiskAllowed()
 {
    // 1. 达到日盈利目标
-   if (g_today_profit_pips >= Daily_Target_Profit_Pips)
-   {
-      Comment("日盈利目标达成，暂停交易。");
-      return false;
-   }
+   // if (g_today_profit_pips >= Daily_Target_Profit_Pips)
+   // {
+   //    Comment("日盈利目标达成，暂停交易。");
+   //    return false;
+   // }
 
-   // 2. 达到日最大亏损
-   if (g_today_profit_pips <= -Daily_Max_Loss_Pips)
-   {
-      Comment("日最大亏损触发，暂停交易。");
-      return false;
-   }
+   // // 2. 达到日最大亏损
+   // if (g_today_profit_pips <= -Daily_Max_Loss_Pips)
+   // {
+   //    Comment("日最大亏损触发，暂停交易。");
+   //    return false;
+   // }
 
-   // 3. 达到日最大交易次数
-   if (g_today_trades >= Daily_Max_Trades)
-   {
-      Comment("日交易次数已满，暂停交易。");
-      return false;
-   }
+   // // 3. 达到日最大交易次数
+   // if (g_today_trades >= Daily_Max_Trades)
+   // {
+   //    Comment("日交易次数已满，暂停交易。");
+   //    return false;
+   // }
 
    return true;
+}
+
+//+------------------------------------------------------------------+
+//| 函数: 检查信号是否已交易 (核心追踪函数)
+//| 职责: 扫描所有持仓和历史订单，防止重复交易。
+//+------------------------------------------------------------------+
+/*
+bool IsSignalAlreadyTraded(string signal_id)
+{
+    // 遍历所有订单 (持仓和历史订单)
+    for(int i = OrdersHistoryTotal() - 1; i >= 0; i--)
+    {
+        if(OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) || OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+        {
+            if (OrderMagicNumber() == MagicNumber)
+            {
+                // 检查订单注释是否包含信号 ID
+                if (StringFind(OrderComment(), signal_id) != -1) 
+                {
+                    return true; // 找到了，已交易
+                }
+            }
+        }
+    }
+    return false; // 未找到，可以交易
+}
+*/
+
+//+------------------------------------------------------------------+
+//| L3: 检查信号是否已被交易 (防重复交易过滤器)                      |
+//| 必须分两步检查：1. 持仓订单 (MODE_TRADES) 2. 历史订单 (MODE_HISTORY)|
+//+------------------------------------------------------------------+
+bool IsSignalAlreadyTraded(string signal_id)
+{
+   // 🚨 1. 检查当前未平仓订单 (MODE_TRADES) 🚨
+   // 循环次数: OrdersTotal()
+   for (int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      // 关键: 使用 MODE_TRADES 选择持仓订单
+      if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         // 匹配品种和 MagicNumber
+         if (OrderSymbol() == _Symbol && OrderMagicNumber() == MagicNumber)
+         {
+            // 检查订单注释是否包含该信号 ID
+            if (StringFind(OrderComment(), signal_id, 0) != -1)
+            {
+               Print("防重复：信号 ID (", signal_id, ") 已在当前持仓订单中找到。阻止开仓。");
+               return true;
+            }
+         }
+      }
+   }
+
+   // 🚨 2. 检查历史已平仓订单 (MODE_HISTORY) 🚨
+   // 循环次数: OrdersHistoryTotal()
+   // 注意：在历史订单中，我们只关心该信号是否已经导致过一次交易
+
+   // 必须确保历史数据已加载 (通常在 OnInit() 或 OnTick() 早期)
+   // HistorySelect(0, TimeCurrent()); // 如果担心加载问题，可以解除此行注释
+
+   for (int i = OrdersHistoryTotal() - 1; i >= 0; i--)
+   {
+      // 关键: 使用 MODE_HISTORY 选择历史订单
+      if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+      {
+         // 匹配品种和 MagicNumber
+         if (OrderSymbol() == _Symbol && OrderMagicNumber() == MagicNumber)
+         {
+            // 检查订单注释是否包含该信号 ID
+            if (StringFind(OrderComment(), signal_id, 0) != -1)
+            {
+               Print("防重复：信号 ID (", signal_id, ") 已在历史已平仓订单中找到。阻止开仓。");
+               return true;
+            }
+         }
+      }
+   }
+
+   return false; // 没有找到任何匹配的订单，允许开仓
+}
+
+//+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_月日_时分)             |
+//+------------------------------------------------------------------+
+string GenerateSignalID(datetime signal_time)
+{
+   // --- 定义辅助变量 (用于 StringReplace，避免歧义) ---
+   // 必须使用连接来确保 MQL4 编译器将其识别为明确的 string
+   string find_underscore = "_" + "";
+   string find_dot = "." + "";
+   string find_colon = ":" + "";
+   string replace_empty = "" + "";
+
+   // 1. 获取品种前缀 (例如: BTCUSD -> BTC)
+   string symbol_prefix = _Symbol;
+   if (StringLen(_Symbol) >= 3)
+   {
+      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符
+   }
+
+   // 2. 清理品种名中的下划线/点
+   // 将 symbol_prefix 赋值给一个临时变量，以便 StringReplace 进行修改 (引用传递)
+   string temp_symbol = symbol_prefix;
+
+   // 🚨 关键修正：StringReplace 仅作函数调用，不赋值给 string 变量 🚨
+   StringReplace(temp_symbol, find_underscore, replace_empty); // 正确用法：修改 temp_symbol
+   StringReplace(temp_symbol, find_dot, replace_empty);        // 正确用法：修改 temp_symbol
+
+   // ----------------------------------------------------
+   // 3. 修正日期/时间获取逻辑
+   // ----------------------------------------------------
+
+   // 3.1 获取完整日期: "yyyy.mm.dd" (使用 TIME_DATE 确保格式标准)
+   string full_date = TimeToString(signal_time, TIME_DATE);
+
+   // 3.2 截取月日部分: 从第 5 位开始，长度为 5 ("mm.dd")
+   // 格式： yyyy.mm.dd
+   // 索引： 0123456789
+   string month_day = StringSubstr(full_date, 5, 5);
+
+   // 3.3 获取时间: "hh:mi"
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 4. 清理日期时间分隔符 (使用临时变量来处理 TimeToString 的结果)
+   string temp_month_day = month_day;
+   string temp_hour_minute = hour_minute;
+
+   // 🚨 关键修正：StringReplace 仅作函数调用 🚨
+   StringReplace(temp_month_day, find_dot, replace_empty);
+   StringReplace(temp_hour_minute, find_colon, replace_empty);
+
+   // 5. 最终 ID 拼接
+   // 格式: 品种前缀_月日_时分 (例如：XAU_1201_1517)
+   return temp_symbol + "_" + temp_month_day + "_" + temp_hour_minute;
 }
