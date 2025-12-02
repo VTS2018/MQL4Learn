@@ -65,6 +65,7 @@ input int Daily_Max_Trades = 5;                // 日最大交易次数
 
 input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=P2
 
+extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
 //====================================================================
 // 函数声明
 //====================================================================
@@ -200,6 +201,9 @@ void OnTick()
 
    //+------------------------------------------------------------------+
    // 3.0 版本 必须使用扫描逻辑
+
+   // 🚨 关键：在每次 OnTick 开始时，重置新鲜度追踪 🚨
+   Found_First_Qualified_Signal = false;
 
    // 🚨 核心扫描逻辑：寻找最新的有效信号 🚨
    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
@@ -544,7 +548,14 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    // ------------------------------------------------------------------
    
    // 程序运行到这里，说明 trade_command 已经是 OP_BUY 或 OP_SELL 了
-   
+
+   // 1. 🚨 L3a: 信号新鲜度过滤 (只允许扫描到的第一个合格信号通过) 🚨
+   if (!IsSignalFresh(trade_command))
+   {
+      Print("L3a 过滤：这不是扫描到的第一个合格信号，阻止开仓。");
+      return OP_NONE; // 阻止不新鲜的信号
+   }
+
    // 1. 生成唯一 ID
    string signal_id = GenerateSignalID(data.OpenTime);
    
@@ -867,4 +878,30 @@ string GenerateSignalID(datetime signal_time)
    // 5. 最终 ID 拼接
    // 格式: 品种前缀_月日_时分 (例如：XAU_1201_1517)
    return temp_symbol + "_" + temp_month_day + "_" + temp_hour_minute;
+}
+
+//+------------------------------------------------------------------+
+//| L3a: 信号新鲜度过滤器 (只允许扫描到的第一个合格信号通过)         |
+//| 必须在外层 for 循环开始前重置 Found_First_Qualified_Signal 为 false |
+//+------------------------------------------------------------------+
+bool IsSignalFresh(int trade_command)
+{
+    // 如果 trade_command 是 OP_NONE，则这不是一个合格信号，不影响 Found_First_Qualified_Signal
+    if (trade_command == OP_NONE)
+    {
+        return true; // 保持新鲜，继续扫描
+    }
+
+    // 程序运行到这里，说明 trade_command 是 OP_BUY 或 OP_SELL
+
+    // 检查：这是不是我们发现的第一个合格信号？
+    if (Found_First_Qualified_Signal == false)
+    {
+        // 发现第一个合格信号！将其标记为已找到，并允许它通过。
+        Found_First_Qualified_Signal = true;
+        return true; // 允许通过 (新鲜)
+    }
+
+    // 如果 Found_First_Qualified_Signal 已经是 true，说明这不是第一个合格信号
+    return false; // 阻止 (不新鲜)
 }
