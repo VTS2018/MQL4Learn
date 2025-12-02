@@ -210,9 +210,9 @@ void OnTick()
       // 2. 核心决策：检查信号并执行所有 L2/L3 过滤
       int trade_command = CheckSignalAndFilter(data, shift);
 
-      Print("---->[KTarget_FinderBot.mq4:223]: shift: ", shift, "---trade_command:", trade_command, "--",
-            data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--",
-            data.BullishReferencePrice, "--", data.BearishReferencePrice);
+      // Print("---->[KTarget_FinderBot.mq4:223]: shift: ", shift, "---trade_command:", trade_command, "--",
+      //       data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--",
+      //       data.BullishReferencePrice, "--", data.BearishReferencePrice);
 
       if (trade_command != OP_NONE)
       {
@@ -476,9 +476,102 @@ int CountOpenTrades(int magic)
 //| 职责: 协调所有内部和外部过滤规则
 //| 返回: OP_BUY, OP_SELL, 或 0 (OP_NONE)
 //+------------------------------------------------------------------+
-int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
+int CheckSignalAndFilter_V1(const KBarSignal &data, int signal_shift)
 {
    return -1;
+}
+
+//+------------------------------------------------------------------+
+//| 核心决策函数：检查信号有效性并执行防重复过滤                     |
+//| 去除了 L3a (新鲜度) 和 L3b (最大风险)，仅保留核心逻辑             |
+//+------------------------------------------------------------------+
+int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
+{
+   int trade_command = OP_NONE; // 初始化为 -1
+
+   // ------------------------------------------------------------------
+   // 步骤 1: L2 信号侦测与质量筛选 (Buffer 2 & 3)
+   // ------------------------------------------------------------------
+
+   // --- A. 优先检查看涨信号 ---
+   // 检查 Buffer 2 是否有值 (不为空且不为0)
+   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+   {
+      // 调试日志：看到了原始信号
+      // Print("[DEBUG] Shift=", signal_shift, " 发现看涨原始数据: ", data.BullishReferencePrice);
+
+      // 质量门槛检查
+      if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
+      {
+         trade_command = OP_BUY;
+         // 找到符合质量的看涨信号，准备进入 L3c 检查
+      }
+      else
+      {
+         // 调试日志：质量不够
+         // Print("[DEBUG] Shift=", signal_shift, " 看涨被过滤。质量(", data.BullishReferencePrice, ") < 设定(", Min_Signal_Quality, ")");
+      }
+   }
+
+   // --- B. 检查看跌信号 (仅当没有发现看涨信号时) ---
+   if (trade_command == OP_NONE)
+   {
+      // 检查 Buffer 3 是否有值
+      if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+      {
+         // 调试日志：看到了原始信号
+         // Print("[DEBUG] Shift=", signal_shift, " 发现看跌原始数据: ", data.BearishReferencePrice);
+
+         // 质量门槛检查
+         if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
+         {
+             trade_command = OP_SELL;
+             // 找到符合质量的看跌信号，准备进入 L3c 检查
+         }
+         else
+         {
+             // 调试日志：质量不够
+             // Print("[DEBUG] Shift=", signal_shift, " 看跌被过滤。质量(", data.BearishReferencePrice, ") < 设定(", Min_Signal_Quality, ")");
+         }
+      }
+   }
+
+   // 如果 L2 检查完，trade_command 还是 -1，说明没有合格信号，直接返回，让循环继续找下一个 shift
+   if (trade_command == OP_NONE) return OP_NONE;
+
+   // ------------------------------------------------------------------
+   // 步骤 2: L3c 信号重复性检查 (防重复交易)
+   // ------------------------------------------------------------------
+   
+   // 程序运行到这里，说明 trade_command 已经是 OP_BUY 或 OP_SELL 了
+   
+   // 1. 生成唯一 ID
+   string signal_id = GenerateSignalID(data.OpenTime);
+   
+   // 2. 检查历史订单和持仓
+   if (IsSignalAlreadyTraded(signal_id))
+   {
+      // 既然已交易，我们必须阻止这次开仓，返回 OP_NONE
+      // 这会导致外层循环继续向历史回溯，寻找更早之前的未交易信号
+      Print(">>> 信号 ID: ", signal_id, " 已在历史/持仓中找到，跳过此信号。 <<<");
+      return OP_NONE; 
+   }
+
+   // ------------------------------------------------------------------
+   // 步骤 3: 最终放行
+   // ------------------------------------------------------------------
+   
+   // 只有到了这里，才说明：
+   // 1. 信号存在且质量达标
+   // 2. 信号没有被交易过
+   
+   // 打印最终确认日志
+   Print(" 最终决策通过: Shift=", signal_shift, 
+         " | 类型: ", (trade_command==OP_BUY?"BUY":"SELL"), 
+         " | 质量: ", (trade_command==OP_BUY ? DoubleToString(data.BullishReferencePrice,1) : DoubleToString(data.BearishReferencePrice,1)),
+         " | ID: ", signal_id);
+
+   return trade_command; // 返回有效指令，这将导致外层 OnTick 循环立即停止！
 }
 
 //+------------------------------------------------------------------+
@@ -686,7 +779,7 @@ bool IsSignalAlreadyTraded(string signal_id)
             // 检查订单注释是否包含该信号 ID
             if (StringFind(OrderComment(), signal_id, 0) != -1)
             {
-               Print("防重复：信号 ID (", signal_id, ") 已在当前持仓订单中找到。阻止开仓。");
+               Print(">>> 防重复：信号 ID (", signal_id, ") 已在当前持仓订单中找到。阻止开仓。");
                return true;
             }
          }
@@ -711,7 +804,7 @@ bool IsSignalAlreadyTraded(string signal_id)
             // 检查订单注释是否包含该信号 ID
             if (StringFind(OrderComment(), signal_id, 0) != -1)
             {
-               Print("防重复：信号 ID (", signal_id, ") 已在历史已平仓订单中找到。阻止开仓。");
+               Print(">>> 防重复：信号 ID (", signal_id, ") 已在历史已平仓订单中找到。阻止开仓。");
                return true;
             }
          }
