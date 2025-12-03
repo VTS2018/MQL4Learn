@@ -67,6 +67,11 @@ input int Daily_Max_Trades = 5;                // 日最大交易次数
 input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=P2
 
 extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
+
+// --- L2: 趋势过滤器参数 ---
+input bool   Use_Trend_Filter    = true;   // 是否开启均线大趋势过滤
+input int    Trend_MA_Period     = 200;    // 均线周期 (默认200，牛熊分界线)
+input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SMMA, 3=LWMA
 //====================================================================
 // 函数声明
 //====================================================================
@@ -495,6 +500,17 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    int trade_command = OP_NONE; // 初始化为 -1
 
    // ------------------------------------------------------------------
+   // 准备工作：计算当前的均线数值 (基于当前的 signal_shift)
+   // ------------------------------------------------------------------
+   double ma_value = 0;
+   if (Use_Trend_Filter)
+   {
+      // iMA 函数详解见下文
+      ma_value = iMA(_Symbol, 0, Trend_MA_Period, 0, Trend_MA_Method, PRICE_CLOSE, signal_shift);
+      ma_value = NormalizeDouble(ma_value, Digits());
+   }
+
+   // ------------------------------------------------------------------
    // 步骤 1: L2 信号侦测与质量筛选 (Buffer 2 & 3)
    // ------------------------------------------------------------------
 
@@ -508,8 +524,23 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
       // 质量门槛检查
       if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
       {
-         trade_command = OP_BUY;
+         //1.0
+         // trade_command = OP_BUY;
          // 找到符合质量的看涨信号，准备进入 L3c 检查
+
+         //2.0
+         // 🚨 B. 趋势过滤 (新增) 🚨
+         // 如果开启了过滤，且 收盘价 < 均线，说明是逆势单，我们要过滤掉
+         if (Use_Trend_Filter && Close[signal_shift] < ma_value)
+         {
+             Print("[趋势过滤] 忽略看涨信号 @ ", TimeToString(data.OpenTime), "。价格(", Close[signal_shift], ") 在均线(", ma_value, ")之下");
+             // 不做任何操作，trade_command 保持 OP_NONE
+         }
+         else
+         {
+             trade_command = OP_BUY; // 顺势，通过！
+             // ... (原来的日志打印代码)
+         }
       }
       else
       {
@@ -530,8 +561,21 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
          // 质量门槛检查
          if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
          {
-             trade_command = OP_SELL;
-             // 找到符合质量的看跌信号，准备进入 L3c 检查
+            // trade_command = OP_SELL;
+            // 找到符合质量的看跌信号，准备进入 L3c 检查
+
+            // 🚨 B. 趋势过滤 (新增) 🚨
+            // 如果开启了过滤，且 收盘价 > 均线，说明是逆势单
+            if (Use_Trend_Filter && Close[signal_shift] > ma_value)
+            {
+               // Print("[趋势过滤] 忽略看跌信号。价格在均线之上");
+               Print("[趋势过滤] 忽略看跌信号 @ ", TimeToString(data.OpenTime), "。价格(", Close[signal_shift], ") 在均线(", ma_value, ")之上");
+            }
+            else
+            {
+               trade_command = OP_SELL; // 顺势，通过！
+                                        // ... (原来的日志打印代码)
+            }
          }
          else
          {
