@@ -322,7 +322,7 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
     ObjectSetInteger(0, name, OBJPROP_FILL, 1); // 开启填充
     //ObjectSetInteger(0, name, OBJPROP_LEVEL, 120); // 透明度设置 (例如 120)
     
-    ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Area");
+    // ObjectSetString(0, name, OBJPROP_TEXT, "P1/P2 Area");
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false); // 不可选中
     
     // 3. 更新矩形位置 (用于 OnCalculate 循环更新)

@@ -11,6 +11,7 @@
 #define OP_NONE -1
 
 #include <K_Data.mqh>
+#include <K_Utils.mqh>
 #include <KBot_Logic.mqh>
 
 //+------------------------------------------------------------------+
@@ -549,6 +550,14 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    
    // 程序运行到这里，说明 trade_command 已经是 OP_BUY 或 OP_SELL 了
 
+   // 1. 🚨 L3c: 信号时效性过滤 (新增逻辑) 🚨
+   // 检查 K[0] 是否紧跟信号成立 (即 signal_shift 必须为 1)
+   if (!IsSignalTimely(signal_shift))
+   {
+      // 阻止开仓，让 for 循环继续寻找 shift=1 的信号
+      return OP_NONE;
+   }
+
    // 1. 🚨 L3a: 信号新鲜度过滤 (只允许扫描到的第一个合格信号通过) 🚨
    if (!IsSignalFresh(trade_command))
    {
@@ -650,8 +659,7 @@ void CalculateTradeAndExecute(const KBarSignal &data, int type)
     // string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 ";
 
     // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态
-    string comment = "[" + EA_Version_Tag + 
-                     "|ID:" + signal_id;
+    string comment = EA_Version_Tag + "|" + signal_id;
 
     // 4. 执行交易 (此处使用固定手数，未来需要加入资金管理)
     ExecuteTrade(type, FixedLot, sl_price, tp_price, entry_price, comment);
@@ -828,7 +836,7 @@ bool IsSignalAlreadyTraded(string signal_id)
 //+------------------------------------------------------------------+
 //| 辅助函数：生成绝对唯一的信号 ID (品种前缀_月日_时分)             |
 //+------------------------------------------------------------------+
-string GenerateSignalID(datetime signal_time)
+string GenerateSignalID_V1(datetime signal_time)
 {
    // --- 定义辅助变量 (用于 StringReplace，避免歧义) ---
    // 必须使用连接来确保 MQL4 编译器将其识别为明确的 string
@@ -881,6 +889,61 @@ string GenerateSignalID(datetime signal_time)
 }
 
 //+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_周期_日时分)         |
+//| 新格式: BTC_M1021806                                             |
+//+------------------------------------------------------------------+
+string GenerateSignalID(datetime signal_time)
+{
+   // --- 定义辅助变量 (保持不变) ---
+   string find_underscore = "_" + "";
+   string find_dot = "." + "";
+   string find_colon = ":" + "";
+   string replace_empty = "" + "";
+   
+   // 1. 获取品种前缀 (例如: BTCUSD -> BTC) [cite: 47]
+   string symbol_prefix = _Symbol;
+   if (StringLen(_Symbol) >= 3)
+   {
+      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符 [cite: 49]
+   }
+
+   // 2. 清理品种名中的下划线/点
+   string temp_symbol = symbol_prefix;
+   StringReplace(temp_symbol, find_underscore, replace_empty); // [cite: 50]
+   StringReplace(temp_symbol, find_dot, replace_empty);        // [cite: 51]
+
+   // ----------------------------------------------------
+   // 3. 修正日期/时间获取逻辑 (新格式：日时分 DHHMM)
+   // ----------------------------------------------------
+
+   // 3.1 获取完整日期: "yyyy.mm.dd" (用于截取日) [cite: 51]
+   string full_date = TimeToString(signal_time, TIME_DATE);
+
+   // 3.2 截取日部分: 从第 8 位开始，长度为 2 ("dd")
+   // 格式： yyyy.mm.dd
+   // 索引： 0123456789
+   string day = StringSubstr(full_date, 8, 2); 
+   
+   // 3.3 获取时间: "hh:mi" (时分) [cite: 53]
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 4. 清理时间分隔符 (只清理时分)
+   string temp_hour_minute = hour_minute;
+   StringReplace(temp_hour_minute, find_colon, replace_empty); // [cite: 55]
+
+   // ----------------------------------------------------
+   // 5. 最终 ID 拼接
+   // ----------------------------------------------------
+
+   // 获取周期名称 (例如: "M1", "H4", "D1")
+   string timeframe_name = GetTimeframeName(Period());
+   
+   // 格式: 品种前缀_周期_日时分 (例如：BTC_M1021806)
+   // 注意：我们移除了下划线，直接连接
+   return temp_symbol + "_" + timeframe_name + day + temp_hour_minute; 
+}
+
+//+------------------------------------------------------------------+
 //| L3a: 信号新鲜度过滤器 (只允许扫描到的第一个合格信号通过)         |
 //| 必须在外层 for 循环开始前重置 Found_First_Qualified_Signal 为 false |
 //+------------------------------------------------------------------+
@@ -904,4 +967,20 @@ bool IsSignalFresh(int trade_command)
 
     // 如果 Found_First_Qualified_Signal 已经是 true，说明这不是第一个合格信号
     return false; // 阻止 (不新鲜)
+}
+
+//+------------------------------------------------------------------+
+//| L3c: 信号时效性过滤器 (只允许 shift=1 的信号通过)               |
+//+------------------------------------------------------------------+
+bool IsSignalTimely(int signal_shift)
+{
+   // 只有 shift=1 的信号被认为是“紧跟信号成立后的第一根 K 线”
+   if (signal_shift == 1)
+   {
+      return true; // 允许通过 (时效性达标)
+   }
+
+   // 所有 shift >= 2 的信号都被视为滞后，即使它是合格且未交易的
+   Print(" L3c 过滤：信号滞后。要求 shift=1，当前 shift=", signal_shift, "。阻止开仓。");
+   return false; // 阻止
 }
