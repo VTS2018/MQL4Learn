@@ -271,6 +271,7 @@ TuningParameters GetTunedParameters()
     p.Lookahead_Top          = 20;
     p.Lookback_Top           = 20;
     p.Max_Signal_Lookforward = 20;
+    p.Look_LLHH_Candles      = 3;
     
     // 根据周期动态调整参数
     switch (_Period)
@@ -279,6 +280,7 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 1440;
             p.Lookahead_Bottom = p.Lookback_Bottom = 30;
             p.Lookahead_Top = p.Lookback_Top = 30;
+
             p.Max_Signal_Lookforward = 30;
             p.Look_LLHH_Candles = 3;
             break;
@@ -287,6 +289,7 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 1440;
             p.Lookahead_Bottom = p.Lookback_Bottom = 25;
             p.Lookahead_Top = p.Lookback_Top = 25;
+
             p.Max_Signal_Lookforward = 25;
             p.Look_LLHH_Candles = 3;
             break;
@@ -295,6 +298,7 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 1440;
             p.Lookahead_Bottom = p.Lookback_Bottom = 18;
             p.Lookahead_Top = p.Lookback_Top = 18;
+
             p.Max_Signal_Lookforward = 18;
             p.Look_LLHH_Candles = 3;
             break;
@@ -303,6 +307,7 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 1440;
             p.Lookahead_Bottom = p.Lookback_Bottom = 15;
             p.Lookahead_Top = p.Lookback_Top = 15;
+
             p.Max_Signal_Lookforward = 15;
             p.Look_LLHH_Candles = 3;
             break;
@@ -311,6 +316,7 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 2160;
             p.Lookahead_Bottom = p.Lookback_Bottom = 12;
             p.Lookahead_Top = p.Lookback_Top = 12;
+
             p.Max_Signal_Lookforward = 12;
             p.Look_LLHH_Candles = 3;
             break;
@@ -320,35 +326,39 @@ TuningParameters GetTunedParameters()
             p.Scan_Range = 1260; 
             p.Lookahead_Bottom = p.Lookback_Bottom = 8;
             p.Lookahead_Top = p.Lookback_Top = 8;
+
             p.Max_Signal_Lookforward = 8;
             p.Look_LLHH_Candles = 3;
             break;
-            
+        // 开始调整 日周期 确认K前瞻 是5根 5天    
         case PERIOD_D1: // D1：日周期，遵循您的思路 (约 1-1.5 周)
             // 扫描范围覆盖约 1 个月
-            p.Scan_Range = 1825; 
-            p.Lookahead_Bottom = p.Lookback_Bottom = 7;
-            p.Lookahead_Top = p.Lookback_Top = 7;
-            p.Max_Signal_Lookforward = 7;
+            p.Scan_Range = 500; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 2;
+            p.Lookahead_Top = p.Lookback_Top = 2;
+
+            p.Max_Signal_Lookforward = 5;
             p.Look_LLHH_Candles = 3;
             break;
             
         case PERIOD_W1: // W1：周周期，只需要关注最近几周或几个月的结构
             // 扫描范围覆盖约 3 个月
-            p.Scan_Range = 260; 
-            p.Lookahead_Bottom = p.Lookback_Bottom = 5;
-            p.Lookahead_Top = p.Lookback_Top = 5;
-            p.Max_Signal_Lookforward = 5;
-            p.Look_LLHH_Candles = 3;
-            break;
-            
-        case PERIOD_MN1: // MN1：月周期，只需关注最近半年
-            // 扫描范围覆盖约 6 个月
-            p.Scan_Range = 100; 
+            p.Scan_Range = 500; 
             p.Lookahead_Bottom = p.Lookback_Bottom = 3;
             p.Lookahead_Top = p.Lookback_Top = 3;
+
             p.Max_Signal_Lookforward = 3;
             p.Look_LLHH_Candles = 3;
+            break;
+        // 月线调整为2    
+        case PERIOD_MN1: // MN1：月周期，只需关注最近半年
+            // 扫描范围覆盖约 6 个月
+            p.Scan_Range = 300; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 2;
+            p.Lookahead_Top = p.Lookback_Top = 2;
+
+            p.Max_Signal_Lookforward = 2;
+            p.Look_LLHH_Candles = 2;
             break;
     }
     
