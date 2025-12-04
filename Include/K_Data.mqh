@@ -68,9 +68,17 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 #define HIGHLIGHT_COLOR_S clrIndianRed
 #define HIGHLIGHT_ALPHA   50 // 透明度 (0-255，50为浅色)
 
+// 月周期
+#define HIGHLIGHT_COLOR_MN1_B C'0,255,0'
+#define HIGHLIGHT_COLOR_MN1_S C'0,255,0'
+
+// 周周期
+#define HIGHLIGHT_COLOR_W1_B C'255,255,0'
+#define HIGHLIGHT_COLOR_W1_S C'255,255,0'
+
 // 日周期 (D1) 特有颜色：选择高亮的、对比度强的颜色
 #define HIGHLIGHT_COLOR_D1_B clrGold          // 看涨使用金色 (高对比度)
-#define HIGHLIGHT_COLOR_D1_S clrOrangeRed      // 看跌使用醒目的红橙色 (高对比度)
+#define HIGHLIGHT_COLOR_D1_S C'64,224,208'    // 看跌使用醒目的红橙色 (高对比度)
 
 // 4H 周期 (H4) 特有颜色
 #define HIGHLIGHT_COLOR_H4_B clrYellowGreen   // 看涨使用黄绿色

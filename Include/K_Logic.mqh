@@ -244,16 +244,14 @@ color GetHighlightColorByPeriod(bool is_bullish)
         rect_color = is_bullish ? HIGHLIGHT_COLOR_H1_B : HIGHLIGHT_COLOR_H1_S;
     }
     // 3. 未来扩展区域 (例如 W1, MN1)
-    /*
     else if (current_period == PERIOD_W1) // 周周期
     {
-        // rect_color = is_bullish ? HIGHLIGHT_COLOR_W1_B : HIGHLIGHT_COLOR_W1_S;
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_W1_B : HIGHLIGHT_COLOR_W1_S;
     }
     else if (current_period == PERIOD_MN1) // 月周期
     {
-        // rect_color = is_bullish ? HIGHLIGHT_COLOR_MN1_B : HIGHLIGHT_COLOR_MN1_S;
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_MN1_B : HIGHLIGHT_COLOR_MN1_S;
     }
-    */
     
     return rect_color;
 }
