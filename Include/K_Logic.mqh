@@ -313,7 +313,7 @@ TuningParameters GetTunedParameters()
             break;
 
         case PERIOD_H1: // H1：稳定的中周期
-            p.Scan_Range = 2160;
+            p.Scan_Range = 500;
             p.Lookahead_Bottom = p.Lookback_Bottom = 12;
             p.Lookahead_Top = p.Lookback_Top = 12;
 
@@ -323,7 +323,7 @@ TuningParameters GetTunedParameters()
             
         case PERIOD_H4: // H4：长周期开始，K线代表的市场意义大增
             // 扫描范围覆盖约 2-3 周
-            p.Scan_Range = 1260; 
+            p.Scan_Range = 500; 
             p.Lookahead_Bottom = p.Lookback_Bottom = 8;
             p.Lookahead_Top = p.Lookback_Top = 8;
 

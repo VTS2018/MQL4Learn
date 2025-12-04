@@ -82,7 +82,7 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 
 // 4H 周期 (H4) 特有颜色
 #define HIGHLIGHT_COLOR_H4_B clrYellowGreen   // 看涨使用黄绿色
-#define HIGHLIGHT_COLOR_H4_S clrDarkOrange    // 看跌使用深橙色
+#define HIGHLIGHT_COLOR_H4_S C'127,255,212'    // 看跌使用深橙色
 
 // 1H 周期 (H1) 特有颜色
 #define HIGHLIGHT_COLOR_H1_B clrLightBlue     // 看涨使用浅蓝色
