@@ -38,7 +38,7 @@ input string   IndicatorName          = "KTarget_Finder5"; // 指标文件名(�
 
 // 对应 KTarget_Finder5.mq4 的输入参数
 input bool     Indi_Is_EA_Mode        = true;  // 必须设置为 TRUE，以触发指标写入 SL 价格
-input bool     Indi_Smart_Tuning      = true; // Smart_Tuning_Enabled
+input bool     Indi_Smart_Tuning      = false; // Smart_Tuning_Enabled
 input int      Indi_Scan_Range        = 500;   // Scan_Range
 input int      Indi_Lookahead_Bottom  = 20;    // Lookahead_Bottom
 input int      Indi_Lookback_Bottom   = 20;    // Lookback_Bottom
@@ -68,8 +68,9 @@ input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=
 
 extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
 
+//====================================================================
 // --- L2: 趋势过滤器参数 ---
-input bool   Use_Trend_Filter    = true;   // 是否开启均线大趋势过滤
+input bool   Use_Trend_Filter    = false;   // 是否开启均线大趋势过滤
 input int    Trend_MA_Period     = 200;    // 均线周期 (默认200，牛熊分界线)
 input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SMMA, 3=LWMA
 //====================================================================
