@@ -66,9 +66,11 @@ input int Daily_Max_Trades = 5;                // 日最大交易次数
 
 input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=P2
 
-extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
-
 //====================================================================
+// --- 严格过滤版本 只有紧跟信号成立后的 第一根K线 才允许交易
+extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
+//====================================================================
+input string   __Separator_9__ = "--- Separator  9 ---";
 // --- L2: 趋势过滤器参数 ---
 input bool   Use_Trend_Filter    = false;   // 是否开启均线大趋势过滤
 input int    Trend_MA_Period     = 200;    // 均线周期 (默认200，牛熊分界线)
@@ -487,10 +489,6 @@ int CountOpenTrades(int magic)
 //| 职责: 协调所有内部和外部过滤规则
 //| 返回: OP_BUY, OP_SELL, 或 0 (OP_NONE)
 //+------------------------------------------------------------------+
-int CheckSignalAndFilter_V1(const KBarSignal &data, int signal_shift)
-{
-   return -1;
-}
 
 //+------------------------------------------------------------------+
 //| 核心决策函数：检查信号有效性并执行防重复过滤                     |
@@ -501,7 +499,7 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    int trade_command = OP_NONE; // 初始化为 -1
 
    // ------------------------------------------------------------------
-   // 准备工作：计算当前的均线数值 (基于当前的 signal_shift)
+   // 准备工作：计算当前的均线数值 (基于当前的 signal_shift) 1分钟测试效果不好 可以选择关闭它
    // ------------------------------------------------------------------
    double ma_value = 0;
    if (Use_Trend_Filter)
@@ -539,8 +537,20 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
          }
          else
          {
-             trade_command = OP_BUY; // 顺势，通过！
+             // 3.0
+             // trade_command = OP_BUY; // 顺势，通过！
              // ... (原来的日志打印代码)
+
+             // 🚨 C. L2c: 斐波那契反转区域过滤 (新增调用位置) 🚨
+             if (IsReversalInFibZone(signal_shift, OP_BUY))
+             {
+               trade_command = OP_BUY; // 顺势且在斐波区域内，通过！
+               // ... (打印日志) ...
+             }
+             else
+             {
+                Print("L2c 过滤：看涨信号不在理想的斐波反转区域。当前:shift=", signal_shift);
+             }
          }
       }
       else
@@ -574,8 +584,18 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
             }
             else
             {
-               trade_command = OP_SELL; // 顺势，通过！
-                                        // ... (原来的日志打印代码)
+               // trade_command = OP_SELL; // 顺势，通过！
+               // ... (原来的日志打印代码)
+
+               // 🚨 C. L2c: 斐波那契反转区域过滤 (新增调用位置) 🚨
+               if (IsReversalInFibZone(signal_shift, OP_SELL))
+               {
+                  trade_command = OP_SELL; // 顺势且在斐波区域内，通过！
+               }
+               else
+               {
+                  Print("L2c 过滤：看跌信号不在理想的斐波反转区域。当前:shift=", signal_shift);
+               }
             }
          }
          else
@@ -1028,4 +1048,124 @@ bool IsSignalTimely(int signal_shift)
    // 所有 shift >= 2 的信号都被视为滞后，即使它是合格且未交易的
    Print(" L3c 过滤：信号滞后。要求 shift=1，当前 shift=", signal_shift, "。阻止开仓。");
    return false; // 阻止
+}
+
+// KTarget_FinderBot.mq4
+
+//+------------------------------------------------------------------+
+//| L2c: 斐波那契反转区域过滤 (Context Filter)                       |
+//| 检查当前反转信号是否位于前一个趋势的 2.618-3.0 衰竭区            |
+//+------------------------------------------------------------------+
+bool IsReversalInFibZone(int current_shift, int current_type)
+{
+   // 1. 确定我们要找的前一个信号类型
+   // 如果当前是 SELL，我们要找之前的 BUY；反之亦然。
+   int search_type = (current_type == OP_SELL) ? OP_BUY : OP_SELL;
+
+   // 2. 向历史回溯扫描 (从当前信号的前一根 K 线开始)
+   // 我们限制回溯范围，比如最多往前找 100 根，太远就没有因果关系了
+   int max_history_scan = 100;
+   int found_prev_shift = -1;
+
+   KBarSignal prev_data; // 用于存储找到的历史信号数据
+   // 🚨 修正：初始化 prev_data 以解决 uninitialized variable 错误 🚨
+   ZeroMemory(prev_data);
+
+   for (int i = current_shift + 1; i < current_shift + max_history_scan; i++)
+   {
+      KBarSignal temp_data = GetIndicatorBarData(i);
+
+      // 检查是否有由于 search_type 指定的信号
+      bool is_target_found = false;
+
+      if (search_type == OP_BUY)
+      {
+         // 找看涨信号 (有质量代码，且有有效的 SL)
+         // if (temp_data.BullishReferencePrice > 0 && temp_data.BullishStopLossPrice > 0)
+         if (temp_data.BullishReferencePrice != (double)EMPTY_VALUE && temp_data.BullishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+      else
+      {
+         // 找看跌信号
+         // if (temp_data.BearishReferencePrice > 0 && temp_data.BearishStopLossPrice > 0)
+         if (temp_data.BearishReferencePrice != (double)EMPTY_VALUE && temp_data.BearishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+
+      if (is_target_found)
+      {
+         found_prev_shift = i;
+         prev_data = temp_data;
+         Print("---->[KTarget_FinderBot.mq4:1098]: shift= ", i, "--", prev_data.BullishStopLossPrice, "--", prev_data.BearishStopLossPrice, "--", prev_data.BullishReferencePrice, "--", prev_data.BearishReferencePrice);
+         break; // 找到了最近的一个反向信号，停止扫描
+      }
+   }
+   
+   // 如果没找到前一个反向信号，无法判断上下文，视策略而定 (这里默认返回 false 过滤掉，或者 true 放行)
+   if (found_prev_shift == -1)
+   {
+       // Print("未找到前置反向信号，无法计算斐波那契区域。");
+       return false; // 严格模式：没参考就不做
+   }
+
+   // 3. 计算前一个信号的风险波幅 (Risk)
+   double prev_entry = Close[found_prev_shift]; // 假设信号 K 收盘价为入场
+   double prev_sl = 0;
+   double risk = 0;
+
+   if (search_type == OP_BUY)
+   {
+      prev_sl = prev_data.BullishStopLossPrice;
+      risk = prev_entry - prev_sl; // 看涨：入场 - 止损
+   }
+   else
+   {
+      prev_sl = prev_data.BearishStopLossPrice;
+      risk = prev_sl - prev_entry; // 看跌：止损 - 入场
+   }
+
+   // 4. 计算 2.618 - 3.00 区域
+   // 注意：扩展是沿着前一个趋势方向延伸的
+   double zone_low = 0;
+   double zone_high = 0;
+
+   if (search_type == OP_BUY)
+   {
+      // 前一个是涨势，目标位在上方
+      zone_low  = prev_entry + (risk * 2.618);
+      zone_high = prev_entry + (risk * 3.000);
+   }
+   else
+   {
+      // 前一个是跌势，目标位在下方
+      // 下跌时，数值越小越远，所以 3.0 是 zone_low (数值小)，2.618 是 zone_high
+      zone_low  = prev_entry - (risk * 3.000); 
+      zone_high = prev_entry - (risk * 2.618);
+   }
+   
+   // 5. 检查当前信号价格是否在区域内
+   double current_price = Close[current_shift]; // 当前信号 K 线的收盘价
+
+   // 添加一点容差 (例如 10% 的 Risk 距离)，这就是您说的“附近”
+   double tolerance = risk * 0.1; 
+
+   bool in_zone = false;
+   if (current_price >= (zone_low - tolerance) && current_price <= (zone_high + tolerance))
+   {
+      in_zone = true;
+   }
+
+   if (in_zone)
+   {
+       string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+       Print(" L2c 斐波过滤通过: 当前", type_str, "信号 @ ", current_price, 
+             " 位于前值 Fib [2.618-3.0] 区域 (", DoubleToString(zone_low, _Digits), "-", DoubleToString(zone_high, _Digits), ")");
+       return true;
+   }
+   else
+   {
+       // Print("L2c 斐波过滤: 当前信号不在前值 Fib 衰竭区。");
+       return false;
+   }
 }
