@@ -665,8 +665,27 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         double price_end   = CalculateFiboPrice(P1_price, P2_price, level2);
         // Print("===>[K_Drawing_Funcs.mqh:624]: price_end: ", price_end," level2: ",level2);
 
+
+        // 🚨 修正2.0：确定文本的锚点 🚨
+        // 时间锚点：使用 time2 (Time[0])，即矩形的右侧，实现右侧定位
+        datetime time_anchor = Time[0];
+
+        // 价格锚点：根据方向确定是矩形的高点还是低点
+        double text_anchor_price;
+        if (is_bullish)
+        {
+            // 看涨斐波 (文本在右下角): 锚定价格为矩形价格的较低点
+            text_anchor_price = MathMin(price_start, price_end);
+        }
+        else
+        {
+            // 看跌斐波 (文本在右上角): 锚定价格为矩形价格的较高点
+            text_anchor_price = MathMax(price_start, price_end);
+        }
+
+        // 1.0 注销
         // 矩形的顶部价格 (作为文本锚定点)
-        double price_top = price_end;
+        // double price_top = price_end;
 
         // 2. 命名对象，使用特殊标记 "_FiboHL_" 满足周期切换不删除需求
         string name = g_object_prefix + "Rect_FiboHL_" + (is_bullish ? "B_" : "S_") + GetBarTimeID(target_index) + "#" + DoubleToString(level1, 3) + "_" + DoubleToString(level2, 3);
@@ -727,8 +746,13 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             ObjectSetString(0, name, OBJPROP_TEXT, description_text);
 
             string description_text_level = description_text + " " + DoubleToString(level1, 3);
-            // 3. 🚨 调用新函数绘制图表文本 🚨
-            DrawFiboHighlightText(text_name, description_text_level, time1, price_top, tf_flag);
+
+            // 3. 🚨 调用新函数绘制图表文本 🚨 1.0
+            // DrawFiboHighlightText(text_name, description_text_level, time1, price_top, tf_flag);
+
+            // 3. 🚨 修正调用新函数绘制图表文本 🚨 2.0
+            // 使用 time_anchor 和 text_anchor_price，并传入 is_bullish
+            DrawFiboHighlightText(text_name, description_text_level, time_anchor, text_anchor_price, tf_flag, is_bullish);
         }
         else
         {
@@ -746,7 +770,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
  * @param anchor_price: 文本的锚定价格 (矩形顶部价格)
  * @param tf_flag: 文本对象的周期可见性位标志
  */
-void DrawFiboHighlightText(string text_name, string text_content, datetime anchor_time, double anchor_price, int tf_flag)
+void DrawFiboHighlightText(string text_name, string text_content, datetime anchor_time, double anchor_price, int tf_flag, bool is_bullish)
 {
     if (Is_EA_Mode) return;
     // 确保旧文本对象被删除
@@ -764,9 +788,28 @@ void DrawFiboHighlightText(string text_name, string text_content, datetime ancho
         ObjectSetString(0, text_name, OBJPROP_FONT, "Arial"); 
         ObjectSetInteger(0, text_name, OBJPROP_FONTSIZE, 8); 
         
+        // 默认1.0的设置
         // 设置锚点：左上角
-        ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER); 
-        ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER); 
+        // ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+        // ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+
+        // 🚨 修正2.0：根据看涨/看跌设置文本锚点 🚨
+        if (is_bullish)
+        {
+            // 看涨斐波 (文本在 右下角)
+            // 时间/价格锚点: CORNER_LEFT_UPPER (不变)
+            ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+            // 文本内部定位: 锚定在 文本自身的右下角
+            ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_LOWER);
+        }
+        else
+        {
+            // 看跌斐波 (文本在 右上角)
+            // 时间/价格锚点: CORNER_LEFT_UPPER (不变)
+            ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+            // 文本内部定位: 锚定在 文本自身的右上角
+            ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+        }
         
         // 关键优化：设置文本位置微调，稍微远离边角，以避免与边框重叠
         ObjectSetInteger(0, text_name, OBJPROP_XDISTANCE, 5); // 稍微右移 5 像素
@@ -777,6 +820,6 @@ void DrawFiboHighlightText(string text_name, string text_content, datetime ancho
         else ObjectSetInteger(0, text_name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
         
         // 确保文本对象不可选中
-        ObjectSetInteger(0, text_name, OBJPROP_SELECTABLE, false);
+        ObjectSetInteger(0, text_name, OBJPROP_SELECTABLE, true);
     }
 }
