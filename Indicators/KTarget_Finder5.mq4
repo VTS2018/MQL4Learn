@@ -641,12 +641,13 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                 }
             }
             break;
-        }    
+        }
+
         case CHARTEVENT_KEYDOWN:
         {
             // 用户按下了键盘上的键
-            Print("    侦测到键盘按下事件 (CHARTEVENT_KEYDOWN)");
-            Print("    按下的键代码 (lparam): ", lparam);
+            // Print("    侦测到键盘按下事件 (CHARTEVENT_KEYDOWN)");
+            // Print("    按下的键代码 (lparam): ", lparam);
             break;
         }
             

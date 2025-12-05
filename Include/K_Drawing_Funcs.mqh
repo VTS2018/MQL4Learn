@@ -497,10 +497,10 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
         // }
     }
 
-    Print("--->[K_Drawing_Funcs.mqh:497]: _Period: ", _Period);
+    // Print("--->[K_Drawing_Funcs.mqh:497]: _Period: ", _Period);
     // 1. 获取当前周期的正确位标志 (例如：传入 43200，返回 256)
     int current_tf_flag = GetTimeframeFlag(_Period);
-    Print("--->[K_Drawing_Funcs.mqh:498]: current_tf_flag: ", current_tf_flag);
+    // Print("--->[K_Drawing_Funcs.mqh:498]: current_tf_flag: ", current_tf_flag);
     
     if (current_tf_flag != 0)
     {
@@ -515,6 +515,7 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
  * @param target_index: Argument 1
  * @param is_bullish: Argument 2
  */
+/*
 void ClearSignalRectangle(int target_index, bool is_bullish)
 {
     // 构建可能存在的旧矩形名称
@@ -530,12 +531,14 @@ void ClearSignalRectangle(int target_index, bool is_bullish)
         Print("DEBUG: Cleared old signal rectangle for target index: ", target_name);
     }
 }
+*/
 
 /**
  * 清理旧有的信号绘制的矩形对象
  * @param target_index: 锚点K线的索引，不是锚点的索引 而是最低价和最高价K线的索引 这个函数先放到这里以后再解决
  * @param is_bullish: 是否为看涨信号 (true=看涨, false=看跌)
  */
+/*
 void ClearSignalRectangle_v2(int target_index, bool is_bullish)
 {
     // 1. 构建要查找的矩形名称的唯一标识 (即 '#' 符号之前的所有部分)
@@ -567,6 +570,7 @@ void ClearSignalRectangle_v2(int target_index, bool is_bullish)
         }
     }
 }
+*/
 //------------------------
 void DrawFiboHighlightRectangles(int target_index, int P2_index, bool is_bullish)
 {
@@ -617,10 +621,10 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
 
     //--------------------------------------------
     // 先调试价格
-    Print("-->[K_Drawing_Funcs.mqh:600]: P1_price: ", P1_price);
-    Print("-->[K_Drawing_Funcs.mqh:601]: P2_price: ", P2_price);
-    Print("-->[K_Drawing_Funcs.mqh:602]: time1: ", time1);
-    Print("-->[K_Drawing_Funcs.mqh:603]: time2: ", time2);
+    // Print("-->[K_Drawing_Funcs.mqh:600]: P1_price: ", P1_price);
+    // Print("-->[K_Drawing_Funcs.mqh:601]: P2_price: ", P2_price);
+    // Print("-->[K_Drawing_Funcs.mqh:602]: time1: ", time1);
+    // Print("-->[K_Drawing_Funcs.mqh:603]: time2: ", time2);
     //return; 价格全部对应得上 测试通过
     //--------------------------------------------
 
@@ -656,17 +660,17 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         
         // 1. 计算价格坐标
         double price_start = CalculateFiboPrice(P1_price, P2_price, level1);
-        Print("===>[K_Drawing_Funcs.mqh:622]: price_start: ", price_start," level1: ",level1);
+        // Print("===>[K_Drawing_Funcs.mqh:622]: price_start: ", price_start," level1: ",level1);
 
         double price_end   = CalculateFiboPrice(P1_price, P2_price, level2);
-        Print("===>[K_Drawing_Funcs.mqh:624]: price_end: ", price_end," level2: ",level2);
+        // Print("===>[K_Drawing_Funcs.mqh:624]: price_end: ", price_end," level2: ",level2);
 
         // 矩形的顶部价格 (作为文本锚定点)
         double price_top = price_end;
 
         // 2. 命名对象，使用特殊标记 "_FiboHL_" 满足周期切换不删除需求
         string name = g_object_prefix + "Rect_FiboHL_" + (is_bullish ? "B_" : "S_") + GetBarTimeID(target_index) + "#" + DoubleToString(level1, 3) + "_" + DoubleToString(level2, 3);
-        Print("===>[K_Drawing_Funcs.mqh:624]: name: ", name);
+        // Print("===>[K_Drawing_Funcs.mqh:624]: name: ", name);
 
         string text_name = name + "_TXT";
 
@@ -712,19 +716,19 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
 
             // 设置周期可见性
-            // int tf_flag = GetTimeframeFlag(_Period);
-            // if (tf_flag != 0)
-            //     ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_flag);
-            // else
-            //     ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+            int tf_flag = GetTimeframeFlag(_Period);
+            if (tf_flag != 0)
+                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_flag);
+            else
+                ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
 
-            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+            // ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
             // 🚨 核心修正：设置 OBJPROP_TEXT 作为对象列表的“说明” 🚨
             ObjectSetString(0, name, OBJPROP_TEXT, description_text);
 
             string description_text_level = description_text + " " + DoubleToString(level1, 3);
             // 3. 🚨 调用新函数绘制图表文本 🚨
-            DrawFiboHighlightText(text_name, description_text_level, time1, price_top, 0);
+            DrawFiboHighlightText(text_name, description_text_level, time1, price_top, tf_flag);
         }
         else
         {
