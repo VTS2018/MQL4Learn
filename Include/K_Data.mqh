@@ -74,7 +74,7 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 
 // 周周期
 #define HIGHLIGHT_COLOR_W1_B C'255,255,0'
-#define HIGHLIGHT_COLOR_W1_S C'255,255,0'
+#define HIGHLIGHT_COLOR_W1_S C'135,206,250'
 
 // 日周期 (D1) 特有颜色：选择高亮的、对比度强的颜色
 #define HIGHLIGHT_COLOR_D1_B clrGold          // 看涨使用金色 (高对比度)
