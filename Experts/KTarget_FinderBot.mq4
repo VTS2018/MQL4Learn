@@ -1123,17 +1123,69 @@ bool IsReversalInFibZone(int current_shift, int current_type)
    if (search_type == OP_BUY)
    {
       // 前一个是涨势，目标位在上方
-      zone_low  = prev_entry + (risk * 2.618);
-      Print("--->[KTarget_FinderBot.mq4:1127]: zone_low: ", zone_low);
-      zone_high = prev_entry + (risk * 3.000);
-      Print("--->[KTarget_FinderBot.mq4:1129]: zone_high: ", zone_high);
+      // zone_low  = prev_entry + (risk * 2.618);
+      // Print("--->[KTarget_FinderBot.mq4:1127]: zone_low: ", zone_low);
+      // zone_high = prev_entry + (risk * 3.000);
+      // Print("--->[KTarget_FinderBot.mq4:1129]: zone_high: ", zone_high);
+
+      // 2.0计算 1.618-1.88；2.618-2.88；4.236-4.88；6-7
+      zone_low = prev_sl + (risk * 1.618);
+      zone_low  = NormalizeDouble(zone_low, _Digits);
+      Print("--->[KTarget_FinderBot.mq4:1133]: zone_low: ", DoubleToString(zone_low, _Digits));
+      zone_high = prev_sl + (risk * 1.88);
+      zone_high  = NormalizeDouble(zone_high, _Digits);
+      Print("--->[KTarget_FinderBot.mq4:1135]: zone_high: ", DoubleToString(zone_high, _Digits));
+
+      // zone_low = prev_sl + (risk * 2.618);
+      // Print("--->[KTarget_FinderBot.mq4:1138]: zone_low: ", zone_low);
+      // zone_high = prev_sl + (risk * 2.88);
+      // Print("--->[KTarget_FinderBot.mq4:1140]: zone_high: ", zone_high);
+
+      // zone_low = prev_sl + (risk * 4.236);
+      // Print("--->[KTarget_FinderBot.mq4:1143]: zone_low: ", zone_low);
+      // zone_high = prev_sl + (risk * 4.88);
+      // Print("--->[KTarget_FinderBot.mq4:1145]: zone_high: ", zone_high);
+
+      // zone_low = prev_sl + (risk * 5);
+      // Print("--->[KTarget_FinderBot.mq4:1148]: zone_low: ", zone_low);
+      // zone_high = prev_sl + (risk * 6);
+      // Print("--->[KTarget_FinderBot.mq4:1150]: zone_high: ", zone_high);
    }
    else
    {
       // 前一个是跌势，目标位在下方
       // 下跌时，数值越小越远，所以 3.0 是 zone_low (数值小)，2.618 是 zone_high
-      zone_low  = prev_entry - (risk * 3.000); 
-      zone_high = prev_entry - (risk * 2.618);
+      // zone_low  = prev_entry - (risk * 3.000); 
+      // zone_high = prev_entry - (risk * 2.618);
+
+      // 2.0 NormalizeDouble(raw_fibo_price, _Digits)
+      zone_low  = prev_sl - (risk * 1.618);
+      zone_low  = NormalizeDouble(zone_low, _Digits);
+      Print("--->[KTarget_FinderBot.mq4:1161]: zone_low: ", DoubleToString(zone_low, _Digits));
+      zone_high = prev_sl - (risk * 1.88);
+      zone_high = NormalizeDouble(zone_high, _Digits);
+      Print("--->[KTarget_FinderBot.mq4:1163]: zone_high: ", DoubleToString(zone_high, _Digits));
+
+      // zone_low  = prev_sl - (risk * 2.618);
+      // zone_low  = NormalizeDouble(zone_low, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1168]: zone_low: ", DoubleToString(zone_low, _Digits));
+      // zone_high = prev_sl - (risk * 2.88);
+      // zone_high = NormalizeDouble(zone_high, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1170]: zone_high: ", DoubleToString(zone_high, _Digits));
+      
+      // zone_low  = prev_sl - (risk * 4.236);
+      // zone_low  = NormalizeDouble(zone_low, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1173]: zone_low: ", DoubleToString(zone_low, _Digits));
+      // zone_high = prev_sl - (risk * 4.88);
+      // zone_high = NormalizeDouble(zone_high, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1175]: zone_high: ", DoubleToString(zone_high, _Digits));
+
+      // zone_low  = prev_sl - (risk * 5);
+      // zone_low  = NormalizeDouble(zone_low, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1178]: zone_low: ", DoubleToString(zone_low, _Digits));
+      // zone_high = prev_sl - (risk * 6);
+      // zone_high = NormalizeDouble(zone_high, _Digits);
+      // Print("--->[KTarget_FinderBot.mq4:1180]: zone_high: ", DoubleToString(zone_high, _Digits));
    }
    
    /*
@@ -1171,7 +1223,8 @@ bool IsReversalInFibZone(int current_shift, int current_type)
    double current_high = High[current_shift];
    // 添加容差 (例如 10% 的 Risk 距离)，即您说的“附近”
    double tolerance = risk * 0.1;
-   Print("--->[KTarget_FinderBot.mq4:1174]: tolerance: ", tolerance);
+   tolerance = NormalizeDouble(tolerance, _Digits);
+   Print("--->[KTarget_FinderBot.mq4:1174]: tolerance: ", DoubleToString(tolerance, _Digits));
 
    // 计算带容差的检查区域
    double check_zone_low  = zone_low - tolerance;
