@@ -79,6 +79,8 @@ input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SM
 // 函数声明
 //====================================================================
 KBarSignal GetIndicatorBarData(int shift);
+double GetIndicatorSignal(int buffer_index, int shift);
+string GenerateSignalID(datetime signal_time);
 //====================================================================
 
 //+------------------------------------------------------------------+
@@ -222,70 +224,19 @@ void OnTick()
 
       // 2. 核心决策：检查信号并执行所有 L2/L3 过滤
       int trade_command = CheckSignalAndFilter(data, shift);
+      // Print("----> shift: ", shift, "---trade_command:", trade_command, "--", data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--", data.BullishReferencePrice, "--", data.BearishReferencePrice);
 
-      // Print("---->[KTarget_FinderBot.mq4:223]: shift: ", shift, "---trade_command:", trade_command, "--",
-      //       data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--",
-      //       data.BullishReferencePrice, "--", data.BearishReferencePrice);
-
+      /*
       if (trade_command != OP_NONE)
       {
          // 3. 找到最新信号，执行交易并退出扫描
          CalculateTradeAndExecute(data, trade_command);
          return; // 找到最新信号，立即停止扫描和决策
       }
+      */
    }
 
    //+------------------------------------------------------------------+
-
-   /** 1.0 版本
-   // --- 2. 获取信号 (Communication) ---
-   // 读取上根已收盘 K 线 (index 1) 的信号
-   double buy_signal  = GetIndicatorSignal(2, 1); // Buffer 2 = Bullish Signal
-   Print("--->[KTarget_FinderBot.mq4:110]: buy_signal: ", buy_signal);
-   double sell_signal = GetIndicatorSignal(3, 1); // Buffer 3 = Bearish Signal
-   Print("--->[KTarget_FinderBot.mq4:112]: sell_signal: ", sell_signal);
-   // --- 3. 执行交易逻辑 ---
-   
-   // 3.1 处理买入信号
-   if(buy_signal != (double)EMPTY_VALUE && buy_signal != 0.0)
-   {
-      Print(">>> 侦测到看涨信号 @ ", Time[1]);
-      
-      // A. 寻找结构性止损 (寻找最近的 Buffer 0 锚点)
-      double sl_price = FindStructuralSL(0, 1); 
-      
-      // 如果没找到锚点(极少情况)，就用最近低点做保护
-      if(sl_price == 0) sl_price = Low[1] - 100 * Point; 
-
-      // B. 计算止盈 (基于盈亏比)
-      double risk = Ask - sl_price;
-      double tp_price = Ask + (risk * RewardRatio);
-
-      // C. 执行开仓
-      ExecuteTrade(OP_BUY, FixedLot, sl_price, tp_price, "K-Target Buy");
-   }
-
-   // 3.2 处理卖出信号
-   if(sell_signal != (double)EMPTY_VALUE && sell_signal != 0.0)
-   {
-      Print(">>> 侦测到看跌信号 @ ", Time[1]);
-      
-      // A. 寻找结构性止损 (寻找最近的 Buffer 1 锚点)
-      double sl_price = FindStructuralSL(1, 1);
-      
-      if(sl_price == 0) sl_price = High[1] + 100 * Point;
-
-      // B. 计算止盈 (基于盈亏比)
-      double risk = sl_price - Bid;
-      double tp_price = Bid - (risk * RewardRatio);
-
-      // C. 执行开仓
-      ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, "K-Target Sell");
-   }
-   */
-  //+------------------------------------------------------------------+
-
-
 }
 
 //+------------------------------------------------------------------+
@@ -721,7 +672,6 @@ void CalculateTradeAndExecute(const KBarSignal &data, int type)
     // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态 (State 0: 刚开仓)
     // string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 | Risk:" + DoubleToString(Max_Risk_Per_Trade * 100, 2) + "%";
     // string oldcomment = "Q" + IntegerToString((int)data.BullishReferencePrice) + " Trade";
-    // string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 ";
 
     // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态
     string comment = EA_Version_Tag + "|" + signal_id;
@@ -821,30 +771,6 @@ bool IsDailyRiskAllowed()
 //+------------------------------------------------------------------+
 //| 函数: 检查信号是否已交易 (核心追踪函数)
 //| 职责: 扫描所有持仓和历史订单，防止重复交易。
-//+------------------------------------------------------------------+
-/*
-bool IsSignalAlreadyTraded(string signal_id)
-{
-    // 遍历所有订单 (持仓和历史订单)
-    for(int i = OrdersHistoryTotal() - 1; i >= 0; i--)
-    {
-        if(OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) || OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
-        {
-            if (OrderMagicNumber() == MagicNumber)
-            {
-                // 检查订单注释是否包含信号 ID
-                if (StringFind(OrderComment(), signal_id) != -1) 
-                {
-                    return true; // 找到了，已交易
-                }
-            }
-        }
-    }
-    return false; // 未找到，可以交易
-}
-*/
-
-//+------------------------------------------------------------------+
 //| L3: 检查信号是否已被交易 (防重复交易过滤器)                      |
 //| 必须分两步检查：1. 持仓订单 (MODE_TRADES) 2. 历史订单 (MODE_HISTORY)|
 //+------------------------------------------------------------------+
@@ -896,61 +822,6 @@ bool IsSignalAlreadyTraded(string signal_id)
    }
 
    return false; // 没有找到任何匹配的订单，允许开仓
-}
-
-//+------------------------------------------------------------------+
-//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_月日_时分)             |
-//+------------------------------------------------------------------+
-string GenerateSignalID_V1(datetime signal_time)
-{
-   // --- 定义辅助变量 (用于 StringReplace，避免歧义) ---
-   // 必须使用连接来确保 MQL4 编译器将其识别为明确的 string
-   string find_underscore = "_" + "";
-   string find_dot = "." + "";
-   string find_colon = ":" + "";
-   string replace_empty = "" + "";
-
-   // 1. 获取品种前缀 (例如: BTCUSD -> BTC)
-   string symbol_prefix = _Symbol;
-   if (StringLen(_Symbol) >= 3)
-   {
-      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符
-   }
-
-   // 2. 清理品种名中的下划线/点
-   // 将 symbol_prefix 赋值给一个临时变量，以便 StringReplace 进行修改 (引用传递)
-   string temp_symbol = symbol_prefix;
-
-   // 🚨 关键修正：StringReplace 仅作函数调用，不赋值给 string 变量 🚨
-   StringReplace(temp_symbol, find_underscore, replace_empty); // 正确用法：修改 temp_symbol
-   StringReplace(temp_symbol, find_dot, replace_empty);        // 正确用法：修改 temp_symbol
-
-   // ----------------------------------------------------
-   // 3. 修正日期/时间获取逻辑
-   // ----------------------------------------------------
-
-   // 3.1 获取完整日期: "yyyy.mm.dd" (使用 TIME_DATE 确保格式标准)
-   string full_date = TimeToString(signal_time, TIME_DATE);
-
-   // 3.2 截取月日部分: 从第 5 位开始，长度为 5 ("mm.dd")
-   // 格式： yyyy.mm.dd
-   // 索引： 0123456789
-   string month_day = StringSubstr(full_date, 5, 5);
-
-   // 3.3 获取时间: "hh:mi"
-   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
-
-   // 4. 清理日期时间分隔符 (使用临时变量来处理 TimeToString 的结果)
-   string temp_month_day = month_day;
-   string temp_hour_minute = hour_minute;
-
-   // 🚨 关键修正：StringReplace 仅作函数调用 🚨
-   StringReplace(temp_month_day, find_dot, replace_empty);
-   StringReplace(temp_hour_minute, find_colon, replace_empty);
-
-   // 5. 最终 ID 拼接
-   // 格式: 品种前缀_月日_时分 (例如：XAU_1201_1517)
-   return temp_symbol + "_" + temp_month_day + "_" + temp_hour_minute;
 }
 
 //+------------------------------------------------------------------+
@@ -1050,11 +921,9 @@ bool IsSignalTimely(int signal_shift)
    return false; // 阻止
 }
 
-// KTarget_FinderBot.mq4
-
 //+------------------------------------------------------------------+
 //| L2c: 斐波那契反转区域过滤 (Context Filter)                       |
-//| 检查当前反转信号是否位于前一个趋势的 2.618-3.0 衰竭区            |
+//| 检查当前反转信号是否位于前一个趋势的 2.618-3.0 衰竭区             |
 //+------------------------------------------------------------------+
 bool IsReversalInFibZone(int current_shift, int current_type)
 {
