@@ -35,14 +35,16 @@
 
 //+------------------------------------------------------------------+
 
-// --- 辅助结构体：用于存储解析结果 ---
+//+------------------------------------------------------------------+
+//| 辅助结构体：用于存储解析结果                                      |
+//+------------------------------------------------------------------+
 struct ParsedRectInfo
 {
     bool     is_bullish; // 看涨 (true) / 看跌 (false)
     datetime P1_time;    // P1 K线开盘时间
     datetime P2_time;    // P2 K线开盘时间
 };
-//-----------------------------------
+
 // 在 K_Data.mqh 或 K_Utils.mqh 中定义，此处仅用于示例
 struct FiboZone {
     double level1; // 区域底部级别
@@ -63,6 +65,10 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
     {4.236, 4.880},
     {5.000, 6.000}
 };
+
+//+------------------------------------------------------------------+
+//| 定义扩展矩形的颜色                                                |
+//+------------------------------------------------------------------+
 // 默认颜色 (用于所有其他周期) 矩形颜色和透明度
 #define HIGHLIGHT_COLOR_B clrSeaGreen
 #define HIGHLIGHT_COLOR_S clrIndianRed
@@ -87,9 +93,10 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 // 1H 周期 (H1) 特有颜色
 #define HIGHLIGHT_COLOR_H1_B clrLightBlue     // 看涨使用浅蓝色
 #define HIGHLIGHT_COLOR_H1_S clrHotPink       // 看跌使用亮粉色
-//------------------
 
-// 定义用于智能调优的参数结构体
+//+------------------------------------------------------------------+
+//| 定义用于智能调优的参数结构体                                      |
+//+------------------------------------------------------------------+
 struct TuningParameters
 {
     int Scan_Range;
@@ -101,9 +108,8 @@ struct TuningParameters
     int Look_LLHH_Candles;
 };
 
-//----------------------
 //+------------------------------------------------------------------+
-//| 批量 K 线信号数据结构体 (Indicator Data Structure)                   |
+//| 批量 K 线信号数据结构体 (Indicator Data Structure)                |
 //+------------------------------------------------------------------+
 struct KBarSignal
 {
@@ -123,4 +129,16 @@ struct KBarSignal
 
     // 我们可以增加一个字段来存储开仓价 (即信号K线的收盘价)
     // double SignalClosePrice; // 存储 Close[shift] 这里看看如何更加精确的获取
+};
+
+//+------------------------------------------------------------------+
+//| 一个轻量级的结构体来存储所有合格的信号，用于后续的比较             |
+//+------------------------------------------------------------------+
+struct FilteredSignal
+{
+    int      shift;              // K线索引 (1, 2, 3...)
+    datetime signal_time;        // 信号发生时间
+    double   confirmation_close; // 信号确认K线的收盘价 (Close[shift])
+    double   stop_loss;          // 信号的止损价
+    int      type;               // 交易类型 (OP_BUY 或 OP_SELL)
 };
