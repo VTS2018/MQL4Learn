@@ -543,7 +543,7 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
 
    // --- A. 优先检查看涨信号 ---
    // 检查 Buffer 2 是否有值 (不为空且不为0)
-   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0 && data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
    {
       // 调试日志：看到了原始信号
       // Print("[DEBUG] Shift=", signal_shift, " 发现看涨原始数据: ", data.BullishReferencePrice);
@@ -592,7 +592,7 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    if (trade_command == OP_NONE)
    {
       // 检查 Buffer 3 是否有值
-      if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+      if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0 && data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
       {
          // 调试日志：看到了原始信号
          // Print("[DEBUG] Shift=", signal_shift, " 发现看跌原始数据: ", data.BearishReferencePrice);
