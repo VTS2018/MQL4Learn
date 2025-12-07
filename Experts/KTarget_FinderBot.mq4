@@ -84,6 +84,8 @@ string GenerateSignalID(datetime signal_time);
 void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[]);
 int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[]);
 void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[]);
+void MergeAndSortSignals(FilteredSignal &bulls[], FilteredSignal &bears[], FilteredSignal &result_list[]);
+void Test_MergeAndSortSignals(FilteredSignal &merge_list[]);
 //====================================================================
 
 //+------------------------------------------------------------------+
@@ -261,13 +263,15 @@ void OnTick()
    // 运行测试 查看结果
    Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
 
-   /*
+   
    // 4. 合并并排序 (生成列表 X)
    // 此时 sorted_valid_signals[0] 就是距离现价最近的那个有效结构信号
    MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
 
    int total_valid_signals = ArraySize(sorted_valid_signals);
+   Test_MergeAndSortSignals(sorted_valid_signals);
 
+   /*
    // ==========================================================================
    // 第二阶段：核心执行循环 (只针对精英信号进行决策)
    // ==========================================================================
@@ -1730,4 +1734,71 @@ void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[
    Print(">>> 单元测试：FilterWeakBearishSignals 结束 <<<");
    Print("=================================================");
 
+}
+//+------------------------------------------------------------------+
+//| 辅助函数：合并看涨和看跌列表，并按 shift 从小到大 (由新到旧) 排序  |
+//+------------------------------------------------------------------+
+void MergeAndSortSignals(FilteredSignal &bulls[], FilteredSignal &bears[], FilteredSignal &result_list[])
+{
+   int size_bull = ArraySize(bulls);
+   int size_bear = ArraySize(bears);
+   int total_size = size_bull + size_bear;
+
+   // 1. 重置结果数组大小
+   ArrayResize(result_list, total_size);
+
+   // 2. 合并数据
+   int index = 0;
+   // 先放入看涨信号
+   for (int i = 0; i < size_bull; i++)
+   {
+      result_list[index] = bulls[i];
+      index++;
+   }
+   // 再放入看跌信号
+   for (int i = 0; i < size_bear; i++)
+   {
+      result_list[index] = bears[i];
+      index++;
+   }
+
+   // 3. 排序 (冒泡排序 Bubble Sort)
+   // 目标：按 shift 值从小到大排序 (shift 1 是最新，shift 100 是较旧)
+   // 这样循环时，我们总是先处理离现价最近的有效信号
+   if (total_size > 1)
+   {
+      for (int i = 0; i < total_size - 1; i++)
+      {
+         for (int j = 0; j < total_size - i - 1; j++)
+         {
+            // 如果前一个信号的 shift 比后一个大 (说明前一个更旧)，则交换
+            if (result_list[j].shift > result_list[j + 1].shift)
+            {
+               FilteredSignal temp = result_list[j];
+               result_list[j] = result_list[j + 1];
+               result_list[j + 1] = temp;
+            }
+         }
+      }
+   }
+}
+
+void Test_MergeAndSortSignals(FilteredSignal &merge_list[])
+{
+   Print("=================================================");
+   Print(">>> 单元测试：合并以后的看涨和看跌信号列表 开始 <<<");
+
+   // 1. 构造模拟数据
+   int original_size = ArraySize(merge_list);
+
+   // 打印输入数据
+   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
+   Print("【合并以后】信号数量: ", original_size);
+   for (int i = 0; i < original_size; i++)
+   {
+      Print("输入 #", i + 1, " | K[", merge_list[i].shift, "] | SL: ", DoubleToString(merge_list[i].stop_loss, _Digits));
+   }
+
+   Print(">>> 单元测试：合并以后的看涨和看跌信号列表 结束 <<<");
+   Print("=================================================");
 }
