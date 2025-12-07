@@ -81,6 +81,9 @@ input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SM
 KBarSignal GetIndicatorBarData(int shift);
 double GetIndicatorSignal(int buffer_index, int shift);
 string GenerateSignalID(datetime signal_time);
+void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[]);
+int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[]);
+void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[]);
 //====================================================================
 
 //+------------------------------------------------------------------+
@@ -216,6 +219,7 @@ void OnTick()
    // 🚨 关键：在每次 OnTick 开始时，重置新鲜度追踪 🚨
    Found_First_Qualified_Signal = false;
 
+   /*
    // 🚨 核心扫描逻辑：寻找最新的有效信号 🚨
    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
    {
@@ -226,15 +230,78 @@ void OnTick()
       int trade_command = CheckSignalAndFilter(data, shift);
       // Print("----> shift: ", shift, "---trade_command:", trade_command, "--", data.BullishStopLossPrice, "--", data.BearishStopLossPrice, "--", data.BullishReferencePrice, "--", data.BearishReferencePrice);
 
-      /*
       if (trade_command != OP_NONE)
       {
          // 3. 找到最新信号，执行交易并退出扫描
          CalculateTradeAndExecute(data, trade_command);
          return; // 找到最新信号，立即停止扫描和决策
       }
-      */
    }
+   */
+
+   //+------------------------------------------------------------------+
+
+   //+------------------------------------------------------------------+
+   // 4.0
+   // ==========================================================================
+   // 第一阶段：数据准备 (收集 -> 清洗 -> 合并)
+   // ==========================================================================
+   // 1. 定义数组
+   FilteredSignal raw_bulls[], raw_bears[];     // 原始信号
+   FilteredSignal clean_bulls[], clean_bears[]; // 清洗后的信号
+   FilteredSignal sorted_valid_signals[];       // 最终合并排序的列表 (X)
+
+   // 2. 收集原始信号 (扫描 1 到 Indi_LastScan_Range)
+   CollectAllSignals(raw_bulls, raw_bears);
+
+   // 3. 执行“优胜劣汰”弱势过滤
+   FilterWeakBullishSignals(raw_bulls, clean_bulls); // 看涨：新低优胜
+   FilterWeakBearishSignals(raw_bears, clean_bears); // 看跌：新高优胜
+
+   // 运行测试 查看结果
+   Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
+
+   /*
+   // 4. 合并并排序 (生成列表 X)
+   // 此时 sorted_valid_signals[0] 就是距离现价最近的那个有效结构信号
+   MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
+
+   int total_valid_signals = ArraySize(sorted_valid_signals);
+
+   // ==========================================================================
+   // 第二阶段：核心执行循环 (只针对精英信号进行决策)
+   // ==========================================================================
+
+   // 🚨 新版核心扫描逻辑：循环“有效信号列表 X” 🚨
+   for (int i = 0; i < total_valid_signals; i++)
+   {
+      // A. 从列表中提取关键信息
+      FilteredSignal signal_item = sorted_valid_signals[i];
+      int current_shift = signal_item.shift;
+
+      // B. 重新获取完整的指标数据 (为了兼容 CheckSignalAndFilter)
+      // 虽然 FilteredSignal 有部分数据，但 CheckSignalAndFilter 可能需要完整的 KBarSignal 结构
+      KBarSignal full_data = GetIndicatorBarData(current_shift);
+
+      // C. 核心决策：执行 L2 (趋势/斐波) 和 L3 (风险/新鲜度) 过滤
+      // 注意：这里的 CheckSignalAndFilter 可能会再次检查 L2c (CheckSignalContext)
+      // 此时它会基于这个 shift 进行上下文判断
+      int trade_command = CheckSignalAndFilter(full_data, current_shift);
+
+      // 调试打印 (可选)
+      // Print("检查有效信号 #", i, " (Shift ", current_shift, ") -> 结果: ", trade_command);
+
+      if (trade_command != OP_NONE)
+      {
+         // D. 找到最新且通过所有检查的信号，执行交易
+         CalculateTradeAndExecute(full_data, trade_command);
+
+         // E. 立即退出！
+         // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
+         return;
+      }
+   }
+   */
 
    //+------------------------------------------------------------------+
 }
@@ -1407,4 +1474,205 @@ bool IsReversalInFibZone(int current_shift, int current_type)
     }
     // 循环结束后，如果没有命中任何区域
     return false;
+}
+
+//+------------------------------------------------------------------+
+//| 收集所有合格信号：扫描历史K线并分离看涨和看跌信号                |
+//| @param bullish_list: 引用 - 存储看涨信号列表                    |
+//| @param bearish_list: 引用 - 存储看跌信号列表                    |
+//+------------------------------------------------------------------+
+void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+{
+    // 1. 清空数组，准备重新收集
+    ArrayResize(bullish_list, 0); 
+    ArrayResize(bearish_list, 0); 
+
+    // 2. 开始扫描：从 K[1] 往历史左侧扫描
+    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+    {
+        // A. 批量读取所有缓冲区数据 (假设 GetIndicatorBarData 可用)
+        KBarSignal data = GetIndicatorBarData(shift); 
+        
+        // -----------------------
+        // 检查看涨信号
+        // -----------------------
+        if (data.BullishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BullishReferencePrice >= Min_Signal_Quality &&
+            data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+        {
+            int current_size = ArraySize(bullish_list); 
+            ArrayResize(bullish_list, current_size + 1); 
+
+            bullish_list[current_size].shift = shift;
+            bullish_list[current_size].signal_time = data.OpenTime;
+            bullish_list[current_size].confirmation_close = Close[shift]; 
+            bullish_list[current_size].stop_loss = data.BullishStopLossPrice; 
+            bullish_list[current_size].type = OP_BUY;
+        }
+        
+        // -----------------------
+        // 检查看跌信号
+        // -----------------------
+        if (data.BearishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BearishReferencePrice >= Min_Signal_Quality &&
+            data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+        {
+            int current_size = ArraySize(bearish_list); 
+            ArrayResize(bearish_list, current_size + 1); 
+
+            bearish_list[current_size].shift = shift;
+            bearish_list[current_size].signal_time = data.OpenTime;
+            bearish_list[current_size].confirmation_close = Close[shift]; 
+            bearish_list[current_size].stop_loss = data.BearishStopLossPrice; 
+            bearish_list[current_size].type = OP_SELL;
+        }
+    }
+}
+//+------------------------------------------------------------------+
+//| 信号弱势过滤 (看涨 - 新低优胜逻辑)                              |
+//| 逻辑：从最新信号开始往历史回溯。                                 |
+//|      如果 Newer.Close < Older.SL，则 Older 无效 (被击穿)。       |
+//|      如果 Newer.Close >= Older.SL，则 Older 有效 (支撑有效)。    |
+//+------------------------------------------------------------------+
+int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[])
+{
+    // 1. 初始化
+    ArrayResize(filtered_list, 0);
+    int total = ArraySize(source_signals);
+    
+    if (total == 0) return 0;
+
+    // 2. 总是保留最新的信号 (索引 0，即 shift 最小的信号)
+    // 因为它是离现价最近的市场事实，无论它长什么样，它都是最新的参考点
+    ArrayResize(filtered_list, 1);
+    filtered_list[0] = source_signals[0];
+
+    // 3. 设定初始比较基准：使用最新信号的【收盘价】
+    double threshold_close = source_signals[0].confirmation_close;
+
+    // 4. 向历史方向遍历 (从索引 1 开始，即次新的信号)
+    for (int i = 1; i < total; i++)
+    {
+        FilteredSignal older_signal = source_signals[i];
+        
+        // -------------------------------------------------------------
+        // 🚨 核心逻辑：新低优胜 🚨
+        // 比较：最新有效信号的 Close vs 历史信号的 SL
+        // -------------------------------------------------------------
+        
+        // 情况 A: 击穿 (Invalidation)
+        // 如果较新的 Close 价格 低于 历史信号的 SL (最低价)
+        // 说明最新的价格已经打破了该历史信号的结构，该历史信号失效。
+        if (threshold_close < older_signal.stop_loss)
+        {
+            // Print("❌ 过滤 (看涨): 历史信号 K[", older_signal.shift, "] SL:", older_signal.stop_loss, 
+            //       " 被较新信号 Close:", threshold_close, " 击穿。排除。");
+            
+            // 排除该信号，继续循环。
+            // 阈值 threshold_close 保持不变 (继续用较新的这个低价去检验更老的信号)
+            continue;
+        }
+
+        // 情况 B: 支撑有效 (Validation)
+        // 如果较新的 Close 价格 高于或等于 历史信号的 SL
+        // 说明虽然可能有回调，但没有打穿该历史信号的底，该历史信号依然作为阶梯存在。
+        
+        // 加入有效列表
+        int new_index = ArraySize(filtered_list);
+        ArrayResize(filtered_list, new_index + 1);
+        filtered_list[new_index] = older_signal;
+
+        // 🚨 关键更新：既然这个历史信号有效，它就成为更早信号的验证者 🚨
+        // 我们更新阈值为这个历史信号的 Close
+        threshold_close = older_signal.confirmation_close;
+    }
+
+    // 这里的 filtered_list 顺序已经是：最新 -> 较新 -> 老 -> 最老
+    // 符合您 K[1] 往左寻找的直觉，不需要 ArrayReverse。
+    
+    return ArraySize(filtered_list);
+}
+//+------------------------------------------------------------------+
+//| 信号弱势过滤 (看跌 - 新高优胜逻辑)                              |
+//| 逻辑：Newer.Close > Older.SL，则 Older 无效 (被涨破)。           |
+//+------------------------------------------------------------------+
+int FilterWeakBearishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[])
+{
+    ArrayResize(filtered_list, 0);
+    int total = ArraySize(source_signals);
+    
+    if (total == 0) return 0;
+
+    // 1. 保留最新信号
+    ArrayResize(filtered_list, 1);
+    filtered_list[0] = source_signals[0];
+
+    // 2. 设定初始比较基准：使用最新信号的【收盘价】
+    double threshold_close = source_signals[0].confirmation_close;
+
+    // 3. 向历史方向遍历
+    for (int i = 1; i < total; i++)
+    {
+        FilteredSignal older_signal = source_signals[i];
+        
+        // -------------------------------------------------------------
+        // 🚨 核心逻辑：新高优胜 🚨
+        // 看跌信号的 SL 是最高价 (压力位)
+        // -------------------------------------------------------------
+        
+        // 情况 A: 涨破 (Invalidation)
+        // 如果较新的 Close 价格 高于 历史信号的 SL (最高价)
+        // 说明最新的价格已经反向突破了该历史信号的压力位，该历史信号失效。
+        if (threshold_close > older_signal.stop_loss)
+        {
+            // Print("❌ 过滤 (看跌): 历史信号 K[", older_signal.shift, "] SL:", older_signal.stop_loss, 
+            //       " 被较新信号 Close:", threshold_close, " 涨破。排除。");
+            continue;
+        }
+
+        // 情况 B: 压力有效 (Validation)
+        // 较新的 Close 依然在 历史信号 SL 之下
+        int new_index = ArraySize(filtered_list);
+        ArrayResize(filtered_list, new_index + 1);
+        filtered_list[new_index] = older_signal;
+
+        // 更新阈值
+        threshold_close = older_signal.confirmation_close;
+    }
+
+    return ArraySize(filtered_list);
+}
+//+------------------------------------------------------------------+
+//| 测试 FilterWeakBullishSignals 函数的主入口点                     |
+//+------------------------------------------------------------------+
+void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[])
+{
+   Print("=================================================");
+   Print(">>> 单元测试：FilterWeakBullishSignals 开始 <<<");
+
+   // 1. 构造模拟数据
+   int original_size = ArraySize(raw_bullish_list);
+
+   // 打印输入数据
+   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
+   Print("原始【看涨】信号数量: ", original_size);
+   for (int i = 0; i < original_size; i++)
+   {
+      Print("输入 #", i + 1, " | K[", raw_bullish_list[i].shift, "] | SL: ", DoubleToString(raw_bullish_list[i].stop_loss, _Digits));
+   }
+
+   // 2. 执行过滤函数
+   int final_count = ArraySize(clean_bullish_list);
+
+   // 3. 打印输出结果
+   Print("\n--- 输出信号列表 (过滤后) ---");
+   Print("最终【看涨】有效信号数量: ", final_count);
+
+   for (int i = 0; i < final_count; i++)
+   {
+      Print("输出 #", i + 1, " | K[", clean_bullish_list[i].shift, "] | SL: ", DoubleToString(clean_bullish_list[i].stop_loss, _Digits));
+   }
+
+   Print(">>> 单元测试：FilterWeakBullishSignals 结束 <<<");
+   Print("=================================================");
 }
