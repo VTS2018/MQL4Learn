@@ -1491,7 +1491,7 @@ bool IsReversalInFibZone(int current_shift, int current_type)
 //| @param bullish_list: 引用 - 存储看涨信号列表                    |
 //| @param bearish_list: 引用 - 存储看跌信号列表                    |
 //+------------------------------------------------------------------+
-void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+void CollectAllSignals_V1(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
 {
     // 1. 清空数组，准备重新收集
     ArrayResize(bullish_list, 0); 
@@ -1520,6 +1520,14 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
             // --------------------------------------------------------
             // 🚨 核心修正 2：看涨信号价格区位过滤 (信号价必须低于现价)
             // 我们使用信号的确认收盘价 (Close[shift]) 作为其“价格”的代表
+            // 为什么加入这个判断？就是为了保证 找到的 看涨信号 一定是小于现价的
+            // 因为 如果扫描到 【高于现价的 历史做多信号】 是没有意义的
+            // 扫描到的看跌信号 在现价的下方 则没有意义
+            // 这里最纠结的两点 就是 K[1] 如果是信号 该如何处理的问题？
+            // 如果我们不加判断 则一定能收集到K[1],但是会有无效的历史信号混入
+            // 如果我们加了判断 则K[1] 信号有可能会丢失掉，如此在后续的上下文计算时就会bug
+            // 上下文的算法 就是将当前确认信号 和 历史相对比
+            // 这就要考虑 要不要 自己和自己对比的问题
             // --------------------------------------------------------
 
             if (Close[shift] < current_price)
@@ -1561,6 +1569,98 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
         }
     }
 }
+
+//+------------------------------------------------------------------+
+//| L0: 信号收集器 (CollectAllSignals)                               |
+//| 职责：从指标缓冲区全量收集信号，并执行最高效的价格区位过滤。       |
+//| V2.0 优化：确保 K[1] 信号不被价格区位过滤错误剔除。               |
+//+------------------------------------------------------------------+
+void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+{
+   // 1. 清空数组，准备重新收集 (数组将按 shift 从小到大填充，即从最新到最旧)
+   ArrayResize(bullish_list, 0);
+   ArrayResize(bearish_list, 0);
+
+   // 🚨 核心修正 1：获取现价基准 (使用当前 K 线的收盘价 Close[0])
+   double current_price = Close[0];
+
+   // 2. 开始扫描：从 K[1] (shift=1) 往历史左侧扫描
+   for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+   {
+      // A. 批量读取所有缓冲区数据 (假设 GetIndicatorBarData 可用)
+      KBarSignal data = GetIndicatorBarData(shift);
+
+      // =============================================================
+      // 🚨 核心修正 2：K[1] 信号的无条件通行权
+      // 确保 K[1] 不被 K[0] 的跳空低开/高开错误过滤
+      // =============================================================
+      bool is_valid_price_zone = false;
+
+      if (shift == 1)
+      {
+         // K[1] (最新信号) 具有最高优先级，无条件通过价格区位检查
+         is_valid_price_zone = true;
+      }
+      else // K[2] 及更老的信号，必须进行价格区位检查
+      {
+         // --- 看涨信号的价格区位检查 (必须低于现价) ---
+         if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+         {
+            if (Close[shift] < current_price)
+               is_valid_price_zone = true;
+         }
+         // --- 看跌信号的价格区位检查 (必须高于现价) ---
+         else if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+         {
+            if (Close[shift] > current_price)
+               is_valid_price_zone = true;
+         }
+      }
+
+      // ---------------------------------------------
+      // B. 检查并添加看涨信号 (OP_BUY)
+      // ---------------------------------------------
+      if (data.BullishReferencePrice != (double)EMPTY_VALUE &&
+          (int)data.BullishReferencePrice >= Min_Signal_Quality && // 信号质量检查
+          data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+      {
+         // 🚨 引入价格区位检查
+         if (is_valid_price_zone)
+         {
+            int current_size = ArraySize(bullish_list);
+            ArrayResize(bullish_list, current_size + 1);
+
+            bullish_list[current_size].shift = shift;
+            bullish_list[current_size].signal_time = data.OpenTime;
+            bullish_list[current_size].confirmation_close = Close[shift];
+            bullish_list[current_size].stop_loss = data.BullishStopLossPrice;
+            bullish_list[current_size].type = OP_BUY;
+         }
+      }
+
+      // ---------------------------------------------
+      // C. 检查并添加看跌信号 (OP_SELL)
+      // ---------------------------------------------
+      if (data.BearishReferencePrice != (double)EMPTY_VALUE &&
+          (int)data.BearishReferencePrice >= Min_Signal_Quality && // 信号质量检查
+          data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+      {
+         // 🚨 引入价格区位检查
+         if (is_valid_price_zone)
+         {
+            int current_size = ArraySize(bearish_list);
+            ArrayResize(bearish_list, current_size + 1);
+
+            bearish_list[current_size].shift = shift;
+            bearish_list[current_size].signal_time = data.OpenTime;
+            bearish_list[current_size].confirmation_close = Close[shift];
+            bearish_list[current_size].stop_loss = data.BearishStopLossPrice;
+            bearish_list[current_size].type = OP_SELL;
+         }
+      }
+   }
+}
+
 //+------------------------------------------------------------------+
 //| 信号弱势过滤 (看涨 - 新低优胜逻辑)                              |
 //| 逻辑：从最新信号开始往历史回溯。                                 |
