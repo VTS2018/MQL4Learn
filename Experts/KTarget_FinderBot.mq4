@@ -1698,4 +1698,36 @@ void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[
 
    Print(">>> 单元测试：FilterWeakBullishSignals 结束 <<<");
    Print("=================================================");
+
+   Print("==================================================================================================");
+   
+   Print("=================================================");
+   Print(">>> 单元测试：FilterWeakBearishSignals 开始 <<<");
+
+   // 1. 构造模拟数据
+   int original_size_1 = ArraySize(raw_bearish_list);
+
+   // 打印输入数据
+   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
+   Print("原始【看跌】信号数量: ", original_size_1);
+   for (int i = 0; i < original_size_1; i++)
+   {
+      Print("输入 #", i + 1, " | K[", raw_bearish_list[i].shift, "] | SL: ", DoubleToString(raw_bearish_list[i].stop_loss, _Digits));
+   }
+
+   // 2. 执行过滤函数
+   int final_count_1 = ArraySize(clean_bearish_list);
+
+   // 3. 打印输出结果
+   Print("\n--- 输出信号列表 (过滤后) ---");
+   Print("最终【看跌】有效信号数量: ", final_count_1);
+
+   for (int i = 0; i < final_count_1; i++)
+   {
+      Print("输出 #", i + 1, " | K[", clean_bearish_list[i].shift, "] | SL: ", DoubleToString(clean_bearish_list[i].stop_loss, _Digits));
+   }
+
+   Print(">>> 单元测试：FilterWeakBearishSignals 结束 <<<");
+   Print("=================================================");
+
 }
