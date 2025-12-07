@@ -1487,6 +1487,12 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
     ArrayResize(bullish_list, 0); 
     ArrayResize(bearish_list, 0); 
 
+    // -----------------------------------------------------------
+    // 🚨 核心修正 1：获取现价基准 (使用当前 K 线的收盘价)
+    // Close[0] 代表当前正在形成的 K 线的收盘价（或最新的价格）
+    // -----------------------------------------------------------
+    double current_price = Close[0];
+
     // 2. 开始扫描：从 K[1] 往历史左侧扫描
     for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
     {
@@ -1500,14 +1506,23 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
             (int)data.BullishReferencePrice >= Min_Signal_Quality &&
             data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
         {
-            int current_size = ArraySize(bullish_list); 
-            ArrayResize(bullish_list, current_size + 1); 
 
-            bullish_list[current_size].shift = shift;
-            bullish_list[current_size].signal_time = data.OpenTime;
-            bullish_list[current_size].confirmation_close = Close[shift]; 
-            bullish_list[current_size].stop_loss = data.BullishStopLossPrice; 
-            bullish_list[current_size].type = OP_BUY;
+            // --------------------------------------------------------
+            // 🚨 核心修正 2：看涨信号价格区位过滤 (信号价必须低于现价)
+            // 我们使用信号的确认收盘价 (Close[shift]) 作为其“价格”的代表
+            // --------------------------------------------------------
+
+            if (Close[shift] < current_price)
+            {
+               int current_size = ArraySize(bullish_list);
+               ArrayResize(bullish_list, current_size + 1);
+
+               bullish_list[current_size].shift = shift;
+               bullish_list[current_size].signal_time = data.OpenTime;
+               bullish_list[current_size].confirmation_close = Close[shift];
+               bullish_list[current_size].stop_loss = data.BullishStopLossPrice;
+               bullish_list[current_size].type = OP_BUY;
+            }
         }
         
         // -----------------------
@@ -1517,14 +1532,22 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
             (int)data.BearishReferencePrice >= Min_Signal_Quality &&
             data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
         {
-            int current_size = ArraySize(bearish_list); 
-            ArrayResize(bearish_list, current_size + 1); 
 
-            bearish_list[current_size].shift = shift;
-            bearish_list[current_size].signal_time = data.OpenTime;
-            bearish_list[current_size].confirmation_close = Close[shift]; 
-            bearish_list[current_size].stop_loss = data.BearishStopLossPrice; 
-            bearish_list[current_size].type = OP_SELL;
+            // --------------------------------------------------------
+            // 🚨 核心修正 3：看跌信号价格区位过滤 (信号价必须高于现价)
+            // --------------------------------------------------------
+
+            if (Close[shift] > current_price)
+            {
+               int current_size = ArraySize(bearish_list);
+               ArrayResize(bearish_list, current_size + 1);
+
+               bearish_list[current_size].shift = shift;
+               bearish_list[current_size].signal_time = data.OpenTime;
+               bearish_list[current_size].confirmation_close = Close[shift];
+               bearish_list[current_size].stop_loss = data.BearishStopLossPrice;
+               bearish_list[current_size].type = OP_SELL;
+            }
         }
     }
 }
@@ -1548,7 +1571,7 @@ int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &f
     filtered_list[0] = source_signals[0];
 
     // 3. 设定初始比较基准：使用最新信号的【收盘价】
-    double threshold_close = source_signals[0].confirmation_close;
+    double threshold_close = source_signals[0].stop_loss;
 
     // 4. 向历史方向遍历 (从索引 1 开始，即次新的信号)
     for (int i = 1; i < total; i++)
@@ -1584,7 +1607,7 @@ int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &f
 
         // 🚨 关键更新：既然这个历史信号有效，它就成为更早信号的验证者 🚨
         // 我们更新阈值为这个历史信号的 Close
-        threshold_close = older_signal.confirmation_close;
+        threshold_close = older_signal.stop_loss;
     }
 
     // 这里的 filtered_list 顺序已经是：最新 -> 较新 -> 老 -> 最老
@@ -1608,7 +1631,7 @@ int FilterWeakBearishSignals(FilteredSignal &source_signals[], FilteredSignal &f
     filtered_list[0] = source_signals[0];
 
     // 2. 设定初始比较基准：使用最新信号的【收盘价】
-    double threshold_close = source_signals[0].confirmation_close;
+    double threshold_close = source_signals[0].stop_loss;
 
     // 3. 向历史方向遍历
     for (int i = 1; i < total; i++)
@@ -1637,7 +1660,7 @@ int FilterWeakBearishSignals(FilteredSignal &source_signals[], FilteredSignal &f
         filtered_list[new_index] = older_signal;
 
         // 更新阈值
-        threshold_close = older_signal.confirmation_close;
+        threshold_close = older_signal.stop_loss;
     }
 
     return ArraySize(filtered_list);
