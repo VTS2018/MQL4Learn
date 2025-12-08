@@ -890,7 +890,7 @@ void CalculateTradeAndExecute(const KBarSignal &data, int type)
     // 3. 计算 TP (固定为 1.618 斐波那契级别)
     // 斐波那契轴线是 SL价格 到 Close[1] 的距离 (即 risk)
     // 假设我们使用 1.618 作为固定止盈位，为实现动态追踪准备。
-    double tp_level = 1.618; 
+    double tp_level = 1.0; 
     
     if (type == OP_BUY)
     {
@@ -2147,7 +2147,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
             if (current_low <= check_high && current_high >= check_low)
             {
                Print(" [上下文-反转] 当前看跌(K", current_shift, ") 触碰 历史看涨(K", prev.shift, ") Fib区间 [",
-                     DoubleToString(level1, 2), "-", DoubleToString(level2, 2), "]");
+                     DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "]");
                // 返回特定的上下文代码，或者简单的 true/false，这里假设返回由上层决定的指令
                // 为了简单，我们只返回 true 表示上下文有效
                return 1; // 上下文有效
@@ -2190,7 +2190,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
             if (current_low <= check_high && current_high >= check_low)
             {
                Print(" [上下文-反转] 当前看涨(K", current_shift, ") 触碰 历史看跌(K", prev.shift, ") Fib区间 [",
-                     DoubleToString(level1, 2), "-", DoubleToString(level2, 2), "]");
+                     DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "]");
                return 1;
             }
          }
