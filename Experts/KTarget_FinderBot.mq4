@@ -261,7 +261,7 @@ void OnTick()
    FilterWeakBearishSignals(raw_bears, clean_bears); // 看跌：新高优胜
 
    // 运行测试 查看结果
-   Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
+   // Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
 
    
    // 4. 合并并排序 (生成列表 X)
@@ -269,7 +269,7 @@ void OnTick()
    MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
 
    int total_valid_signals = ArraySize(sorted_valid_signals);
-   Test_MergeAndSortSignals(sorted_valid_signals);
+   // Test_MergeAndSortSignals(sorted_valid_signals);
    if (total_valid_signals <= 0)
    {
       // 没有找到历史信号数据 不交易
@@ -277,7 +277,6 @@ void OnTick()
       return;
    }
 
-   /*
    // ==========================================================================
    // 第二阶段：核心执行循环 (只针对精英信号进行决策)
    // ==========================================================================
@@ -288,11 +287,29 @@ void OnTick()
       // A. 从列表中提取关键信息
       FilteredSignal signal_item = sorted_valid_signals[i];
       int current_shift = signal_item.shift;
+      Print("--->[KTarget_FinderBot.mq4:290]: 查看是否包含K[1] 最新信号 current_shift: ", current_shift);
 
       // B. 重新获取完整的指标数据 (为了兼容 CheckSignalAndFilter)
       // 虽然 FilteredSignal 有部分数据，但 CheckSignalAndFilter 可能需要完整的 KBarSignal 结构
       KBarSignal full_data = GetIndicatorBarData(current_shift);
 
+      // ----------------------------------------------------
+      // 🚨 核心调用更新 🚨
+      // 此时的逻辑是：位置优先原则的实现，先进行上下文的检查，只有上下文 位置通过 以后 才再次进行信号的过滤
+      // ----------------------------------------------------
+      // 将清洗过的两个列表传入函数
+      int context_result = CheckSignalContext(current_shift, signal_item.type, clean_bulls, clean_bears);
+      Print("===>[KTarget_FinderBot.mq4:301]: context_result: ", context_result);
+
+      // 判定逻辑：
+      // 如果返回 0，说明没有上下文支持，通常我们选择不做，或者降低手数
+      // 如果返回 > 0 (1=反转, 2=回踩)，说明是优质信号
+      if (context_result > 0)
+      {
+         Print("===>[KTarget_FinderBot.mq4:309]: context_result---上下文通过检查了 开始执行交易吧 ", context_result);
+      }
+
+      /*
       // C. 核心决策：执行 L2 (趋势/斐波) 和 L3 (风险/新鲜度) 过滤
       // 注意：这里的 CheckSignalAndFilter 可能会再次检查 L2c (CheckSignalContext)
       // 此时它会基于这个 shift 进行上下文判断
@@ -310,8 +327,8 @@ void OnTick()
          // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
          return;
       }
+      */
    }
-   */
 
    //+------------------------------------------------------------------+
 }
@@ -1920,19 +1937,120 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
    // 这个函数的逻辑 就是满足我们 “见位”的核心思路，即不是所有的信号都要做，要有位置，要有位置的量化和
    // 判断，只有到了位置以后，我们看到了信号，才执行一笔交易，这极大的过滤的 无效的开仓 所以是非常重要的 一个进步
 
+    // =================================================================
+    // 1. 数据准备
+    // =================================================================
+    double current_high = High[current_shift];
+    double current_low  = Low[current_shift];
+
+    // --- 定义需要检查的斐波那契区域 ---
+    // 格式: {Level1, Level2}，可以根据需要自由添加/修改
+    double FiboLevels[4][2] = {
+        {1.618, 1.88},
+        {2.618, 2.88},
+        {4.236, 4.88},
+        {6, 7}
+        // 您可以添加更多区域，例如 {0.618, 0.786}
+    };
+    int zones_count = ArrayRange(FiboLevels, 0);
+    // Print("--->[KTarget_FinderBot.mq4:1273]: zones_count: ", zones_count);
+
    // =================================================================
    // 逻辑 A: 斐波那契反转检查 (Fibonacci Reversal)
    // 场景：当前是看跌 -> 检查是否触碰了历史【看涨】信号的延伸阻力区
    //       当前是看涨 -> 检查是否触碰了历史【看跌】信号的延伸支撑区
    // =================================================================
 
+   // --- 情况 A1: 当前是看跌 (OP_SELL) ---
    if (current_type == OP_SELL)
    {
       // 我想实现 在循环中 连续查找三次 左右，如果这个有效列表有超过三个以上 就找最大的 那个 更旧的信号
+      // 1. 遍历历史【看涨】列表 (寻找阻力)
+      int total_bulls = ArraySize(history_bulls);
+      for (int i = 0; i < total_bulls; i++)
+      {
+         FilteredSignal prev = history_bulls[i];
+
+         // 必须是历史信号 (shift 更大)
+         if (prev.shift <= current_shift) continue;
+
+         // 计算 Risk (入场 - 止损)
+         double risk = prev.confirmation_close - prev.stop_loss;
+         if (risk <= 0) continue;
+
+         double tolerance = NormalizeDouble(risk * 0.1, _Digits);
+
+         // 循环检查所有斐波那契区域
+         for (int z = 0; z < zones_count; z++)
+         {
+            double level1 = FiboLevels[z][0];
+            double level2 = FiboLevels[z][1];
+
+            // 修正：基准价使用 prev.stop_loss (最低点)
+            // 看涨延伸：基准 + Risk * Level
+            double zone_low = prev.stop_loss + (risk * level1);
+            double zone_high = prev.stop_loss + (risk * level2);
+
+            // 精度修正
+            zone_low = NormalizeDouble(zone_low, _Digits);
+            zone_high = NormalizeDouble(zone_high, _Digits);
+
+            // 应用容差
+            double check_low = zone_low - tolerance;
+            double check_high = zone_high + tolerance;
+
+            // 触碰检查
+            if (current_low <= check_high && current_high >= check_low)
+            {
+               Print(" [上下文-反转] 当前看跌(K", current_shift, ") 触碰 历史看涨(K", prev.shift, ") Fib区间 [",
+                     DoubleToString(level1, 2), "-", DoubleToString(level2, 2), "]");
+               // 返回特定的上下文代码，或者简单的 true/false，这里假设返回由上层决定的指令
+               // 为了简单，我们只返回 true 表示上下文有效
+               return 1; // 上下文有效
+            }
+         }
+      }
    }
+   // --- 情况 A2: 当前是看涨 (OP_BUY) ---
    else if (current_type == OP_BUY)
    {
+      // 1. 遍历历史【看跌】列表 (寻找支撑)
+      int total_bears = ArraySize(history_bears);
+      for (int i = 0; i < total_bears; i++)
+      {
+         FilteredSignal prev = history_bears[i];
+         if (prev.shift <= current_shift) continue;
 
+         // Risk (止损 - 入场)
+         double risk = prev.stop_loss - prev.confirmation_close;
+         if (risk <= 0) continue;
+
+         double tolerance = NormalizeDouble(risk * 0.1, _Digits);
+
+         for (int z = 0; z < zones_count; z++)
+         {
+            double level1 = FiboLevels[z][0];
+            double level2 = FiboLevels[z][1];
+
+            // 修正：基准价使用 prev.stop_loss (最高点)
+            // 看跌延伸：基准 - Risk * Level (数值越小越远)
+            double zone_low = prev.stop_loss - (risk * level2);  // level2 大，减得多，是低位
+            double zone_high = prev.stop_loss - (risk * level1); // level1 小，减得少，是高位
+
+            zone_low = NormalizeDouble(zone_low, _Digits);
+            zone_high = NormalizeDouble(zone_high, _Digits);
+
+            double check_low = zone_low - tolerance;
+            double check_high = zone_high + tolerance;
+
+            if (current_low <= check_high && current_high >= check_low)
+            {
+               Print(" [上下文-反转] 当前看涨(K", current_shift, ") 触碰 历史看跌(K", prev.shift, ") Fib区间 [",
+                     DoubleToString(level1, 2), "-", DoubleToString(level2, 2), "]");
+               return 1;
+            }
+         }
+      }
    }
    
 
