@@ -1,0 +1,54 @@
+void OnTick()
+{
+   // ... (前面的时间检查等) ...
+
+   // =================================================================
+   // 第一阶段：全量收集与清洗 (The Funnel)
+   // =================================================================
+   
+   // 1. 这里包含了原本的扫描逻辑 (shift 1 到 500)
+   // 您的 "K[1] < 4100" 价格过滤逻辑就在这里面！
+   CollectAllSignals(raw_bulls, raw_bears); 
+
+   // 2. 这里执行 "新低优胜" 过滤
+   FilterWeakBullishSignals(raw_bulls, clean_bulls); 
+   FilterWeakBearishSignals(raw_bears, clean_bears); 
+
+   // 3. 这里确保最新的 K[1] 信号排在数组的最前面 (Index 0)
+   MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
+
+   // =================================================================
+   // 第二阶段：精准执行 (The Sniper)
+   // =================================================================
+   
+   int total_valid = ArraySize(sorted_valid_signals);
+   
+   // 🚨 疑问三的答案：在这里循环检查 🚨
+   for (int i = 0; i < total_valid; i++)
+   {
+       // 取出信号 (由于排序，i=0 就是最新的 K[1] 信号)
+       FilteredSignal signal_item = sorted_valid_signals[i];
+       
+       // 重新获取该信号的完整数据
+       KBarSignal full_data = GetIndicatorBarData(signal_item.shift);
+
+       // -----------------------------------------------------------
+       // 🚨 核心检查点 🚨 
+       // -----------------------------------------------------------
+       // 这里调用原来的主检查函数，它内部包含了：
+       // 1. 均线趋势过滤 (L2)
+       // 2. 斐波那契上下文 IsReversalInFibZone (L2c)
+       // 3. 信号新鲜度/重复下单检查 (L3)  <-- 疑问二的答案在这里
+       // -----------------------------------------------------------
+       int trade_command = CheckSignalAndFilter(full_data, signal_item.shift);
+
+       if (trade_command != OP_NONE)
+       {
+           // 执行交易
+           CalculateTradeAndExecute(full_data, trade_command);
+           
+           // V2.0 的优势：找到最优信号后立即退出，不再浪费资源
+           return; 
+       }
+   }
+}
