@@ -1,0 +1,36 @@
+   // 4.0 Test code
+   for (int shift = 1; shift <= 390; shift++)
+   {
+      // A. 读取当前 K 线的所有信号数据
+      KBarSignal current_bar_data = GetIndicatorBarData(shift);
+
+      // B. 获取 MQL4 内置价格信息 (收盘价)
+      double confirmation_close_price = Close[shift];
+
+      // 1. 检查信号类型
+      // bool is_bullish = (current_bar_data.BullishReferencePrice > 0.0);
+      // bool is_bearish = (current_bar_data.BearishReferencePrice > 0.0);
+
+      bool is_bullish = (current_bar_data.BullishReferencePrice != (double)EMPTY_VALUE && current_bar_data.BullishReferencePrice != 0.0);
+      bool is_bearish = (current_bar_data.BearishReferencePrice != (double)EMPTY_VALUE && current_bar_data.BearishReferencePrice != 0.0);
+
+      if (is_bullish)
+      {
+         // 2. 获取看涨信号的止损价
+         double sl_price = current_bar_data.BullishStopLossPrice;
+
+         Print("侦测到看涨信号 @ K[", shift, "] | 收盘价: ", confirmation_close_price, " | 止损价: ", sl_price);
+
+         // 进一步的 L2/L3 过滤逻辑...
+      }
+
+      if (is_bearish)
+      {
+         // 2. 获取看跌信号的止损价
+         double sl_price = current_bar_data.BearishStopLossPrice;
+
+         Print("侦测到看跌信号 @ K[", shift, "] | 收盘价: ", confirmation_close_price, " | 止损价: ", sl_price);
+
+         // 进一步的 L2/L3 过滤逻辑...
+      }
+   }

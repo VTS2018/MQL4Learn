@@ -1,0 +1,63 @@
+# 配置用户名
+git config --global user.name "VTS2018"
+
+# 配置邮箱 (务必与 GitHub 保持一致)
+git config --global user.email "itmaper@gmail.com"
+
+git config --global core.autocrlf true
+
+ssh-keygen -t rsa -C "itmaper@gmail.com"
+
+ssh -T git@github.com
+
+git config --global core.longpaths true
+
+# 此命令会递归查找所有 .mq4 文件，并移除开头的 BOM
+find . -name "*.mq4" -exec sh -c 'sed -i.bak "1s/^\xef\xbb\xbf//" "$0"' {} \;
+
+-----------------------------------------------------------------------------------
+
+
+
+查看这两个版本的区别
+git diff ca0f236 b6a968d -- Experts/KTarget_FinderBot.mq4
+
+7adcf32657f1e53ffb3107bbc6ae04eba71c4bc9 就是最原始的版本 我已经打上标签了
+d1798ade669335af9d1d932219eee8c456ec05b2 就是新算法的版本 这两个版本需要效果上的对比
+
+# 示例：我们假设这是您 MQL4 策略的初始版本 V1.0.0
+git tag -a v1.0.0 -m "V1.0.0 - 最原始的版本 只用来找到IB/DB确认." 7adcf32657f1e53ffb3107bbc6ae04eba71c4bc9
+git push origin v1.0.0
+
+git tag -a v1.0.1 -m "V1.0.1 - 解耦代码完成，下一个版本去掉无效的注释和代码 格式化代码." 1ad35ac59c6a24543eeb6c461d8d93b759388f24
+git push origin v1.0.1
+
+git tag -a v1.0.2 -m "V1.0.2 - 下一个版本继续 做代码上的解耦测试." 571ca6739d601c01c2f0cab843846827f84fcc32
+git push origin v1.0.2
+
+
+
+git tag -a v1.0.3 -m "V1.0.3 - 虽然斐波绘制的调用还有一些问题 但是可以作为下一个版本的标签." bf255c12f24374a30a09d211802d7d960eb1b91b
+git push origin v1.0.3
+
+git tag -a v1.1.0 -m "V1.1.0 - 分离函数都不同的文件 文件代码结构更加清晰." 7e5703fbc0b5462f2765fd3e0013db9e3425506e
+git push origin v1.1.0
+
+
+git tag -a v1.1.1 -m "V1.1.1 - KTarget_FinderBot 1.0 最初的版本和ai备份的版本 .FindStructuralSL 可以读取新缓冲区数据" 87ee4c2
+git push origin v1.1.1
+
+git tag -a v1.1.2 -m "V1.1.2 - 开始实现 信号的上下文关系之前 做一个标签 下一步要整理代码" 6e56b95
+git push origin v1.1.2
+
+
+git tag -a v1.1.3 -m "V1.1.3 - 已经实现了 基础版本的 位置过滤" 5b78baa
+git push origin v1.1.3
+
+
+git checkout d1798ade669335af9d1d932219eee8c456ec05b2 -- Indicators/KTarget_Finder4_FromGemini.mq4
+
+
+
+
+git checkout ca0f236 -- Experts/KTarget_FinderBot.mq4
