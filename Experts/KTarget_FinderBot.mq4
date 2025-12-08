@@ -307,27 +307,27 @@ void OnTick()
       if (context_result > 0)
       {
          Print("===>[KTarget_FinderBot.mq4:309]: context_result---上下文通过检查了 开始执行交易吧 ", context_result);
-      }
 
-      /*
-      // C. 核心决策：执行 L2 (趋势/斐波) 和 L3 (风险/新鲜度) 过滤
-      // 注意：这里的 CheckSignalAndFilter 可能会再次检查 L2c (CheckSignalContext)
-      // 此时它会基于这个 shift 进行上下文判断
-      int trade_command = CheckSignalAndFilter(full_data, current_shift);
+         // C. 核心决策：执行 L2 (趋势/斐波) 和 L3 (风险/新鲜度) 过滤
+         // 注意：这里的 CheckSignalAndFilter 可能会再次检查 L2c (CheckSignalContext)
+         // 此时它会基于这个 shift 进行上下文判断
+         int trade_command = CheckSignalAndFilter_V2(full_data, current_shift);
 
-      // 调试打印 (可选)
-      // Print("检查有效信号 #", i, " (Shift ", current_shift, ") -> 结果: ", trade_command);
+         // 调试打印 (可选)
+         // Print("检查有效信号 #", i, " (Shift ", current_shift, ") -> 结果: ", trade_command);
 
-      if (trade_command != OP_NONE)
-      {
-         // D. 找到最新且通过所有检查的信号，执行交易
-         CalculateTradeAndExecute(full_data, trade_command);
+         if (trade_command != OP_NONE)
+         {
+            // D. 找到最新且通过所有检查的信号，执行交易
+            CalculateTradeAndExecute(full_data, trade_command);
 
-         // E. 立即退出！
-         // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
+            // E. 立即退出！
+            // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
+            return;
+         }
+
          return;
       }
-      */
    }
 
    //+------------------------------------------------------------------+
@@ -641,6 +641,150 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
                {
                   Print("L2c 过滤：看跌信号不在理想的斐波反转区域。当前:shift=", signal_shift);
                }
+            }
+         }
+         else
+         {
+             // 调试日志：质量不够
+             // Print("[DEBUG] Shift=", signal_shift, " 看跌被过滤。质量(", data.BearishReferencePrice, ") < 设定(", Min_Signal_Quality, ")");
+         }
+      }
+   }
+
+   // 如果 L2 检查完，trade_command 还是 -1，说明没有合格信号，直接返回，让循环继续找下一个 shift
+   if (trade_command == OP_NONE) return OP_NONE;
+
+   // ------------------------------------------------------------------
+   // 步骤 2: L3c 信号重复性检查 (防重复交易)
+   // ------------------------------------------------------------------
+   
+   // 程序运行到这里，说明 trade_command 已经是 OP_BUY 或 OP_SELL 了
+
+   // 1. 🚨 L3c: 信号时效性过滤 (新增逻辑) 🚨
+   // 检查 K[0] 是否紧跟信号成立 (即 signal_shift 必须为 1)
+   if (!IsSignalTimely(signal_shift))
+   {
+      // 阻止开仓，让 for 循环继续寻找 shift=1 的信号
+      return OP_NONE;
+   }
+
+   // 1. 🚨 L3a: 信号新鲜度过滤 (只允许扫描到的第一个合格信号通过) 🚨
+   if (!IsSignalFresh(trade_command))
+   {
+      Print("L3a 过滤：这不是扫描到的第一个合格信号，阻止开仓。");
+      return OP_NONE; // 阻止不新鲜的信号
+   }
+
+   // 1. 生成唯一 ID
+   string signal_id = GenerateSignalID(data.OpenTime);
+   
+   // 2. 检查历史订单和持仓
+   if (IsSignalAlreadyTraded(signal_id))
+   {
+      // 既然已交易，我们必须阻止这次开仓，返回 OP_NONE
+      // 这会导致外层循环继续向历史回溯，寻找更早之前的未交易信号
+      Print(">>> 信号 ID: ", signal_id, " 已在历史/持仓中找到，跳过此信号。 <<<");
+      return OP_NONE; 
+   }
+
+   // ------------------------------------------------------------------
+   // 步骤 3: 最终放行
+   // ------------------------------------------------------------------
+   
+   // 只有到了这里，才说明：
+   // 1. 信号存在且质量达标
+   // 2. 信号没有被交易过
+   
+   // 打印最终确认日志
+   Print(" 最终决策通过: Shift=", signal_shift, 
+         " | 类型: ", (trade_command==OP_BUY?"BUY":"SELL"), 
+         " | 质量: ", (trade_command==OP_BUY ? DoubleToString(data.BullishReferencePrice,1) : DoubleToString(data.BearishReferencePrice,1)),
+         " | ID: ", signal_id);
+
+   return trade_command; // 返回有效指令，这将导致外层 OnTick 循环立即停止！
+}
+
+int CheckSignalAndFilter_V2(const KBarSignal &data, int signal_shift)
+{
+   int trade_command = OP_NONE; // 初始化为 -1
+
+   // ------------------------------------------------------------------
+   // 准备工作：计算当前的均线数值 (基于当前的 signal_shift) 1分钟测试效果不好 可以选择关闭它
+   // ------------------------------------------------------------------
+   double ma_value = 0;
+   if (Use_Trend_Filter)
+   {
+      // iMA 函数详解见下文
+      ma_value = iMA(_Symbol, 0, Trend_MA_Period, 0, Trend_MA_Method, PRICE_CLOSE, signal_shift);
+      ma_value = NormalizeDouble(ma_value, Digits());
+   }
+
+   // ------------------------------------------------------------------
+   // 步骤 1: L2 信号侦测与质量筛选 (Buffer 2 & 3)
+   // ------------------------------------------------------------------
+
+   // --- A. 优先检查看涨信号 ---
+   // 检查 Buffer 2 是否有值 (不为空且不为0)
+   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0 && data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+   {
+      // 调试日志：看到了原始信号
+      // Print("[DEBUG] Shift=", signal_shift, " 发现看涨原始数据: ", data.BullishReferencePrice);
+
+      // 质量门槛检查
+      if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
+      {
+         //1.0
+         // trade_command = OP_BUY;
+         // 找到符合质量的看涨信号，准备进入 L3c 检查
+
+         //2.0
+         // 🚨 B. 趋势过滤 (新增) 🚨
+         // 如果开启了过滤，且 收盘价 < 均线，说明是逆势单，我们要过滤掉
+         if (Use_Trend_Filter && Close[signal_shift] < ma_value)
+         {
+             Print("[趋势过滤] 忽略看涨信号 @ ", TimeToString(data.OpenTime), "。价格(", Close[signal_shift], ") 在均线(", ma_value, ")之下");
+             // 不做任何操作，trade_command 保持 OP_NONE
+         }
+         else
+         {
+             // 3.0
+             trade_command = OP_BUY; // 顺势，通过！
+             // ... (原来的日志打印代码)
+         }
+      }
+      else
+      {
+         // 调试日志：质量不够
+         // Print("[DEBUG] Shift=", signal_shift, " 看涨被过滤。质量(", data.BullishReferencePrice, ") < 设定(", Min_Signal_Quality, ")");
+      }
+   }
+
+   // --- B. 检查看跌信号 (仅当没有发现看涨信号时) ---
+   if (trade_command == OP_NONE)
+   {
+      // 检查 Buffer 3 是否有值
+      if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0 && data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+      {
+         // 调试日志：看到了原始信号
+         // Print("[DEBUG] Shift=", signal_shift, " 发现看跌原始数据: ", data.BearishReferencePrice);
+
+         // 质量门槛检查
+         if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
+         {
+            // trade_command = OP_SELL;
+            // 找到符合质量的看跌信号，准备进入 L3c 检查
+
+            // 🚨 B. 趋势过滤 (新增) 🚨
+            // 如果开启了过滤，且 收盘价 > 均线，说明是逆势单
+            if (Use_Trend_Filter && Close[signal_shift] > ma_value)
+            {
+               // Print("[趋势过滤] 忽略看跌信号。价格在均线之上");
+               Print("[趋势过滤] 忽略看跌信号 @ ", TimeToString(data.OpenTime), "。价格(", Close[signal_shift], ") 在均线(", ma_value, ")之上");
+            }
+            else
+            {
+               trade_command = OP_SELL; // 顺势，通过！
+               // ... (原来的日志打印代码)
             }
          }
          else
