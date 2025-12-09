@@ -40,6 +40,11 @@
 //+------------------------------------------------------------------+
 void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[])
 {
+   if (!Debug_Print_Valid_List)
+   {
+      return;
+   }
+   
    Print("=================================================");
    Print(">>> 单元测试：FilterWeakBullishSignals 开始 <<<");
 
@@ -69,7 +74,7 @@ void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[
    Print(">>> 单元测试：FilterWeakBullishSignals 结束 <<<");
    Print("=================================================");
 
-   Print("==================================================================================================");
+   Print("===========================================看涨和看跌的分割线便于查看===========================================");
    
    Print("=================================================");
    Print(">>> 单元测试：FilterWeakBearishSignals 开始 <<<");
@@ -104,6 +109,10 @@ void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[
 
 void Test_MergeAndSortSignals(FilteredSignal &merge_list[])
 {
+   if (!Debug_Print_Valid_List)
+   {
+      return;
+   }
    Print("=================================================");
    Print(">>> 单元测试：合并以后的看涨和看跌信号列表 开始 <<<");
 

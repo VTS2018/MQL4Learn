@@ -20,6 +20,7 @@
 // --- Bot Core Settings ---
 input string EA_Version_Tag = "V3";     // 版本信息标签，用于订单注释追踪
 input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 false 时，EA 不执行任何操作
+input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执行开仓和平仓操作
 //+------------------------------------------------------------------+
 
 //====================================================================
@@ -93,18 +94,18 @@ input string   Fibo_Zone_4         = "6.0, 7.0";        // 斐波那契衰竭区
 double g_FiboExhaustionLevels[MAX_FIBO_ZONES][2]; // 全局数组用于存储解析结果
 int    g_FiboZonesCount = 0;                     // 实际加载的区域数量
 
+//+------------------------------------------------------------------+
+//| 8. 调试/日志输出设置 (Debug/Logging)                             |
+//+------------------------------------------------------------------+
+input string   __DEBUG_LOGGING__    = "--- Debug/Logging ---";
+input bool     Debug_Print_Valid_List = false; // 是否在日志中打印清洗合并后的有效信号列表 (sorted_valid_signals)
+// input int      Log_Level            = 1;      // 日志级别 (例如 0=关, 1=关键信息, 2=详细)
+
 //====================================================================
 // 函数声明
 //====================================================================
 // KBarSignal GetIndicatorBarData(int shift);
-// double GetIndicatorSignal(int buffer_index, int shift);
-// string GenerateSignalID(datetime signal_time);
 
-void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[]);
-int FilterWeakBullishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[]);
-// void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[]);
-void MergeAndSortSignals(FilteredSignal &bulls[], FilteredSignal &bears[], FilteredSignal &result_list[]);
-// void Test_MergeAndSortSignals(FilteredSignal &merge_list[]);
 //====================================================================
 
 //+------------------------------------------------------------------+
@@ -284,7 +285,7 @@ void OnTick()
    FilterWeakBearishSignals(raw_bears, clean_bears); // 看跌：新高优胜
 
    // 运行测试 查看结果
-   // Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
+   Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
 
    
    // 4. 合并并排序 (生成列表 X)
@@ -292,7 +293,7 @@ void OnTick()
    MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
 
    int total_valid_signals = ArraySize(sorted_valid_signals);
-   // Test_MergeAndSortSignals(sorted_valid_signals);
+   Test_MergeAndSortSignals(sorted_valid_signals);
    if (total_valid_signals <= 0)
    {
       // 没有找到历史信号数据 不交易
@@ -310,7 +311,7 @@ void OnTick()
       // A. 从列表中提取关键信息
       FilteredSignal signal_item = sorted_valid_signals[i];
       int current_shift = signal_item.shift;
-      Print("--->[KTarget_FinderBot.mq4:290]: 查看是否包含K[1] 最新信号 current_shift: ", current_shift);
+      Print("--->[306]: 循环遍历过滤后的信号列表 查看是否包含K[1] 最新信号 current_shift: ", current_shift, " 信号时间:", signal_item.signal_time, " 信号类型:", (signal_item.type == OP_BUY ? "BUY 信号" : "SELL 信号"));
 
       // B. 重新获取完整的指标数据 (为了兼容 CheckSignalAndFilter)
       // 虽然 FilteredSignal 有部分数据，但 CheckSignalAndFilter 可能需要完整的 KBarSignal 结构
@@ -435,6 +436,12 @@ void ExecuteTrade_V1(int type, double lots, double sl, double tp, string comment
 // 🚨 修正后的函数签名：增加 entry_price 参数 🚨
 void ExecuteTrade(int type, double lots, double sl, double tp, double entry_price, string comment)
 {
+   if (!EA_Trading_Enabled)
+   {
+      Print("没有开启 EA_Trading_Enabled 开关，需要手动根据信号来决定是否开仓！！！");
+      return;
+   }
+   
    // Print("DEBUG: Comment长度=", StringLen(comment), ", 内容='", comment, "'");
 
    // 1. 规范化价格
@@ -515,8 +522,9 @@ int CountOpenTrades(int magic)
 //+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
-//| 核心决策函数：检查信号有效性并执行防重复过滤                     |
-//| 去除了 L3a (新鲜度) 和 L3b (最大风险)，仅保留核心逻辑             |
+//| 1.0
+//| 核心决策函数：检查信号有效性并执行防重复过滤
+//| 去除了 L3a (新鲜度) 和 L3b (最大风险)，仅保留核心逻辑
 //+------------------------------------------------------------------+
 int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
 {
@@ -683,6 +691,11 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
    return trade_command; // 返回有效指令，这将导致外层 OnTick 循环立即停止！
 }
 
+//+------------------------------------------------------------------+
+//| 2.0 移除单一的简单判断上下文的逻辑 被CheckSignalContext 替代
+//| 核心决策函数：检查信号有效性并执行防重复过滤
+//| 去除了 L3a (新鲜度) 和 L3b (最大风险)，仅保留核心逻辑
+//+------------------------------------------------------------------+
 int CheckSignalAndFilter_V2(const KBarSignal &data, int signal_shift)
 {
    int trade_command = OP_NONE; // 初始化为 -1
@@ -1477,11 +1490,47 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
    // =================================================================
    if (current_type == OP_SELL)
    {
+      // 遍历历史【看跌】列表 (同向)
+      int total_bears = ArraySize(history_bears);
+      // 我们只关心最近的一个有效同向信号，假设列表按 shift 排序，我们找第一个比当前旧的
+      for (int i = 0; i < total_bears; i++)
+      {
+         FilteredSignal prev = history_bears[i];
+         if (prev.shift <= current_shift) continue; // 跳过
 
+         // 基础区间：从 SL(最高) 到 Close(最低)
+         double zone_top = prev.stop_loss;
+         double zone_bottom = prev.confirmation_close;
+
+         // 触碰检查 (K线是否进入了这个区间)
+         if (current_low <= zone_top && current_high >= zone_bottom)
+         {
+            Print(" [上下文-回踩] 当前看跌(K", current_shift, ") 回踩 历史看跌(K", prev.shift, ") 基础区间");
+            return 2; // 返回不同的代码表示回踩
+         }
+         break; // 只检查最近的一个有效同向信号
+      }
    }
    else if (current_type == OP_BUY)
    {
+      // 遍历历史【看涨】列表 (同向)
+      int total_bulls = ArraySize(history_bulls);
+      for (int i = 0; i < total_bulls; i++)
+      {
+         FilteredSignal prev = history_bulls[i];
+         if (prev.shift <= current_shift) continue;
 
+         // 基础区间：从 Close(最高) 到 SL(最低)
+         double zone_top = prev.confirmation_close;
+         double zone_bottom = prev.stop_loss;
+
+         if (current_low <= zone_top && current_high >= zone_bottom)
+         {
+            Print(" [上下文-回踩] 当前看涨(K", current_shift, ") 回踩 历史看涨(K", prev.shift, ") 基础区间");
+            return 2;
+         }
+         break;
+      }
    }
 
    // 如果都不满足
