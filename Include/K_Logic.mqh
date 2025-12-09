@@ -356,6 +356,7 @@ TuningParameters GetTunedParameters()
             p.Max_Signal_Lookforward = 3;
             p.Look_LLHH_Candles = 3;
             break;
+            
         // 月线调整为2    
         case PERIOD_MN1: // MN1：月周期，只需关注最近半年
             // 扫描范围覆盖约 6 个月
@@ -363,7 +364,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 2;
             p.Lookahead_Top = p.Lookback_Top = 2;
 
-            p.Max_Signal_Lookforward = 2;
+            p.Max_Signal_Lookforward = 3;
             p.Look_LLHH_Candles = 2;
             break;
     }
