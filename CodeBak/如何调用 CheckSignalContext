@@ -153,3 +153,18 @@ string StringTrim(string str)
    // 返回修剪后的子字符串
    return StringSubstr(str, start, end - start + 1);
 }
+/************************************************************************************************/
+实现连续止损的功能控制
+//+------------------------------------------------------------------+
+//| 7. 连续止损风险管理 (Consecutive SL Risk Management)             |
+//+------------------------------------------------------------------+
+input string   __RISK_CSL__         = "--- Consecutive SL Settings ---";
+input bool     Enable_CSL           = true;     // CSL 功能总开关
+input int      CSL_Max_Losses       = 3;        // 允许的最大连续止损次数 (例如: 连续止损3次)
+input int      CSL_Lockout_Duration = 4;        // 交易锁定小时数 (例如: 锁定4小时)
+
+//+------------------------------------------------------------------+
+//| 全局状态变量 (CSL Tracking)                                      |
+//+------------------------------------------------------------------+
+int    g_ConsecutiveLossCount = 0;   // 当前连续止损计数器
+datetime g_CSLLockoutEndTime    = 0;   // 交易锁定解除的时间戳 (0表示未锁定)
