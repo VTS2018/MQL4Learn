@@ -742,9 +742,25 @@ void FindAndDrawTargetCandles(int total_bars)
         // 1. 检查 K-Target Bottom (看涨) 锚定条件
         if (CheckKTargetBottomCondition(i, total_bars))
         {
-            DrawTargetBottom(i); 
+            // 1.0
+            // DrawTargetBottom(i); 
             // 检查信号确认逻辑 (IB/DB 突破)
             //CheckBullishSignalConfirmation(i);
+
+            // 2.0 修复看跌阴线锚点丢失的 问题 需要将锚点标注代码 放在这里
+            // --- DrawTargetBottom 的真正逻辑 其实转到了这里
+            if (Is_EA_Mode)
+            {
+                // 目标： 在 $\text{EA}$ 模式下，停止在锚点 $\mathbf{i}$ 处写入 $\text{SL}$ 价格，仅保留人工模式下的绘图价格赋值。
+                // 🚨 修正：移除 EA 模式下的 BullishTargetBuffer[i] 赋值 🚨
+                // 即EA模式下 不需要对看涨锚点和看跌锚点进行 缓冲区写入，只保留人工模式下的写入
+                // BullishTargetBuffer[i] = Low[AbsLowIndex];
+            }
+            else
+            {
+                BullishTargetBuffer[i] = Low[i] - 10 * Point();
+            }
+            // --- 结束 DrawTargetBottom
 
             // --- V1.31 NEW: 流程协调 (看涨) ---
 
@@ -778,21 +794,6 @@ void FindAndDrawTargetCandles(int total_bars)
             }
             // --- END V1.35 NEW ---
 
-            // --- DrawTargetBottom 的真正逻辑 其实转到了这里
-            if (Is_EA_Mode)
-            {
-                // 目标： 在 $\text{EA}$ 模式下，停止在锚点 $\mathbf{i}$ 处写入 $\text{SL}$ 价格，仅保留人工模式下的绘图价格赋值。
-                // 🚨 修正：移除 EA 模式下的 BullishTargetBuffer[i] 赋值 🚨
-                // 即EA模式下 不需要对看涨锚点和看跌锚点进行 缓冲区写入，只保留人工模式下的写入
-                // BullishTargetBuffer[i] = Low[AbsLowIndex];
-            }
-            else
-            {
-                BullishTargetBuffer[i] = Low[i] - 10 * Point();
-            }
-
-            // --- 结束 DrawTargetBottom
-
             // 调用信号标记器 (仅传入数据)
             CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
         }
@@ -800,9 +801,22 @@ void FindAndDrawTargetCandles(int total_bars)
         // 2. 检查 K-Target Top (看跌) 锚定条件
         if (CheckKTargetTopCondition(i, total_bars))
         {
-            DrawTargetTop(i); 
+            // 1.0
+            // DrawTargetTop(i); 
             // 检查信号确认逻辑
             //CheckBearishSignalConfirmation(i);
+
+            // 2.0 修复
+            // --- DrawTargetTop 的真正逻辑 其实转到了这里
+            if (Is_EA_Mode)
+            {
+                //BearishTargetBuffer[i] = High[AbsHighIndex];
+            }
+            else
+            {
+                BearishTargetBuffer[i] = High[i] + 10 * Point();
+            }
+            // --- 结束DrawTargetTop
 
             // --- V1.31 NEW: 流程协调 (看跌) ---
 
@@ -830,17 +844,6 @@ void FindAndDrawTargetCandles(int total_bars)
                 DrawAbsoluteSupportLine(AbsHighIndex, false, 15);
             }
             // --- END V1.35 NEW ---
-
-            // --- DrawTargetTop 的真正逻辑 其实转到了这里
-            if (Is_EA_Mode)
-            {
-                //BearishTargetBuffer[i] = High[AbsHighIndex];
-            }
-            else
-            {
-                BearishTargetBuffer[i] = High[i] + 10 * Point();
-            }
-            // --- 结束DrawTargetTop
 
             // 调用信号标记器 (仅传入数据)
             CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
