@@ -13,6 +13,7 @@
 #include <K_Data.mqh>
 #include <K_Utils.mqh>
 #include <KBot_Logic.mqh>
+#include <KBot_Test.mqh>
 
 //+------------------------------------------------------------------+
 // --- Bot Core Settings ---
@@ -77,14 +78,15 @@ input int    Trend_MA_Period     = 200;    // 均线周期 (默认200，牛熊�
 input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SMMA, 3=LWMA
 
 //+------------------------------------------------------------------+
-//| 6. 斐波那契上下文设置 (Fibonacci Context Inputs)                 |
+//| 斐波那契上下文设置 (Fibonacci Context Inputs)                     
+//| 如果需要更多区域，可以仿照此格式继续添加 Fibo_Zone_4, Fibo_Zone_5..
 //+------------------------------------------------------------------+
 input string   __FIBO_CONTEXT__    = "--- Fibo Exhaustion Levels ---";
 input string   Fibo_Zone_1         = "1.618, 1.88";     // 斐波那契衰竭区 1 (格式: Level_A, Level_B)
 input string   Fibo_Zone_2         = "2.618, 2.88";     // 斐波那契衰竭区 2
 input string   Fibo_Zone_3         = "4.236, 4.88";     // 斐波那契衰竭区 3
 input string   Fibo_Zone_4         = "6.0, 7.0";        // 斐波那契衰竭区 4
-// 如果需要更多区域，可以仿照此格式继续添加 Fibo_Zone_4, Fibo_Zone_5...
+
 // 定义全局存储空间和计数器
 #define MAX_FIBO_ZONES 10 // 最大支持的斐波那契区域数量
 double g_FiboExhaustionLevels[MAX_FIBO_ZONES][2]; // 全局数组用于存储解析结果
@@ -2108,6 +2110,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
 
     // --- 定义需要检查的斐波那契区域 ---
     // 格式: {Level1, Level2}，可以根据需要自由添加/修改
+    /*
     double FiboLevels[4][2] = {
         {1.618, 1.88},
         {2.618, 2.88},
@@ -2116,7 +2119,10 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
         // 您可以添加更多区域，例如 {0.618, 0.786}
     };
     int zones_count = ArrayRange(FiboLevels, 0);
+    */
+   
     // Print("--->[KTarget_FinderBot.mq4:1273]: zones_count: ", zones_count);
+    // 2.0 代码讲上面的斐波区域 定义成了 可以输入和配置的
 
    // =================================================================
    // 逻辑 A: 斐波那契反转检查 (Fibonacci Reversal)
@@ -2144,10 +2150,10 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
          double tolerance = NormalizeDouble(risk * 0.1, _Digits);
 
          // 循环检查所有斐波那契区域
-         for (int z = 0; z < zones_count; z++)
+         for (int z = 0; z < g_FiboZonesCount; z++)
          {
-            double level1 = FiboLevels[z][0];
-            double level2 = FiboLevels[z][1];
+            double level1 = g_FiboExhaustionLevels[z][0];
+            double level2 = g_FiboExhaustionLevels[z][1];
 
             // 修正：基准价使用 prev.stop_loss (最低点)
             // 看涨延伸：基准 + Risk * Level
@@ -2190,10 +2196,10 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
 
          double tolerance = NormalizeDouble(risk * 0.1, _Digits);
 
-         for (int z = 0; z < zones_count; z++)
+         for (int z = 0; z < g_FiboZonesCount; z++)
          {
-            double level1 = FiboLevels[z][0];
-            double level2 = FiboLevels[z][1];
+            double level1 = g_FiboExhaustionLevels[z][0];
+            double level2 = g_FiboExhaustionLevels[z][1];
 
             // 修正：基准价使用 prev.stop_loss (最高点)
             // 看跌延伸：基准 - Risk * Level (数值越小越远)

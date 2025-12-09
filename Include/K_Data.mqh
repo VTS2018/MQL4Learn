@@ -70,8 +70,8 @@ const FiboZone BEARISH_HIGHLIGHT_ZONES[] = {
 //| 定义扩展矩形的颜色                                                |
 //+------------------------------------------------------------------+
 // 默认颜色 (用于所有其他周期) 矩形颜色和透明度
-#define HIGHLIGHT_COLOR_B clrSeaGreen
-#define HIGHLIGHT_COLOR_S clrIndianRed
+#define HIGHLIGHT_COLOR_B C'240,248,255'
+#define HIGHLIGHT_COLOR_S C'240,248,255'
 #define HIGHLIGHT_ALPHA   50 // 透明度 (0-255，50为浅色)
 
 // 月周期

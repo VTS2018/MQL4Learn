@@ -4,9 +4,9 @@
 //|                                                 https://mql5.com |
 //| 09.12.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2025, YourName"
-#property link      "https://mql5.com"
-#property strict
+// #property copyright "Copyright 2025, YourName"
+// #property link      "https://mql5.com"
+// #property strict
 
 //+------------------------------------------------------------------+
 //| defines                                                          |

@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//|                                                   KBot_Logic.mqh |
+//|                                                    KBot_Test.mqh |
 //|                                         Copyright 2025, YourName |
 //|                                                 https://mql5.com |
 //| 09.12.2025 - Initial release                                     |
