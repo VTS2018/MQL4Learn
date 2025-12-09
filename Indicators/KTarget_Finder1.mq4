@@ -47,7 +47,7 @@ int OnInit()
     SetIndexArrow(0, ARROW_CODE);
     
     // 初始化缓冲区数据为 0.0，以便正确绘图
-    ArrayInitialize(TargetBuffer, 0.0);
+    ArrayInitialize(TargetBuffer, EMPTY_VALUE);
     
     // 修正错误：使用 IntegerToString() 显式转换数字到字符串
     IndicatorShortName("目标K线查找器 (左"+IntegerToString(Min_Close_Lookback)+" / 右"+IntegerToString(Min_Close_Period)+")");
@@ -72,7 +72,7 @@ int OnCalculate(const int rates_total,
     if(rates_total < Scan_Range) return(0);
 
     // 清除缓冲区中的所有旧标记
-    ArrayInitialize(TargetBuffer, 0.0);
+    ArrayInitialize(TargetBuffer, EMPTY_VALUE);
     
     // 寻找并绘制所有符合条件的 K-Target
     FindAndDrawTargetCandles(rates_total);
