@@ -86,3 +86,58 @@ bool ParseFiboZone(string fibo_str, double &level1, double &level2)
     // 成功解析
     return true;
 }
+
+//+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_周期_日时分)
+//| 新格式: BTC_M1021806
+//+------------------------------------------------------------------+
+string GenerateSignalID(datetime signal_time)
+{
+   // --- 定义辅助变量 (保持不变) ---
+   string find_underscore = "_" + "";
+   string find_dot = "." + "";
+   string find_colon = ":" + "";
+   string replace_empty = "" + "";
+   
+   // 1. 获取品种前缀 (例如: BTCUSD -> BTC) [cite: 47]
+   string symbol_prefix = _Symbol;
+   if (StringLen(_Symbol) >= 3)
+   {
+      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符 [cite: 49]
+   }
+
+   // 2. 清理品种名中的下划线/点
+   string temp_symbol = symbol_prefix;
+   StringReplace(temp_symbol, find_underscore, replace_empty); // [cite: 50]
+   StringReplace(temp_symbol, find_dot, replace_empty);        // [cite: 51]
+
+   // ----------------------------------------------------
+   // 3. 修正日期/时间获取逻辑 (新格式：日时分 DHHMM)
+   // ----------------------------------------------------
+
+   // 3.1 获取完整日期: "yyyy.mm.dd" (用于截取日) [cite: 51]
+   string full_date = TimeToString(signal_time, TIME_DATE);
+
+   // 3.2 截取日部分: 从第 8 位开始，长度为 2 ("dd")
+   // 格式： yyyy.mm.dd
+   // 索引： 0123456789
+   string day = StringSubstr(full_date, 8, 2); 
+   
+   // 3.3 获取时间: "hh:mi" (时分) [cite: 53]
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 4. 清理时间分隔符 (只清理时分)
+   string temp_hour_minute = hour_minute;
+   StringReplace(temp_hour_minute, find_colon, replace_empty); // [cite: 55]
+
+   // ----------------------------------------------------
+   // 5. 最终 ID 拼接
+   // ----------------------------------------------------
+
+   // 获取周期名称 (例如: "M1", "H4", "D1")
+   string timeframe_name = GetTimeframeName(Period());
+   
+   // 格式: 品种前缀_周期_日时分 (例如：BTC_M1021806)
+   // 注意：我们移除了下划线，直接连接
+   return temp_symbol + "_" + timeframe_name + day + temp_hour_minute; 
+}
