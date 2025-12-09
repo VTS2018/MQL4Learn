@@ -12,6 +12,7 @@
 
 #include <K_Data.mqh>
 #include <K_Utils.mqh>
+#include <KBot_Utils.mqh>
 #include <KBot_Logic.mqh>
 #include <KBot_Test.mqh>
 
@@ -1957,72 +1958,7 @@ int FilterWeakBearishSignals(FilteredSignal &source_signals[], FilteredSignal &f
 
     return ArraySize(filtered_list);
 }
-//+------------------------------------------------------------------+
-//| 测试 FilterWeakBullishSignals 函数的主入口点                     |
-//+------------------------------------------------------------------+
-void Test_FilterWeakBullish_And_BearishSignals(FilteredSignal &raw_bullish_list[], FilteredSignal &raw_bearish_list[], FilteredSignal &clean_bullish_list[], FilteredSignal &clean_bearish_list[])
-{
-   Print("=================================================");
-   Print(">>> 单元测试：FilterWeakBullishSignals 开始 <<<");
 
-   // 1. 构造模拟数据
-   int original_size = ArraySize(raw_bullish_list);
-
-   // 打印输入数据
-   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
-   Print("原始【看涨】信号数量: ", original_size);
-   for (int i = 0; i < original_size; i++)
-   {
-      Print("输入 #", i + 1, " | K[", raw_bullish_list[i].shift, "] | SL: ", DoubleToString(raw_bullish_list[i].stop_loss, _Digits));
-   }
-
-   // 2. 执行过滤函数
-   int final_count = ArraySize(clean_bullish_list);
-
-   // 3. 打印输出结果
-   Print("\n--- 输出信号列表 (过滤后) ---");
-   Print("最终【看涨】有效信号数量: ", final_count);
-
-   for (int i = 0; i < final_count; i++)
-   {
-      Print("输出 #", i + 1, " | K[", clean_bullish_list[i].shift, "] | SL: ", DoubleToString(clean_bullish_list[i].stop_loss, _Digits));
-   }
-
-   Print(">>> 单元测试：FilterWeakBullishSignals 结束 <<<");
-   Print("=================================================");
-
-   Print("==================================================================================================");
-   
-   Print("=================================================");
-   Print(">>> 单元测试：FilterWeakBearishSignals 开始 <<<");
-
-   // 1. 构造模拟数据
-   int original_size_1 = ArraySize(raw_bearish_list);
-
-   // 打印输入数据
-   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
-   Print("原始【看跌】信号数量: ", original_size_1);
-   for (int i = 0; i < original_size_1; i++)
-   {
-      Print("输入 #", i + 1, " | K[", raw_bearish_list[i].shift, "] | SL: ", DoubleToString(raw_bearish_list[i].stop_loss, _Digits));
-   }
-
-   // 2. 执行过滤函数
-   int final_count_1 = ArraySize(clean_bearish_list);
-
-   // 3. 打印输出结果
-   Print("\n--- 输出信号列表 (过滤后) ---");
-   Print("最终【看跌】有效信号数量: ", final_count_1);
-
-   for (int i = 0; i < final_count_1; i++)
-   {
-      Print("输出 #", i + 1, " | K[", clean_bearish_list[i].shift, "] | SL: ", DoubleToString(clean_bearish_list[i].stop_loss, _Digits));
-   }
-
-   Print(">>> 单元测试：FilterWeakBearishSignals 结束 <<<");
-   Print("=================================================");
-
-}
 //+------------------------------------------------------------------+
 //| 辅助函数：合并看涨和看跌列表，并按 shift 从小到大 (由新到旧) 排序  |
 //+------------------------------------------------------------------+
@@ -2071,25 +2007,7 @@ void MergeAndSortSignals(FilteredSignal &bulls[], FilteredSignal &bears[], Filte
    }
 }
 
-void Test_MergeAndSortSignals(FilteredSignal &merge_list[])
-{
-   Print("=================================================");
-   Print(">>> 单元测试：合并以后的看涨和看跌信号列表 开始 <<<");
 
-   // 1. 构造模拟数据
-   int original_size = ArraySize(merge_list);
-
-   // 打印输入数据
-   Print("\n--- 输入信号列表 (从 K[1] 往历史排序) ---");
-   Print("【合并以后】信号数量: ", original_size);
-   for (int i = 0; i < original_size; i++)
-   {
-      Print("输入 #", i + 1, " | K[", merge_list[i].shift, "] | SL: ", DoubleToString(merge_list[i].stop_loss, _Digits));
-   }
-
-   Print(">>> 单元测试：合并以后的看涨和看跌信号列表 结束 <<<");
-   Print("=================================================");
-}
 
 //+------------------------------------------------------------------+
 //| L2: 信号上下文环境检查 (统一版：包含 Fib反转 和 区间回踩)          |
@@ -2120,7 +2038,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
     };
     int zones_count = ArrayRange(FiboLevels, 0);
     */
-   
+
     // Print("--->[KTarget_FinderBot.mq4:1273]: zones_count: ", zones_count);
     // 2.0 代码讲上面的斐波区域 定义成了 可以输入和配置的
 
@@ -2241,28 +2159,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
    return 0;
 }
 
-//+------------------------------------------------------------------+
-//| Helper: 解析单个斐波那契区域字符串 (例如 "1.618, 1.88")         |
-//+------------------------------------------------------------------+
-bool ParseFiboZone(string fibo_str, double &level1, double &level2)
-{
-    string tokens[];
-    // 使用逗号作为分隔符分割字符串
-    int count = StringSplit(fibo_str, ',', tokens);
-    
-    // 必须正好包含两个级别
-    if (count != 2) return false;
-    
-    // 将字符串转换为双精度浮点数
-    level1 = StringToDouble(StringTrim(tokens[0]));
-    level2 = StringToDouble(StringTrim(tokens[1]));
-    
-    // 简单验证：级别不能小于或等于 0
-    if (level1 <= 0 || level2 <= 0) return false; 
-    
-    // 成功解析
-    return true;
-}
+
 
 //+------------------------------------------------------------------+
 //| 初始化斐波那契级别 (在 OnInit 中调用)                           |
@@ -2319,33 +2216,4 @@ void InitializeFiboLevels(string zone1, string zone2, string zone3, string zone4
    */
 
    //+------------------------------------------------------------------+
-}
-
-//+------------------------------------------------------------------+
-//| MQL4 缺失函数：StringTrim (用于移除字符串首尾空格)                |
-//+------------------------------------------------------------------+
-string StringTrim(string str)
-{
-   int len = StringLen(str);
-   if (len == 0) return str;
-   
-   // 移除开头的空格
-   int start = 0;
-   while (start < len && StringGetChar(str, start) == ' ')
-   {
-      start++;
-   }
-   
-   // 如果整个字符串都是空格
-   if (start == len) return "";
-   
-   // 移除末尾的空格
-   int end = len - 1;
-   while (end > start && StringGetChar(str, end) == ' ')
-   {
-      end--;
-   }
-   
-   // 返回修剪后的子字符串
-   return StringSubstr(str, start, end - start + 1);
 }
