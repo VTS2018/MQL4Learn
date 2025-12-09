@@ -327,9 +327,14 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 8;
             p.Lookahead_Top = p.Lookback_Top = 8;
 
-            p.Max_Signal_Lookforward = 8;
+            // 也就是说 前瞻扫描的范围可以大一些 没关系 这个地方 会影响锚点的标注 如果过小会导致一些锚点 无法识别出来
+            // 按说 不应该影响锚点的 标注，这里代码可能还有一些问题
+            // 按理论上讲 锚点标注的逻辑 不应该收到前瞻 信号扫描的 范围影响的
+            // 是不是由于 低开K线的影响导致的标注呢？
+            p.Max_Signal_Lookforward = 15;
             p.Look_LLHH_Candles = 3;
             break;
+            
         // 开始调整 日周期 确认K前瞻 是5根 5天    
         case PERIOD_D1: // D1：日周期，遵循您的思路 (约 1-1.5 周)
             // 扫描范围覆盖约 1 个月
@@ -338,7 +343,8 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Top = p.Lookback_Top = 2;
 
             p.Max_Signal_Lookforward = 5;
-            p.Look_LLHH_Candles = 3;
+            //周期越大 数值可以设置的越小 如果是2 至少保证 5日内的最高价和最低价
+            p.Look_LLHH_Candles = 2;
             break;
             
         case PERIOD_W1: // W1：周周期，只需要关注最近几周或几个月的结构
