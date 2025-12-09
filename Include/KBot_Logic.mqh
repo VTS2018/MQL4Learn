@@ -668,3 +668,280 @@ void CollectAllSignals_V1(FilteredSignal &bullish_list[], FilteredSignal &bearis
 //+------------------------------------------------------------------+
 
 
+//+------------------------------------------------------------------+
+//| CSL 驱动器：MQL4 原生版 (History Polling)                        |
+//| 通过扫描 OrdersHistoryTotal 更新连续止损状态                       |
+//+------------------------------------------------------------------+
+void UpdateCSLByHistory()
+{
+    if (!Enable_CSL) return;
+
+    // 1. 首次运行时，初始化检查时间
+    if (g_LastCSLCheckTime == 0)
+    {
+       g_LastCSLCheckTime = TimeCurrent(); 
+       return; // 首次运行不追溯，只记录当前时间作为起点
+    }
+    
+    // 记录本次检查的开始时间 (用于更新 g_LastCSLCheckTime)
+    datetime check_start_time = TimeCurrent();
+
+    // 2. 获取历史订单总数
+    int total_history = OrdersHistoryTotal(); 
+    // Print("--->[KTarget_FinderBot.mq4:1736]: total_history: ", total_history);
+    // return;
+    
+    // 3. 遍历历史订单
+    // 建议从后往前遍历，因为最新的平仓通常在列表末尾
+    for (int i = total_history - 1; i >= 0; i--)
+    {
+        // 使用 MODE_HISTORY 选择历史订单
+        if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+        {
+            // A. 筛选：确保是本 EA 的订单
+            if (OrderMagicNumber() != MagicNumber || OrderSymbol() != Symbol()) continue;
+            
+            // B. 筛选：只关心 BUY 或 SELL 类型的订单 (排除挂单的删除记录)
+            if (OrderType() > OP_SELL) continue; 
+
+            // C. 核心筛选：平仓时间必须晚于上次检查时间
+            if (OrderCloseTime() <= g_LastCSLCheckTime) 
+            {
+                // 因为我们是从后往前找的，如果发现一个订单的平仓时间比检查点还早，
+                // 说明后面的订单只会更早，可以直接停止循环，节省资源。
+                break; 
+            }
+
+            // 4. 获取利润 (OrderProfit + Swap + Commission)
+            double deal_profit = OrderProfit() + OrderSwap() + OrderCommission();
+
+            // 5. 更新 CSL 状态
+            if (deal_profit < 0) // 亏损
+            {
+                g_ConsecutiveLossCount++;
+                Print("CSL 追踪 (Ticket:", OrderTicket(), "): 亏损 $", DoubleToString(deal_profit, 2), " | 连亏计数: ", g_ConsecutiveLossCount);
+                
+                // 检查阈值
+                if (g_ConsecutiveLossCount >= CSL_Max_Losses)
+                {
+                     int duration_seconds = CSL_Lockout_Duration * 3600; 
+                     g_CSLLockoutEndTime = TimeCurrent() + duration_seconds;
+                     Print("风险警报: 达到 ", CSL_Max_Losses, " 连亏! 锁定至: ", TimeToString(g_CSLLockoutEndTime, TIME_DATE|TIME_SECONDS));
+                }
+            }
+            else // 盈利或平价
+            {
+                if (g_ConsecutiveLossCount > 0)
+                {
+                    Print("CSL 追踪 (Ticket:", OrderTicket(), "): 盈利，连亏清零。");
+                }
+                g_ConsecutiveLossCount = 0;
+            }
+        }
+    }
+    
+    // 6. 更新时间戳
+    g_LastCSLCheckTime = check_start_time;
+}
+
+//+------------------------------------------------------------------+
+//| CSL 锁定状态检查 (在 OnTick 或开仓前调用)                        |
+//| 返回 true 表示当前交易被锁定，不应开仓。                           |
+//+------------------------------------------------------------------+
+bool IsTradingLocked()
+{
+   // 1. 如果功能关闭，则不锁定
+   if (!Enable_CSL) return false;
+
+   // 2. 如果没有锁定时间，则不锁定
+   if (g_CSLLockoutEndTime == 0) return false;
+
+   // 3. 检查锁定是否已解除
+   if (TimeCurrent() >= g_CSLLockoutEndTime)
+   {
+      // 锁定时间已过，解除锁定并重置状态
+      Print("风险解除: 连续止损锁定已到期，EA 恢复正常交易。");
+      g_CSLLockoutEndTime = 0;
+      g_ConsecutiveLossCount = 0; // 锁定结束后，必须重置计数器
+      return false;
+   }
+
+   // 4. 仍在锁定期间
+   Print("交易锁定中: CSL 触发，等待解除时间: ", TimeToString(g_CSLLockoutEndTime, TIME_DATE | TIME_SECONDS));
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| 获取本EA当前持仓数量                                             |
+//| 返回值: 属于本EA的持仓单数量 (OP_BUY 或 OP_SELL)                 |
+//+------------------------------------------------------------------+
+int GetOpenPositionsCount()
+{
+   int count = 0;
+
+   // 遍历当前所有订单（包括挂单和持仓）
+   for (int i = 0; i < OrdersTotal(); i++)
+   {
+      // 尝试选择订单
+      if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         // 1. 筛选：确保是本 EA 的订单
+         if (OrderMagicNumber() != MagicNumber || OrderSymbol() != Symbol())
+            continue;
+
+         // 2. 筛选：只计算持仓单 (OP_BUY 或 OP_SELL)，排除挂单
+         int type = OrderType();
+         if (type == OP_BUY || type == OP_SELL)
+         {
+            count++;
+         }
+      }
+   }
+
+   return count;
+}
+
+//+------------------------------------------------------------------+
+//| 函数: 统计当前品种和 MagicNumber 下的持仓订单数量 暂时没有被调用
+//+------------------------------------------------------------------+
+int CountOpenTrades(int magic)
+{
+   int total = 0;
+
+   // 遍历所有订单 (持仓和挂单)
+   for (int i = 0; i < OrdersTotal(); i++)
+   {
+      // 选中订单
+      if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         // 过滤条件：
+         // 1. 必须是本 EA 的订单 (MagicNumber)
+         // 2. 必须是当前图表品种的订单 (Symbol)
+         // 3. 必须是持仓订单 (OP_BUY 或 OP_SELL，排除挂单 OP_BUYSTOP 等)
+         if (OrderMagicNumber() == magic &&
+             OrderSymbol() == _Symbol &&
+             (OrderType() == OP_BUY || OrderType() == OP_SELL))
+         {
+            total++;
+         }
+      }
+   }
+   return total;
+}
+
+//+------------------------------------------------------------------+
+//| 获取本EA当前交易日（从 00:00:00 开始）的已实现盈亏 (Realized P/L)
+//| 有潜在的问题  历史列表 有可能不会按照时间进行排序
+//+------------------------------------------------------------------+
+double GetTodayRealizedProfit()
+{
+   // 获取当前图表品种的日线0柱（即今天 00:00:00）的时间戳
+   // 这是 MQL4 中获取当前交易日开始时间的标准方法
+   datetime TodayStartTime = iTime(Symbol(), PERIOD_D1, 0);
+   //Print(">[KTarget_FinderBot.mq4:1777]: TodayStartTime: ", TodayStartTime);
+   //return;
+
+   double daily_profit = 0.0;
+
+   // 遍历历史订单
+   int total_history = OrdersHistoryTotal();
+
+   for (int i = total_history - 1; i >= 0; i--)
+   {
+      if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+      {
+         // 1. 筛选：只检查本 EA 的订单
+         if (OrderMagicNumber() != MagicNumber) continue;
+
+         // 2. 筛选：只检查当前交易日内的平仓订单
+         // 只要订单的平仓时间早于今天的开始时间，就停止循环 (因为列表通常按时间排序)
+         if (OrderCloseTime() < TodayStartTime)
+         {
+            break;
+         }
+
+         // 3. 累加已实现净盈亏：Profit + Swap + Commission
+         daily_profit += (OrderProfit() + OrderSwap() + OrderCommission());
+      }
+   }
+
+   return daily_profit;
+}
+
+//风控部分的函数
+//+------------------------------------------------------------------+
+//| 函数: 时间窗口过滤                                               |
+//+------------------------------------------------------------------+
+bool IsTimeWindowAllowed()
+{
+   // 功能说明：比如我是北京时间，我输入的是我北京时间，这时候 可能要考虑冬令时和夏令时的差别
+   // 比如我想让EA 在上午时间段 北京时间 8-12 开始交易；和 下午 四点--6点 ；或者晚上 9-凌晨4点 ；一次性输入这几个时间段
+   // EA只有在这些时间段里，才开始运行并交易
+   // int current_hour = Hour();
+
+   // // 检查是否在允许的时间窗口内
+   // if (current_hour >= Trade_Start_Hour && current_hour < Trade_End_Hour)
+   // {
+   //    return true;
+   // }
+
+   // // 如果不在允许时间内，打印日志并禁止交易
+   // Print("风控过滤: 当前时间 ", current_hour, " 不在交易时间窗口 (", Trade_Start_Hour, "-", Trade_End_Hour, ")。");
+   return false;
+}
+
+// 连续止损 处理
+// 出现订单的连续止损以后 如何处理？
+// 暂停交易  减低手数或者开仓比例  等待一定时间以后才开始下一笔交易；停止 发送提示 人工确定是否还要继续交易
+// UpdateLossStreak IsTradingAllowedByStreak GetAdjustedLotSize
+
+// 日内整体风控 (Daily Cap Controls)
+// 先将EA设置成全天运行 不限制  等各个环节和流程全部 测试通过以后 再来实现交易时间的限制
+
+// KTarget_FinderBot.mq4 (g_last_date 是全局变量，用于存储上次运行的日期)
+
+//+------------------------------------------------------------------+
+//| 函数: 每日数据重置                                               |
+//+------------------------------------------------------------------+
+void CheckDailyReset()
+{
+   //  datetime current_date = iTime(NULL, PERIOD_D1, 0); // 获取当前交易日
+    
+   //  if (current_date != g_last_date)
+   //  {
+   //      // 跨日，执行重置
+   //      g_today_profit_pips = 0;
+   //      g_today_trades = 0;
+   //      g_last_date = current_date;
+   //      Print("--- 每日统计已重置 ---");
+   //  }
+}
+
+//+------------------------------------------------------------------+
+//| 函数: 日内整体风控过滤 (包括亏损/盈利/次数限制)                 |
+//+------------------------------------------------------------------+
+bool IsDailyRiskAllowed()
+{
+   // 1. 达到日盈利目标
+   // if (g_today_profit_pips >= Daily_Target_Profit_Pips)
+   // {
+   //    Comment("日盈利目标达成，暂停交易。");
+   //    return false;
+   // }
+
+   // // 2. 达到日最大亏损
+   // if (g_today_profit_pips <= -Daily_Max_Loss_Pips)
+   // {
+   //    Comment("日最大亏损触发，暂停交易。");
+   //    return false;
+   // }
+
+   // // 3. 达到日最大交易次数
+   // if (g_today_trades >= Daily_Max_Trades)
+   // {
+   //    Comment("日交易次数已满，暂停交易。");
+   //    return false;
+   // }
+
+   return true;
+}
