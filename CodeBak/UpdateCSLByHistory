@@ -1,0 +1,84 @@
+/*
+//+------------------------------------------------------------------+
+//| CSL 驱动器：通过扫描历史订单更新连续止损状态 (History Deal Polling)|
+//| 捕获 SL/TP 自动触发的平仓结果，并更新 CSL 计数。                   |
+//+------------------------------------------------------------------+
+void UpdateCSLByHistory()
+{
+    if (!Enable_CSL) return;
+
+    // 1. 首次运行时，设置初始检查时间 (例如：检查最近 1 小时，防止错过上次关闭EA时的交易)
+    if (g_LastCSLCheckTime == 0)
+    {
+       // 检查最近 1 小时的历史记录作为起点
+       g_LastCSLCheckTime = TimeCurrent() - 3600; 
+    }
+    
+    // 记录当前的检查时间，作为下次检查的起点
+    datetime current_time = TimeCurrent();
+
+
+    // 2. 尝试选择历史订单 (加载历史缓冲区)
+    // 检查范围：从上次检查时间到当前时间
+    if (!HistorySelect(g_LastCSLCheckTime, current_time)) 
+    {
+        // HistorySelect 失败，跳过本次检查，但依然更新时间戳
+        g_LastCSLCheckTime = current_time; 
+        return;
+    }
+    
+    // 3. 遍历所有历史交易记录 (Deals)
+    int total_history = HistoryDealsTotal(); 
+    
+    for (int i = 0; i < total_history; i++)
+    {
+        long deal_ticket = HistoryDealGetTicket(i);
+        if (deal_ticket <= 0) continue; // 确保交易票号有效
+
+        // A. 筛选：确保是本 EA 的交易 (通过 Magic Number)
+        if (HistoryDealGetInteger(deal_ticket, DEAL_MAGIC) != MagicNumber) continue;
+        
+        // B. 筛选：确保是平仓交易 (DEAL_ENTRY == DEAL_ENTRY_OUT)
+        // 只有平仓交易 (SL/TP/手动) 才会影响 CSL 计数
+        if (HistoryDealGetInteger(deal_ticket, DEAL_ENTRY) != DEAL_ENTRY_OUT) continue;
+
+        // C. 筛选：确保交易时间晚于上次检查时间 (避免重复计算)
+        datetime deal_time = (datetime)HistoryDealGetInteger(deal_ticket, DEAL_TIME);
+        if (deal_time <= g_LastCSLCheckTime) continue; 
+        
+        // 4. 获取利润 (包含佣金和隔夜利息)
+        double deal_profit = HistoryDealGetDouble(deal_ticket, DEAL_PROFIT) + 
+                             HistoryDealGetDouble(deal_ticket, DEAL_COMMISSION) +
+                             HistoryDealGetDouble(deal_ticket, DEAL_SWAP);
+
+        // 5. 更新 CSL 状态 (核心逻辑)
+        if (deal_profit < 0) // 订单亏损 (止损)
+        {
+            g_ConsecutiveLossCount++;
+            Print("🔴 CSL 追踪: 发现一笔亏损 (Deal:", deal_ticket, ")。连续亏损次数当前为: ", g_ConsecutiveLossCount);
+            
+            // 检查是否达到锁定阈值
+            if (g_ConsecutiveLossCount >= CSL_Max_Losses)
+            {
+                 // 达到阈值，计算锁定解除时间
+                 int duration_seconds = CSL_Lockout_Duration * 3600; // 转化为秒
+                 g_CSLLockoutEndTime = TimeCurrent() + duration_seconds;
+                 
+                 Print("🚨 风险警报: CSL 达到 ", CSL_Max_Losses, " 次! EA 进入交易锁定状态。");
+            }
+        }
+        else // 订单盈利或平价 (中断连续亏损)
+        {
+            // 任何盈利或平价交易都会重置计数器
+            if (g_ConsecutiveLossCount > 0)
+            {
+                Print("🟢 CSL 追踪: 发现一笔盈利 (Deal:", deal_ticket, ")，连续亏损计数器重置。");
+            }
+            g_ConsecutiveLossCount = 0;
+        }
+    }
+    
+    // 6. 更新检查时间戳，为下一次循环做准备
+    g_LastCSLCheckTime = current_time;
+}
+*/
