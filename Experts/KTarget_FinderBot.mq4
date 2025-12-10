@@ -141,6 +141,13 @@ double   g_Today_Realized_PL     = 0.0;     // 累计今日盈亏
 datetime g_Last_Daily_Check_Time = 0;       // 上次检查历史订单的时间点
 datetime g_Last_Calc_Date        = 0;       // 上次计算的日期 (用于隔日重置)
 
+//+------------------------------------------------------------------+
+//| ✅ 资金管理设置
+//+------------------------------------------------------------------+
+input string         __MONEY_MGMT__ = "--- 资金管理设置 ---";
+input ENUM_RISK_MODE Risk_Mode      = RISK_FIXED_MONEY; // 风险模式
+input double         Risk_Value     = 10.0;            // 风险值 ($100 或 3%)
+
 //====================================================================
 // 函数声明
 //====================================================================
@@ -178,6 +185,15 @@ int OnInit()
    Print("当前品种：Period() ", Period());
    Print("当前品种：Symbol() ", Symbol());
 
+   Print("当前品种：GetContractSize() ", DoubleToString(GetContractSize(), _Digits));
+
+   double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE);
+   double tick_size = MarketInfo(Symbol(), MODE_TICKSIZE);
+
+   Print("当前品种：Symbol() ", DoubleToString(tick_value, _Digits));
+   Print("当前品种：Symbol() ", DoubleToString(tick_size, _Digits));
+
+   Test_PositionSize_Logic();
 
    return(INIT_SUCCEEDED);
 }
