@@ -945,3 +945,84 @@ bool IsDailyRiskAllowed()
 
    return true;
 }
+
+//+------------------------------------------------------------------+
+//| 每日盈亏增量更新函数 (UpdateDailyProfit)                         |
+//| 负责日初重置累计值，并在每个Tick上累加新的平仓盈亏                |
+//+------------------------------------------------------------------+
+void UpdateDailyProfit()
+{
+    // 获取当前日期 (精确到天 即今天 00:00:00 的时间戳)
+    datetime today = iTime(Symbol(), PERIOD_D1, 0); 
+    
+    // 1. 检查是否需要隔日重置
+    if (g_Last_Calc_Date != today)
+    {
+        g_Today_Realized_PL = 0.0; // 累计盈亏清零
+        g_Last_Daily_Check_Time = today; // 检查时间点设为今天开始
+        g_Last_Calc_Date = today; 
+        
+        // 确保在隔日重置时，上次检查时间从今天 00:00:00 开始
+        Print(" 日内盈亏追踪已重置，新的一天开始。");
+    }
+    
+    // 2. 首次启动初始化检查时间
+    if (g_Last_Daily_Check_Time == 0)
+    {
+        // 第一次运行时，将检查时间点设置为当前时间，避免扫描所有历史订单
+        g_Last_Daily_Check_Time = TimeCurrent(); 
+        return; 
+    }
+    
+    datetime current_time = TimeCurrent();
+
+    // 3. 遍历历史订单，只检查上次检查时间之后的新交易
+    // (逻辑与 UpdateCSLByHistory 类似)
+    int total_history = OrdersHistoryTotal(); 
+
+    // 从最新的历史订单开始向前遍历
+    for (int i = total_history - 1; i >= 0; i--)
+    {
+        if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+        {
+            if (OrderMagicNumber() != MagicNumber) continue;
+            
+            // 🚨 CSL/日内限额 的核心：只检查最新平仓的订单
+            // 如果订单平仓时间早于或等于上次检查时间，就可以停止循环（假设列表大致按时间排序）
+            if (OrderCloseTime() <= g_Last_Daily_Check_Time)
+            {
+                break; // 遇到旧订单，停止遍历（因为只关注增量更新，可以假定大部分时间列表是按时间排序的）
+            }
+            
+            // 累加新增的已实现盈亏
+            double deal_profit = OrderProfit() + OrderSwap() + OrderCommission();
+            g_Today_Realized_PL += deal_profit;
+            
+            // 打印增量更新日志
+            Print(" 日内盈亏更新: Ticket ", OrderTicket(), " P/L:", DoubleToString(deal_profit, 2), " | 今日累计:", DoubleToString(g_Today_Realized_PL, 2));
+        }
+    }
+    
+    // 4. 更新检查时间戳
+    g_Last_Daily_Check_Time = current_time;
+}
+
+//+------------------------------------------------------------------+
+//| 检查是否达到日内亏损限制 (Daily Equity Stop)                       |
+//| 直接读取全局变量，速度极快                                        |
+//+------------------------------------------------------------------+
+bool IsDailyLossLimitReached()
+{
+    if (!Check_Daily_Loss_Strictly) return false;
+    
+    // 检查是否达到亏损阈值 (累计盈亏是负值，所以用 <=)
+    // 例如：如果 Daily_Max_Loss_Amount=100，当 g_Today_Realized_PL 达到 -100.00 或更低时触发
+    // 直接使用全局累计盈亏值
+    if (g_Today_Realized_PL <= -Daily_Max_Loss_Amount)
+    {
+        Print(" 风险熔断: 今日已实现亏损 $", DoubleToString(g_Today_Realized_PL, 2), "，达到或超过日内亏损限制 $", Daily_Max_Loss_Amount, "。交易已停止！");
+        return true;
+    }
+    
+    return false;
+}
