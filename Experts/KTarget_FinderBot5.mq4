@@ -15,7 +15,7 @@
 #include <KBot_Utils.mqh>
 #include <KBot_Logic.mqh>
 #include <KBot_Test.mqh>
-
+#include <KBot_Draw.mqh>
 //+------------------------------------------------------------------+
 // --- Bot Core Settings ---
 input string EA_Version_Tag = "V3";     // 版本信息标签，用于订单注释追踪
@@ -1359,6 +1359,11 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
     double current_high = High[current_shift];
     double current_low  = Low[current_shift];
 
+    // --- 定义上下文关系绘图对象前缀 ---
+    // 使用这个唯一的对象前缀，方便在 OnDeinit 或 OnTick 循环开始时进行清理
+    // string context_line_prefix = g_object_prefix + "CRel_";
+    string link_prefix = g_object_prefix + "CtxLink_";
+
     // --- 定义需要检查的斐波那契区域 ---
     // 格式: {Level1, Level2}，可以根据需要自由添加/修改
     /*
@@ -1422,6 +1427,26 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
             // 触碰检查
             if (current_low <= check_high && current_high >= check_low)
             {
+               // -----------------------------------------------------------
+               // 🎨 可视化绘制：看跌信号 K[1] -> 受到 看涨锚点 K[prev] 的阻力
+               // -----------------------------------------------------------
+
+               // 1. 生成唯一名称 (使用时间戳，不要用 shift)
+               // 格式: 前缀 + 当前时间(整数) + "_" + 历史时间(整数)
+               string obj_name = link_prefix + (string)Time[current_shift] + "_" + (string)prev.signal_time;
+
+               // 2. 确定坐标 (Close to Close)
+               datetime t1 = Time[current_shift];  // 起点时间 (当前)
+               double   p1 = Close[current_shift]; // 起点价格
+
+               datetime t2 = prev.signal_time;            // 终点时间 (历史)
+               double   p2 = prev.confirmation_close; // 终点价格 (历史收盘)
+
+               // 3. 调用绘图 (红色虚线，代表受到阻力)
+               DrawContextLinkLine(obj_name, t1, p1, t2, p2, clrRed);
+
+               // -----------------------------------------------------------
+
                Print(" [上下文-反转] 当前看跌(K", current_shift, ") 触碰 历史看涨(K", prev.shift, ") Fib区间 [",
                      DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "]");
                // 返回特定的上下文代码，或者简单的 true/false，这里假设返回由上层决定的指令
@@ -1465,6 +1490,21 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
 
             if (current_low <= check_high && current_high >= check_low)
             {
+               // -----------------------------------------------------------
+               // 🎨 可视化绘制：看涨信号 K[1] -> 受到 看跌锚点 K[prev] 的支撑
+               // -----------------------------------------------------------
+
+               string obj_name = link_prefix + (string)Time[current_shift] + "_" + (string)prev.signal_time;
+
+               datetime t1 = Time[current_shift];
+               double   p1 = Close[current_shift];
+               datetime t2 = prev.signal_time;
+               double   p2 = prev.confirmation_close;
+
+               // 调用绘图 (绿色/蓝色虚线，代表受到支撑)
+               DrawContextLinkLine(obj_name, t1, p1, t2, p2, clrDodgerBlue);
+
+               // -----------------------------------------------------------
                Print(" [上下文-反转] 当前看涨(K", current_shift, ") 触碰 历史看跌(K", prev.shift, ") Fib区间 [",
                      DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "]");
                return 1;
@@ -1496,6 +1536,27 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
          // 触碰检查 (K线是否进入了这个区间)
          if (current_low <= zone_top && current_high >= zone_bottom)
          {
+            // -----------------------------------------------------------
+            // 🎨 可视化绘制：看跌回踩 (同向确认) -> 绘制 深灰色 线条
+            // -----------------------------------------------------------
+
+            // 1. 生成唯一名称
+            // 使用之前定义的 link_prefix (g_object_prefix + "CtxLink_")
+            string obj_name = link_prefix + (string)Time[current_shift] + "_" + (string)prev.signal_time;
+
+            // 2. 确定坐标 (Close to Close)
+            datetime t1 = Time[current_shift];
+            double p1 = Close[current_shift];
+
+            datetime t2 = prev.signal_time;
+            double p2 = prev.confirmation_close;
+
+            // 3. 调用绘图 (使用深灰色 clrDarkGray，表示这是顺势的结构确认)
+            // 注意：DrawContextLinkLine 函数必须已经包含在您的代码中
+            DrawContextLinkLine(obj_name, t1, p1, t2, p2, clrDarkGray);
+
+            // -----------------------------------------------------------
+
             Print(" [上下文-回踩] 当前看跌(K", current_shift, ") 回踩 历史看跌(K", prev.shift, ") 基础区间");
             return 2; // 返回不同的代码表示回踩
          }
@@ -1517,6 +1578,22 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
 
          if (current_low <= zone_top && current_high >= zone_bottom)
          {
+            // -----------------------------------------------------------
+            // 🎨 可视化绘制：看涨回踩 (同向确认) -> 绘制 深灰色 线条
+            // -----------------------------------------------------------
+
+            string obj_name = link_prefix + (string)Time[current_shift] + "_" + (string)prev.signal_time;
+
+            datetime t1 = Time[current_shift];
+            double p1 = Close[current_shift];
+            datetime t2 = prev.signal_time;
+            double p2 = prev.confirmation_close;
+
+            // 调用绘图 (深灰色)
+            DrawContextLinkLine(obj_name, t1, p1, t2, p2, clrDarkGray);
+
+            // -----------------------------------------------------------
+
             Print(" [上下文-回踩] 当前看涨(K", current_shift, ") 回踩 历史看涨(K", prev.shift, ") 基础区间");
             return 2;
          }

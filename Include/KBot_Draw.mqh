@@ -82,6 +82,27 @@ void DrawTrendLineObject(
    // ObjectSet(obj_name, OBJPROP_SELECTABLE, true);
 }
 
+//+------------------------------------------------------------------+
+//| 辅助绘图：绘制信号上下文连接线 (Context Link Line)                 |
+//+------------------------------------------------------------------+
+void DrawContextLinkLine(string obj_name, datetime t1, double p1, datetime t2, double p2, color clr)
+{
+   // 1. 如果对象已存在，先删除（确保属性是最新的）
+   if(ObjectFind(0, obj_name) != -1) ObjectDelete(0, obj_name);
+
+   // 2. 创建趋势线对象
+   ObjectCreate(0, obj_name, OBJ_TREND, 0, t1, p1, t2, p2);
+
+   // 3. 设置属性
+   ObjectSet(obj_name, OBJPROP_COLOR, clr);            // 颜色
+   ObjectSet(obj_name, OBJPROP_STYLE, STYLE_DOT);      // 样式：点划线 (区分于普通趋势线)
+   ObjectSet(obj_name, OBJPROP_WIDTH, 1);              // 宽度
+   ObjectSet(obj_name, OBJPROP_RAY, false);            // 关键：关闭射线延伸，只连接两点
+   ObjectSet(obj_name, OBJPROP_BACK, true);            // 背景显示，不遮挡K线
+   ObjectSet(obj_name, OBJPROP_SELECTABLE, false);     // 不可选中
+   ObjectSet(obj_name, OBJPROP_HIDDEN, true);          // 隐藏在对象列表中(可选)
+}
+
 
 //+------------------------------------------------------------------+
 //| 辅助函数：在图表固定角点显示交易状态信息                           |
