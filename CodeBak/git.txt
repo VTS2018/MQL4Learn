@@ -61,3 +61,9 @@ git checkout d1798ade669335af9d1d932219eee8c456ec05b2 -- Indicators/KTarget_Find
 
 
 git checkout ca0f236 -- Experts/KTarget_FinderBot.mq4
+
+
+# 将 7adcf32 版本的文件内容，保存到本地的 “temp_version.mq4” 文件中
+git show 7adcf32:Experts/MQLTA MT4 One-Click Trade Pro.mq4 > Experts/temp_version.mq4
+
+git show ec9f81a6e6dae73cbd1a4f26815301eeea1c149d:Indicators/KTarget_Finder5.mq4 > Indicators/KTarget_Finder5_old.mq4
