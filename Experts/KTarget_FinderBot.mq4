@@ -148,6 +148,10 @@ input string         __MONEY_MGMT__ = "--- 资金管理设置 ---";
 input ENUM_RISK_MODE Risk_Mode      = RISK_FIXED_MONEY; // 风险模式
 input double         Risk_Value     = 10.0;            // 风险值 ($100 或 3%)
 
+//+------------------------------------------------------------------+
+//| ✅ 唯一对象名前缀
+//+------------------------------------------------------------------+
+string g_object_prefix = "";
 //====================================================================
 // 函数声明
 //====================================================================
@@ -176,6 +180,12 @@ int OnInit()
    }
 
    Print("KTarget_FinderBot 初始化成功。监控信号中...");
+
+   long full_chart_id = MathAbs(ChartID());
+   // int short_chart_id = (int)full_chart_id;
+   int short_chart_id = (int)(full_chart_id % 1000000);
+   g_object_prefix = ShortenObjectNameBot(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
+   Print("--->[KTarget_FinderBot.mq4:188]: g_object_prefix: ", g_object_prefix);
 
    // 🚨 斐波那契参数初始化 🚨
    InitializeFiboLevels(Fibo_Zone_1, Fibo_Zone_2, Fibo_Zone_3, Fibo_Zone_4);

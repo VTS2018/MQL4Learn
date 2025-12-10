@@ -58,6 +58,21 @@ string ShortenObjectName(string original_name)
     // 3. 返回修改后的字符串。
     return new_name;
 }
+string ShortenObjectNameBot(string original_name)
+{
+    // 定义要移除的子字符串
+    string substring_to_remove = "arget_FinderBot";
+    
+    // 1. 创建一个字符串副本，因为 StringReplace 会通过引用直接修改它的第一个参数。
+    string new_name = original_name; 
+    
+    // 2. 🚨 关键修正：直接调用 StringReplace，它会修改 new_name 变量，
+    //    并且我们忽略它的 INT 类型返回值。
+    StringReplace(new_name, substring_to_remove, "");
+    
+    // 3. 返回修改后的字符串。
+    return new_name;
+}
 
 //========================================================================
 // 16. GetBarTimeID: 获取 K 线时间戳作为唯一对象标识符 (V2.07)
