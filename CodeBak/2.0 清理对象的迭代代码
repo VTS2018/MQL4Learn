@@ -1,0 +1,64 @@
+//========================================================================
+// 2. OnDeinit: 指标卸载时调用 (清理图表对象)
+//========================================================================
+void OnDeinit(const int reason)
+{
+    // ... (其他不变的代码) ...
+    
+    if (!Is_EA_Mode)
+    {
+        // ------------------- 2.0 清理对象的迭代代码 -------------------
+        string obj_name;
+
+        // 遍历图表上的所有对象，从后向前删除
+        for (int i = ObjectsTotal() - 1; i >= 0; i--)
+        {
+            obj_name = ObjectName(i);
+
+            // 1. 检查对象是否由本指标创建 (g_object_prefix 必须从名称的第 0 位开始匹配)
+            if (StringFind(obj_name, g_object_prefix, 0) == 0)
+            {
+                // --- 判断是否为 Fibo 对象 ---
+                bool is_fibo_line = (StringFind(obj_name, "_Fibo_", 0) != -1);
+                bool is_fibo_highlight = (StringFind(obj_name, "_FiboHL_", 0) != -1);
+                bool is_fibo_text = (StringFind(obj_name, "_TXT", 0) != -1);
+                
+                // 只要名称中包含任意 Fibo 关键字，就认为是需要保留的对象
+                bool should_keep_fibo = is_fibo_line || is_fibo_highlight || is_fibo_text;
+
+                // --- 清理逻辑分支 ---
+
+                // 场景 A: 切换周期 (REASON_CHARTCHANGE = 5)
+                // 场景 B: 图表关闭/MT4退出 (REASON_CLOSE = 2) 🚨 【新增加的保留逻辑】
+                if (reason == REASON_CHARTCHANGE || reason == REASON_CLOSE)
+                {
+                    // 仅删除非 Fibo 对象，保留所有 Fibo 相关的对象
+                    if (!should_keep_fibo)
+                    {
+                        // 删除非 Fibo 对象（如矩形、基准线等）
+                        ObjectDelete(0, obj_name);
+                    }
+                    // 否则，保留对象
+                }
+                
+                // 场景 C: 手动删除指标 (REASON_REMOVE = 1)
+                // 此时用户明确要求移除指标，应该无条件删除所有对象
+                else if (reason == REASON_REMOVE)
+                {
+                    ObjectDelete(0, obj_name);
+                }
+                
+                // 场景 D: 其他原因 (例如 REASON_RECOMPILE)
+                // 默认删除所有非 Fibo 对象，防止编译后出现重复绘制。
+                else
+                {
+                     if (!should_keep_fibo) ObjectDelete(0, obj_name);
+                }
+            }
+        }
+    }
+
+    // ------------------- 0.0 下面的代码保持不变 -------------------
+    ChartRedraw();
+    Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
+}
