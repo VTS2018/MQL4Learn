@@ -290,27 +290,51 @@ void OnDeinit(const int reason)
     // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
     //ObjectsDeleteAll(0, "IBDB_Line_"); 
     // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
-    //ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
+    //ObjectsDeleteAll(0, "IBDB_P2_Line_");
 
     if (!Is_EA_Mode)
-{
-    /* 1.0
-    // 使用唯一的 g_object_prefix 进行清理
-    for (int i = ObjectsTotal() - 1; i >= 0; i--)
     {
-        string object_name = ObjectName(i);
-        // 检查对象名称是否包含我们独有的前缀
-        if (StringFind(object_name, g_object_prefix) != -1) 
+        /* 1.0
+        // 使用唯一的 g_object_prefix 进行清理
+        for (int i = ObjectsTotal() - 1; i >= 0; i--)
         {
-            ObjectDelete(0, object_name);
+            string object_name = ObjectName(i);
+            // 检查对象名称是否包含我们独有的前缀
+            if (StringFind(object_name, g_object_prefix) != -1)
+            {
+                ObjectDelete(0, object_name);
+            }
         }
-    }
-    */
+        */
 
-    // ------------------- 0.0 下面的代码保持不变 -------------------
-    ChartRedraw();
-    Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
-}
+        // 2.0 遍历图表上的所有对象，从后向前扫描
+        for (int i = ObjectsTotal() - 1; i >= 0; i--)
+        {
+            string obj_name = ObjectName(i);
+
+            // 1. 第一层筛选：必须是本指标创建的对象 (匹配前缀)
+            if (StringFind(obj_name, g_object_prefix) != -1)
+            {
+                // 2. 第二层筛选：检查是否为【斐波那契相关对象】(白名单)
+                // 根据名称特征：包含 "_Fibo_" 或 "_FiboHL_" 的都属于斐波组件
+                bool is_fibo_line = (StringFind(obj_name, "_Fibo_") != -1);
+                bool is_fibo_zone = (StringFind(obj_name, "_FiboHL_") != -1);
+
+                // 3. 核心保护逻辑：如果是斐波对象，【跳过删除】，直接进入下一次循环
+                if (is_fibo_line || is_fibo_zone)
+                {
+                    continue; // 🚨 关键语句：保留对象，不执行下面的删除
+                }
+
+                // 4. 只有非斐波对象 (如信号箭头、临时连线等) 才会被删除
+                ObjectDelete(0, obj_name);
+            }
+        }
+
+        // ------------------- 0.0 下面的代码保持不变 -------------------
+        ChartRedraw();
+        Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
+    }
 }
 
 
