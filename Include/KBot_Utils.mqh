@@ -420,3 +420,27 @@ void Test_PositionSize_Logic()
 
    Print("========== 结束单元测试: 仓位计算模块 ==========");
 }
+
+//+------------------------------------------------------------------+
+//| 功能函数 1: 计算本机与服务器时间差值 (封装独立函数)
+//+------------------------------------------------------------------+
+void CalculateAndPrintTimeOffset()
+{
+   datetime server_time = TimeCurrent(); // MT4 服务器时间 (K线时间)
+   datetime local_time  = TimeLocal();   // 本机电脑时间
+   
+   // 计算差值 (本机 - 服务器)
+   g_TimeOffset_Sec = local_time - server_time;
+   
+   // 计算小时差 (用于直观显示)
+   double hour_diff = (double)g_TimeOffset_Sec / 3600.0;
+   
+   // 打印详细信息到日志
+   Print("=======================================");
+   Print("【时间同步系统启动】");
+   Print("1. MT4服务器时间: ", TimeToString(server_time, TIME_DATE|TIME_SECONDS));
+   Print("2. 本机电脑时间 : ", TimeToString(local_time, TIME_DATE|TIME_SECONDS));
+   Print("3. 时间偏差值   : ", IntegerToString(g_TimeOffset_Sec), " 秒 (约 ", DoubleToString(hour_diff, 1), " 小时)");
+   Print("4. 说明: 正数代表本机比服务器快，负数代表比服务器慢");
+   Print("=======================================");
+}

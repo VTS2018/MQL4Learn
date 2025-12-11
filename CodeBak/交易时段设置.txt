@@ -1,0 +1,119 @@
+//+------------------------------------------------------------------+
+//| 输入参数配置
+//+------------------------------------------------------------------+
+input string   __TIME_SETTINGS__  = "--- 交易时段设置 ---";
+input string   Local_Trade_Slots  = "9-11, 16-18"; // 本地时间交易时段 (24h制, 逗号分隔)
+                                                   // 格式说明: "Start-End"
+                                                   // "9-11" 表示 [09:00 到 10:59]
+                                                   // 留空则全天运行
+
+//+------------------------------------------------------------------+
+//| 全局变量
+//+------------------------------------------------------------------+
+long g_TimeOffset_Sec = 0; // 保存本地时间与服务器时间的差值 (秒)
+
+//+------------------------------------------------------------------+
+//| OnInit: 初始化函数
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // 1. 计算时间差值并打印信息
+   CalculateAndPrintTimeOffset();
+   
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| OnTick: 主循环
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // 1. 检查是否在允许的交易时段
+   if (!IsCurrentTimeInSlots())
+   {
+      // 如果不在时段内，显示注释并退出
+      Comment("当前为本地时间: ", TimeToString(TimeCurrent() + g_TimeOffset_Sec, TIME_DATE|TIME_MINUTES), 
+              "\n不在允许的交易时段: ", Local_Trade_Slots, 
+              "\nEA 暂停运行...");
+      return; 
+   }
+   
+   // 2. 清除非交易时段的注释
+   Comment("");
+   
+   // --- 下面写您的核心交易逻辑 ---
+   // TradeLogic();
+}
+
+//+------------------------------------------------------------------+
+//| 功能函数 1: 计算本机与服务器时间差值 (封装独立函数)
+//+------------------------------------------------------------------+
+void CalculateAndPrintTimeOffset()
+{
+   datetime server_time = TimeCurrent(); // MT4 服务器时间 (K线时间)
+   datetime local_time  = TimeLocal();   // 本机电脑时间
+   
+   // 计算差值 (本机 - 服务器)
+   g_TimeOffset_Sec = local_time - server_time;
+   
+   // 计算小时差 (用于直观显示)
+   double hour_diff = (double)g_TimeOffset_Sec / 3600.0;
+   
+   // 打印详细信息到日志
+   Print("=======================================");
+   Print("【时间同步系统启动】");
+   Print("1. MT4服务器时间: ", TimeToString(server_time, TIME_DATE|TIME_SECONDS));
+   Print("2. 本机电脑时间 : ", TimeToString(local_time, TIME_DATE|TIME_SECONDS));
+   Print("3. 时间偏差值   : ", IntegerToString(g_TimeOffset_Sec), " 秒 (约 ", DoubleToString(hour_diff, 1), " 小时)");
+   Print("4. 说明: 正数代表本机比服务器快，负数代表比服务器慢");
+   Print("=======================================");
+}
+
+//+------------------------------------------------------------------+
+//| 功能函数 2: 检查当前时间是否在配置的时段内
+//+------------------------------------------------------------------+
+bool IsCurrentTimeInSlots()
+{
+   // 1. 如果设置为空，默认全天运行
+   if (Local_Trade_Slots == "") return true;
+
+   // 2. 获取当前的服务器时间，并转换为【对应的本地时间】
+   datetime current_server_time = TimeCurrent();
+   datetime calculated_local_time = current_server_time + g_TimeOffset_Sec;
+   
+   // 3. 提取当前本地时间的小时数 (0-23)
+   int current_local_hour = TimeHour(calculated_local_time);
+   
+   // 4. 解析输入字符串 (例如 "9-11, 16-18")
+   string slots[];
+   // 按逗号分割成多个组
+   int count = StringSplit(Local_Trade_Slots, ',', slots);
+   
+   for (int i = 0; i < count; i++)
+   {
+      string current_slot = slots[i];
+      StringTrimLeft(current_slot);  // 去除空格
+      StringTrimRight(current_slot);
+      
+      // 按连字符 "-" 分割开始和结束时间
+      int hyphen_pos = StringFind(current_slot, "-");
+      if (hyphen_pos > 0)
+      {
+         string str_start = StringSubstr(current_slot, 0, hyphen_pos);
+         string str_end   = StringSubstr(current_slot, hyphen_pos + 1);
+         
+         int start_h = (int)StringToInteger(str_start);
+         int end_h   = (int)StringToInteger(str_end);
+         
+         // 检查是否在范围内
+         // 逻辑: Start <= 当前小时 < End
+         // 例如 9-11，包含 9:00, 9:59, 10:00, 10:59，但不包含 11:00
+         if (current_local_hour >= start_h && current_local_hour < end_h)
+         {
+            return true; // 命中其中一个时段，允许交易
+         }
+      }
+   }
+   
+   return false; // 遍历完所有时段都未命中，禁止交易
+}
