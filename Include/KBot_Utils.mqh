@@ -233,6 +233,13 @@ double NormalizeLots(double lots)
 //| 资金管理模块：核心计算库                                           |
 //+------------------------------------------------------------------+
 
+// 定义仓位计算模式
+enum ENUM_POS_SIZE_MODE
+{
+   POS_FIXED_LOT,       // 模式 A: 固定手数 (例如 0.01 手)
+   POS_RISK_BASED       // 模式 B: 以损定仓 (根据止损距离计算)
+};
+
 // 定义风险计算模式
 enum ENUM_RISK_MODE
 {
@@ -332,6 +339,48 @@ double GetPositionSize(double entry_price, double sl_price, ENUM_RISK_MODE risk_
    double raw_lots = risk_money / (ticks * tick_value);
 
    // E. 修正手数
+   return NormalizeLots(raw_lots);
+}
+
+//+------------------------------------------------------------------+
+//| 辅助函数：根据风险模型计算仓位 (以损定仓核心算法) 这是单独独立出来的函数
+//+------------------------------------------------------------------+
+double GetPositionSize_V1(double entry_price, double sl_price, ENUM_RISK_MODE risk_mode, double risk_val)
+{
+   // 1. 计算具体的风险金额 (美元)
+   double money_to_risk = 0.0;
+   
+   if (risk_mode == RISK_FIXED_MONEY)
+   {
+      money_to_risk = risk_val; // 直接使用固定金额，例如 100
+   }
+   else if (risk_mode == RISK_PERCENTAGE)
+   {
+      // 账户余额 * 百分比 (输入 3.0 代表 3%)
+      money_to_risk = AccountBalance() * (risk_val / 100.0);
+   }
+
+   // 安全检查
+   if (money_to_risk <= 0) return 0;
+
+   // 2. 获取市场数据
+   double tick_size  = MarketInfo(Symbol(), MODE_TICKSIZE);  // 最小跳动点
+   double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE); // 单点价值
+
+   if (tick_size == 0 || tick_value == 0) return 0;
+
+   // 3. 计算止损距离 (绝对值)
+   double price_diff = MathAbs(entry_price - sl_price);
+   
+   // 防止除以零
+   if (price_diff < tick_size) return 0; 
+
+   // 4. 核心公式: 手数 = 风险金额 / ( (距离/TickSize) * TickValue )
+   // 计算止损包含多少个 Tick
+   double ticks = price_diff / tick_size;
+   // 计算手数
+   double raw_lots = money_to_risk / (ticks * tick_value);
+
    return NormalizeLots(raw_lots);
 }
 

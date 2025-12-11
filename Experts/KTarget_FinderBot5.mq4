@@ -24,24 +24,26 @@ input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执
 //+------------------------------------------------------------------+
 
 //====================================================================
-// 1. 策略参数设置 (Strategy Inputs)
+//| ✅ 策略参数设置 (Strategy Inputs)
 //====================================================================
 input string   __STRATEGY_SETTINGS__ = "--- Strategy Settings ---";
 input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
+
+input ENUM_POS_SIZE_MODE Position_Mode = POS_FIXED_LOT;    // 仓位计算模式选择
 input double   FixedLot       = 0.01;        // 固定交易手数
 input int      Slippage       = 3;           // 允许滑点 (点)
-input double   RewardRatio    = 1.5;         // 盈亏比 (TP = SL距离 * Ratio)
+input double   RewardRatio    = 1.0;         // 盈亏比 (TP = SL距离 * Ratio)
 
 //====================================================================
-// 2. 指标参数映射 (Indicator Inputs)
-// 🚨 注意：为了让 iCustom 正确工作，这里的参数必须与指标的 extern 参数完全一致且顺序相同
+//| ✅ 指标参数映射 (Indicator Inputs)
+//| 🚨 注意：为了让 iCustom 正确工作，这里的参数必须与指标的 extern 参数完全一致且顺序相同
 //====================================================================
 input string   __INDICATOR_SETTINGS__ = "--- Indicator Settings ---";
 input string   IndicatorName          = "KTarget_Finder5"; // 指标文件名(不带后缀)
 
 // 对应 KTarget_Finder5.mq4 的输入参数
 input bool     Indi_Is_EA_Mode        = true;  // 必须设置为 TRUE，以触发指标写入 SL 价格
-input bool     Indi_Smart_Tuning      = false; // Smart_Tuning_Enabled
+input bool     Indi_Smart_Tuning      = true;  // Smart_Tuning_Enabled
 input int      Indi_Scan_Range        = 500;   // Scan_Range
 input int      Indi_Lookahead_Bottom  = 20;    // Lookahead_Bottom
 input int      Indi_Lookback_Bottom   = 20;    // Lookback_Bottom
@@ -1029,6 +1031,109 @@ void CalculateTradeAndExecute(const KBarSignal &data, int type)
           " | SL:", DoubleToString(sl_price, _Digits),
           " | TP(1.618):", DoubleToString(tp_price, _Digits),
           " | 质量:", IntegerToString((int)((type == OP_BUY) ? data.BullishReferencePrice : data.BearishReferencePrice)));
+}
+
+//+------------------------------------------------------------------+
+//| CalculateTradeAndExecute V2.0                                    |
+//| 功能：集成固定手数与以损定仓模式，执行交易                           |
+//+------------------------------------------------------------------+
+void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
+{
+    // =================================================================
+    // 1. 价格准备 (Entry & SL)
+    // =================================================================
+    double entry_price = Open[0]; // 始终在新K线开盘时入场
+    double sl_price    = 0;
+    
+    // 获取止损价格 (根据信号结构)
+    if (type == OP_BUY)
+    {
+        sl_price = data.BullishStopLossPrice;
+    }
+    else if (type == OP_SELL)
+    {
+        sl_price = data.BearishStopLossPrice;
+    }
+    
+    // 安全检查：防止止损价格无效
+    if (sl_price == 0) 
+    {
+        Print("错误：止损价格无效 (0)，取消开仓。");
+        return;
+    }
+
+    // =================================================================
+    // 2. 计算风险距离与止盈 (TP)
+    // =================================================================
+    double risk_dist = MathAbs(entry_price - sl_price);
+    double tp_price  = 0;
+
+    // 根据盈亏比 RewardRatio 计算 TP
+    // TP = Entry +/- (RiskDistance * Ratio)
+    if (type == OP_BUY)
+    {
+        tp_price = entry_price + (risk_dist * RewardRatio);
+    }
+    else if (type == OP_SELL)
+    {
+        tp_price = entry_price - (risk_dist * RewardRatio);
+    }
+
+    // =================================================================
+    // 3. 仓位计算 (核心升级部分 🚀)
+    // =================================================================
+    double trade_lots = 0.0;
+
+    // --- 分支 A: 固定手数模式 ---
+    if (Position_Mode == POS_FIXED_LOT)
+    {
+        trade_lots = NormalizeLots(FixedLot);
+    }
+    // --- 分支 B: 以损定仓模式 (风险模型) ---
+    else if (Position_Mode == POS_RISK_BASED)
+    {
+        // 调用我们编写的通用计算函数，传入当前的 Risk_Mode 和 Risk_Value
+        trade_lots = GetPositionSize_V1(entry_price, sl_price, Risk_Mode, Risk_Value);
+        
+        // 记录日志，方便检查计算是否正确
+        Print("[资金管理] 模式:", EnumToString(Risk_Mode), 
+              " | 设定风险:", Risk_Value, 
+              " | 止损差价:", DoubleToString(risk_dist, _Digits),
+              " => 计算手数:", trade_lots);
+    }
+
+    // 最终检查：如果计算出的手数无效 (例如余额不足导致算出来是0)，则中止
+    if (trade_lots <= 0)
+    {
+        Print("错误：计算出的手数无效 (<=0)，可能是资金不足或止损过小。取消交易。");
+        return;
+    }
+
+    // =================================================================
+    // 4. 信号 ID 与 注释生成
+    // =================================================================
+    string signal_id = GenerateSignalID(data.OpenTime);
+    
+    // 注释格式：版本 | 信号ID | 风险提示
+    // 例如: "V2.0|20231010-0900|Risk:100"
+    string risk_info = (Position_Mode == POS_FIXED_LOT) ? "FixLot" : ("Risk:" + DoubleToString(Risk_Value, 1));
+    string comment   = EA_Version_Tag + "|" + signal_id + "|" + risk_info;
+
+    // =================================================================
+    // 5. 执行交易
+    // =================================================================
+    // 假设您已有 ExecuteTrade 封装函数，如果通过测试，可以直接使用
+    // 注意：将 trade_lots 传入
+    ExecuteTrade(type, trade_lots, sl_price, tp_price, entry_price, comment);
+
+    // 打印详细执行日志
+    Print(" [交易执行 V2.0] 类型:", (type == OP_BUY ? "BUY" : "SELL"),
+          " | 手数:", DoubleToString(trade_lots, 2),
+          " | 入场:", DoubleToString(entry_price, _Digits),
+          " | SL:", DoubleToString(sl_price, _Digits),
+          " | TP(Ratio ", DoubleToString(RewardRatio, 1), "):", DoubleToString(tp_price, _Digits),
+          " | 质量:", IntegerToString((int)((type == OP_BUY) ? data.BullishReferencePrice : data.BearishReferencePrice))
+          );
 }
 
 //+------------------------------------------------------------------+
