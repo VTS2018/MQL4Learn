@@ -418,5 +418,5 @@ void Test_PositionSize_Logic()
    double lot3 = GetPositionSize(entry, 1999.00, RISK_FIXED_MONEY, 100);
    Print("测试 3 [窄止损 $1]: 预期 1.00, 实际: ", DoubleToString(lot3, 2));
 
-   Print("========== 单元测试结束 ==========");
+   Print("========== 结束单元测试: 仓位计算模块 ==========");
 }

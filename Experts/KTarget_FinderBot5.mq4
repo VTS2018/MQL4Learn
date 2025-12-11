@@ -193,7 +193,7 @@ int OnInit()
    // int short_chart_id = (int)full_chart_id;
    int short_chart_id = (int)(full_chart_id % 1000000);
    g_object_prefix = ShortenObjectNameBot(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
-   Print("--->[KTarget_FinderBot.mq4:188]: g_object_prefix: ", g_object_prefix);
+   Print("--->[196]: g_object_prefix: ", g_object_prefix);
 
    // 🚨 斐波那契参数初始化 🚨
    InitializeFiboLevels(Fibo_Zone_1, Fibo_Zone_2, Fibo_Zone_3, Fibo_Zone_4);
@@ -486,7 +486,7 @@ void OnTick()
          if (trade_command != OP_NONE)
          {
             // D. 找到最新且通过所有检查的信号，执行交易
-            CalculateTradeAndExecute(full_data, trade_command);
+            CalculateTradeAndExecute_V2(full_data, trade_command);
 
             // E. 立即退出！
             // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
