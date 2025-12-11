@@ -100,7 +100,7 @@ void DrawContextLinkLine(string obj_name, datetime t1, double p1, datetime t2, d
    ObjectSet(obj_name, OBJPROP_RAY, false);            // 关键：关闭射线延伸，只连接两点
    ObjectSet(obj_name, OBJPROP_BACK, true);            // 背景显示，不遮挡K线
    ObjectSet(obj_name, OBJPROP_SELECTABLE, false);     // 不可选中
-   ObjectSet(obj_name, OBJPROP_HIDDEN, true);          // 隐藏在对象列表中(可选)
+   // ObjectSet(obj_name, OBJPROP_HIDDEN, true);          // 隐藏在对象列表中(可选)
 }
 
 
