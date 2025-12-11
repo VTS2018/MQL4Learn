@@ -537,6 +537,7 @@ void OnChartEvent(const int id,
 // 4. 核心辅助函数库 (The Engine Room)
 //====================================================================
 
+/*
 //+------------------------------------------------------------------+
 //| 函数: 执行交易 (OrderSend 封装)
 //+------------------------------------------------------------------+
@@ -573,6 +574,7 @@ void ExecuteTrade_V1(int type, double lots, double sl, double tp, string comment
       Print("订单执行失败! 错误代码: ", GetLastError());
    }
 }
+*/
 
 // 🚨 修正后的函数签名：增加 entry_price 参数 🚨
 void ExecuteTrade(int type, double lots, double sl, double tp, double entry_price, string comment)
@@ -633,6 +635,7 @@ void ExecuteTrade(int type, double lots, double sl, double tp, double entry_pric
 //| 返回: OP_BUY, OP_SELL, 或 0 (OP_NONE)
 //+------------------------------------------------------------------+
 
+/*
 //+------------------------------------------------------------------+
 //| 1.0
 //| 核心决策函数：检查信号有效性并执行防重复过滤
@@ -802,6 +805,7 @@ int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
 
    return trade_command; // 返回有效指令，这将导致外层 OnTick 循环立即停止！
 }
+*/
 
 //+------------------------------------------------------------------+
 //| 2.0 移除单一的简单判断上下文的逻辑 被CheckSignalContext 替代
