@@ -236,7 +236,7 @@ void OnTick()
    UpdateCSLByHistory();
 
    // 🚨 NEW: 日内盈亏增量更新
-    UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
+   UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
 
    // B. CSL 锁定检查 (阻止所有交易)
    if (IsTradingLocked()) return;
