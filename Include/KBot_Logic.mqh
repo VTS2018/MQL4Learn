@@ -1026,3 +1026,83 @@ bool IsDailyLossLimitReached()
     
     return false;
 }
+
+//+------------------------------------------------------------------+
+//| 核心功能：检查是否存在足够的利润空间 (Profit Space Check)
+//| 返回值: true = 空间充足; false = 空间不足，过滤交易
+//+------------------------------------------------------------------+
+bool CheckProfitSpace(int type, double entry_price, double stop_loss_price, FilteredSignal &history_opponents[])
+{
+    // 1. 计算当前信号的风险 (Risk)
+    double current_risk = MathAbs(entry_price - stop_loss_price);
+    
+    // 异常保护：防止风险为0导致除零错误
+    if (current_risk <= Point()) return true; // 风险极小，默认放行
+    
+    // 2. 寻找最近的反向障碍物 (Nearest Obstacle)
+    double target_price = 0.0;
+    int opponent_idx = -1;
+    
+    int total_opponents = ArraySize(history_opponents);
+    
+    // 遍历反向信号列表 (history_opponents 应该是按 shift 排序的，index 0 是最新的)
+    for (int i = 0; i < total_opponents; i++)
+    {
+        FilteredSignal opp = history_opponents[i];
+        
+        // 我们只关心那些在当前价格"前方"的障碍
+        if (type == OP_SELL)
+        {
+            // 做空：障碍物必须在当前价格下方
+            // 我们取反向看涨信号的【最低点(SL)】作为极限目标
+            // 如果您想保守一点，可以取 opp.confirmation_close
+            if (opp.stop_loss < entry_price) 
+            {
+                target_price = opp.stop_loss;
+                opponent_idx = i;
+                break; // 找到了最近的一个下方支撑，停止搜索
+            }
+        }
+        else if (type == OP_BUY)
+        {
+            // 做多：障碍物必须在当前价格上方
+            // 取反向看跌信号的【最高点(SL)】作为极限目标
+            if (opp.stop_loss > entry_price)
+            {
+                target_price = opp.stop_loss;
+                opponent_idx = i;
+                break; // 找到了最近的一个上方阻力
+            }
+        }
+    }
+    
+    // 3. 如果找不到任何历史反向信号作为障碍
+    if (target_price == 0.0) 
+    {
+        // 说明前方是一片开阔地 (或者历史数据不足)，默认允许交易
+        // Print(" [空间检查] 前方无障碍，通过。");
+        return true; 
+    }
+    
+    // 4. 计算剩余空间 (Space)
+    double available_space = MathAbs(entry_price - target_price);
+    
+    // 5. 计算盈亏比 (Reward / Risk)
+    double ratio = available_space / current_risk;
+    
+    // 6. 视觉调试 (可选)：在图表上画出这一段 空间 和 风险 的对比
+    // 这里只打印日志，您也可以调用画线函数
+    string direction = (type == OP_SELL) ? "看跌" : "看涨";
+    
+    if (ratio < Min_Reward_Risk_Ratio)
+    {
+        Print(" [空间过滤] ", direction, "信号被拒绝！风险: ", DoubleToString(current_risk/Point(), 0), 
+              "pt | 剩余空间: ", DoubleToString(available_space/Point(), 0), 
+              "pt | 盈亏比: ", DoubleToString(ratio, 2), " < ", Min_Reward_Risk_Ratio);
+        return false; // 空间太小，拒绝
+    }
+    
+    // 空间充足
+    Print(" [空间充足] ", direction, "信号通过。盈亏比: ", DoubleToString(ratio, 2));
+    return true;
+}

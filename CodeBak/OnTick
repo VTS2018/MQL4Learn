@@ -1,0 +1,156 @@
+//+------------------------------------------------------------------+
+//| OnTick: 核心逻辑循环 (每次报价跳动触发)
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   //+------------------------------------------------------------------+
+   // 🚨 1. 全局开关控制 🚨
+   if (!EA_Master_Switch)
+   {
+      return; // 开关未启用，立即退出 OnTick
+   }
+   
+   // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
+   UpdateCSLByHistory();
+   // 🚨 NEW: 日内盈亏增量更新
+   UpdateDailyProfit(); 
+
+   // B. CSL 锁定检查 (阻止所有交易)
+   if (IsTradingLocked()) return;
+   
+   // 2. 日内亏损限额检查 (直接读取全局变量)
+   if (IsDailyLossLimitReached()) return;
+
+   // ----------------------------------------------------
+   // 🚨 优先级 1.5: 最大持仓限制检查 (NEW!) 🚨
+   // ----------------------------------------------------
+   // 使用修正后的逻辑，如果超限，在图表右下角显示警告
+   int current_positions = GetOpenPositionsCount(); 
+
+   if (current_positions >= Max_Open_Orders)
+   {
+       // 警告显示逻辑已集成在 GetOpenPositionsCount 或外部调用中
+       // 如果使用了之前的代码建议，这里直接 return 即可
+       return; 
+   }
+
+   // --- 1. 新K线检测机制 (New Bar Check) ---
+   if(Time[0] == g_last_bar_time) return;
+   g_last_bar_time = Time[0]; // 更新时间
+
+   //+------------------------------------------------------------------+
+   // 2. 🚨 交易管理政策：防止重复开仓 (可选) 🚨
+   // ...
+
+   // 3.0 版本 必须使用扫描逻辑
+   Found_First_Qualified_Signal = false;
+
+   //+------------------------------------------------------------------+
+   // 4.0 第一阶段：数据准备 (收集 -> 清洗 -> 合并)
+   // ==========================================================================
+   
+   FilteredSignal raw_bulls[], raw_bears[];
+   FilteredSignal clean_bulls[], clean_bears[]; 
+   FilteredSignal sorted_valid_signals[];
+
+   // 1. 收集
+   CollectAllSignals(raw_bulls, raw_bears);
+   
+   // 2. 清洗 (优胜劣汰)
+   FilterWeakBullishSignals(raw_bulls, clean_bulls); 
+   FilterWeakBearishSignals(raw_bears, clean_bears);
+
+   // 3. 合并并排序
+   MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
+
+   int total_valid_signals = ArraySize(sorted_valid_signals);
+   if (total_valid_signals <= 0)
+   {
+      // Print("--- 没有找到历史信号数据 不交易!!! ---");
+      return;
+   }
+
+   // ==========================================================================
+   // 第二阶段：核心执行循环 (只针对精英信号进行决策)
+   // ==========================================================================
+
+   // 🚨 新版核心扫描逻辑：循环“有效信号列表 X” 🚨
+   for (int i = 0; i < total_valid_signals; i++)
+   {
+      // A. 从列表中提取关键信息
+      FilteredSignal signal_item = sorted_valid_signals[i];
+      int current_shift = signal_item.shift;
+      
+      Print("===> 检查信号 K[", current_shift, "] 类型: ", (signal_item.type == OP_BUY ? "BUY" : "SELL"));
+
+      // B. 重新获取完整的指标数据
+      KBarSignal full_data = GetIndicatorBarData(current_shift);
+
+      // ----------------------------------------------------
+      // 🚨 4.0 上下文逻辑：位置优先原则
+      // ----------------------------------------------------
+      int context_result = CheckSignalContext(current_shift, signal_item.type, clean_bulls, clean_bears);
+      
+      // 判定逻辑：
+      // 如果返回 > 0 (1=反转, 2=回踩)，说明是优质信号 (位置正确)
+      if (context_result > 0)
+      {
+         Print("===> [Pass] 上下文检查通过 (代码:", context_result, ")。进入空间检查...");
+
+         // ==========================================================================
+         // 🚨 4.1 新增：利润空间检查 (Reward/Risk Check) 🚨
+         // 位置对了，还要看有没有肉吃（盈亏比）
+         // ==========================================================================
+         
+         bool is_space_sufficient = false;
+         
+         // 准备计算参数
+         double check_entry = Close[current_shift]; // 假设以信号K线收盘价入场
+         double check_sl    = 0.0;
+         
+         // --- 分类检查 ---
+         if (signal_item.type == OP_SELL)
+         {
+             check_sl = High[current_shift]; // 做空止损通常在K线高点
+             
+             // 检查做空空间：传入【看涨列表 clean_bulls】作为下方的障碍物
+             is_space_sufficient = CheckProfitSpace(OP_SELL, check_entry, check_sl, clean_bulls);
+         }
+         else if (signal_item.type == OP_BUY)
+         {
+             check_sl = Low[current_shift];  // 做多止损通常在K线低点
+             
+             // 检查做多空间：传入【看跌列表 clean_bears】作为上方的障碍物
+             is_space_sufficient = CheckProfitSpace(OP_BUY, check_entry, check_sl, clean_bears);
+         }
+         
+         // --- 决策 ---
+         if (!is_space_sufficient)
+         {
+             Print("🛑 [RiskControl] 信号 K[", current_shift, "] 被拒绝：盈亏比空间不足 (Reward/Risk < 阈值)。");
+             continue; // 🚨 跳过当前信号，继续循环检查下一个（如果有的话），或者直接退出循环
+         }
+         
+         // ==========================================================================
+         
+         Print("✅ [Pass] 空间检查通过。准备执行交易逻辑...");
+
+         // C. 核心决策：执行其他 L2/L3 过滤 (趋势线、动量、新鲜度等)
+         int trade_command = CheckSignalAndFilter_V2(full_data, current_shift);
+
+         if (trade_command != OP_NONE)
+         {
+            // D. 找到最新且通过所有检查的信号，执行交易
+            CalculateTradeAndExecute(full_data, trade_command);
+
+            // E. 立即退出！
+            // 既然已经找到了一个完美的信号并执行了，本轮 OnTick 任务完成。
+            return;
+         }
+         
+         // 注意：如果空间够了，但 CheckSignalAndFilter_V2 没过（比如趋势不符），
+         // 代码会继续循环，或者在这里 return (取决于您的策略是只想做一个还是继续找)
+         return; 
+      }
+   }
+}
