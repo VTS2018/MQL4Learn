@@ -1,0 +1,153 @@
+//+------------------------------------------------------------------+
+//|                          K-Target 突破信号识别指标 (V1.33)        |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2025, MQL Developer"
+#property link      "https://www.mql5.com"
+#property version   "1.33" // [V1.33 UPD] 版本号更新
+#property strict
+#property indicator_chart_window
+#property indicator_buffers 4 
+#property indicator_plots   4 
+
+// --- 引入头文件 (核心) ---
+#include <K_Target_Object.mqh>
+#include <K_Target_Core.mqh>
+#include <K_Target_Drawings.mqh>
+
+
+// --- 外部可调参数 (输入) ---
+extern bool Enable_Drawing = true; // [V1.29 NEW] 是否在图表上绘制对象
+extern int Scan_Range = 500;
+extern int Lookahead_Bottom = 20;
+extern int Lookback_Bottom = 20;
+extern int Lookahead_Top = 20;
+extern int Lookback_Top = 20;
+extern int Max_Signal_Lookforward = 5;
+extern int DB_Threshold_Candles = 3;
+
+
+// --- 指标缓冲区 (保留) ---
+double BullishTargetBuffer[];
+double BearishTargetBuffer[]; 
+double BullishSignalBuffer[]; 
+double BearishSignalBuffer[]; 
+
+
+//========================================================================
+// 1. OnInit: 指标初始化
+//========================================================================
+int OnInit()
+{
+    // 缓冲区映射设置 (无变化)
+    SetIndexBuffer(0, BullishTargetBuffer);
+    SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, 1, clrBlue); 
+    SetIndexArrow(0, ARROW_CODE_UP);
+    
+    SetIndexBuffer(1, BearishTargetBuffer);
+    SetIndexStyle(1, DRAW_ARROW, STYLE_SOLID, 1, clrRed); 
+    SetIndexArrow(1, ARROW_CODE_DOWN);
+    
+    SetIndexBuffer(2, BullishSignalBuffer);
+    SetIndexStyle(2, DRAW_ARROW, STYLE_SOLID, 2, clrLimeGreen); 
+    SetIndexArrow(2, ARROW_CODE_SIGNAL_UP);
+    
+    SetIndexBuffer(3, BearishSignalBuffer);
+    SetIndexStyle(3, DRAW_ARROW, STYLE_SOLID, 2, clrDarkViolet); 
+    SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
+    
+    // 初始化所有缓冲区数据为 0.0
+    ArrayInitialize(BullishTargetBuffer, 0.0);
+    ArrayInitialize(BearishTargetBuffer, 0.0);
+    ArrayInitialize(BullishSignalBuffer, 0.0);
+    ArrayInitialize(BearishSignalBuffer, 0.0);
+
+    // ... (所有 SetIndexStyle 和 ArrayInitialize 保持不变) ...
+
+    string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+") V1.33";
+    IndicatorShortName(shortName);
+    return(INIT_SUCCEEDED);
+}
+
+
+//========================================================================
+// 2. OnDeinit: 指标卸载时调用 (清理图表对象)
+//========================================================================
+void OnDeinit(const int reason) 
+{
+    // 清理所有以 "IBDB_" 或 "IBDB_P2_" 为前缀的对象
+    ObjectsDeleteAll(0, "IBDB_Line_");
+    ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
+    ChartRedraw();
+}
+
+
+//========================================================================
+// 3. OnCalculate: 主计算函数 (V1.33 优化结构)
+//========================================================================
+int OnCalculate(const int rates_total, 
+                const int prev_calculated, 
+                const datetime &time[], 
+                const double& open[], 
+                const double& high[], 
+                const double& low[], 
+                const double& close[], 
+                const long& tick_volume[],
+                const long& volume[],    
+                const int& spread[])     
+{
+    if(rates_total < 1) return(0);
+
+    // ---------------------------------------------------------------------
+    // 1. 模式控制 (O(N*W) vs O(N) 模式)
+    // ---------------------------------------------------------------------
+    
+    // 如果是首次运行 (last_bars == 0) 或 K 线总数增加了 (rates_total > last_bars):
+    if (rates_total > last_bars || last_bars == 0)
+    {
+        // A. 运行昂贵的 O(N*W) 预计算 (黑箱)
+        PreCalculate_KTarget_Levels(rates_total); 
+        
+        // B. 清理旧绘图对象，以准备重绘新信号
+        ObjectsDeleteAll(0, "IBDB_Line_");
+        ObjectsDeleteAll(0, "IBDB_P2_Line_"); 
+        
+        // C. O(N) 主扫描 (使用 OOP 结构)
+        int max_bars_to_scan = MathMin(total_bars, Scan_Range);
+        
+        // 清除缓冲区中的所有旧标记 (每次新 K 线时，历史标记需要重写)
+        ArrayInitialize(BullishTargetBuffer, 0.0);
+        ArrayInitialize(BearishTargetBuffer, 0.0);
+        ArrayInitialize(BullishSignalBuffer, 0.0);
+        ArrayInitialize(BearishSignalBuffer, 0.0);
+        
+        for (int i = 1; i < max_bars_to_scan; i++)
+        {
+            KTarget_Signal current_signal;
+            
+            // 看涨信号处理
+            if (KTarget_ProcessSignal(i, current_signal, rates_total, DB_Threshold_Candles)) 
+            {
+                // 绘制 (KTarget_Draw 会处理箭头和 P1/P2 线)
+                KTarget_Draw(current_signal, DB_Threshold_Candles);
+            }
+            
+            // TODO: 添加看跌 KTarget_ProcessSignal 逻辑
+        }
+    }
+    else 
+    {
+        // else if (rates_total == last_bars)
+        // Tick 变动模式 (快速模式): 
+        // KTarget_Core.mqh 中的 MinClose_Future_Buffer 已经包含了 K[0] 的实时价格。
+        // 所以 PreCalculate_KTarget_Levels 运行一次后，K[1] 的状态在每次 Tick 都会被 CheckKTargetBottomCondition_O1 正确反映。
+        
+        // 此处为了性能最大化，暂时只处理新 K 线的突破情况
+        // TODO: 植入 CheckLatestBreakout 逻辑
+    }
+    
+    // ---------------------------------------------------------------------
+    // 2. 准备下次调用
+    // ---------------------------------------------------------------------
+    last_bars = rates_total;
+    return(rates_total);
+}

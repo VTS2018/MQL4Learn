@@ -4,40 +4,11 @@
 //|                                                 https://mql5.com |
 //| 10.12.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
-// #property copyright "Copyright 2025, YourName"
-// #property link      "https://mql5.com"
-// #property strict
 
 //+------------------------------------------------------------------+
-//| defines                                                          |
-//+------------------------------------------------------------------+
-
-// #define MacrosHello   "Hello, world!"
-// #define MacrosYear    2025
-
-//+------------------------------------------------------------------+
-//| DLL imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "user32.dll"
-//    int      SendMessageA(int hWnd,int Msg,int wParam,int lParam);
-// #import "my_expert.dll"
-//    int      ExpertRecalculate(int wParam,int lParam);
-// #import
-
-//+------------------------------------------------------------------+
-//| EX5 imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "stdlib.ex5"
-//    string ErrorDescription(int error_code);
-// #import
-
-//+------------------------------------------------------------------+
-
-//+------------------------------------------------------------------+
-//| 绘制：趋势线对象 (OBJ_TREND)                                      |
-//| 职责：纯绘图，不包含任何交易逻辑或信号查找逻辑。                     |
+//| ❌ -- 表示没有使用
+//| 绘制：趋势线对象 (OBJ_TREND)
+//| 职责：纯绘图，不包含任何交易逻辑或信号查找逻辑。
 //+------------------------------------------------------------------+
 // 参数：
 // obj_name_prefix: 对象名称前缀，用于确保唯一性，且方便清理。
@@ -83,7 +54,7 @@ void DrawTrendLineObject(
 }
 
 //+------------------------------------------------------------------+
-//| 辅助绘图：绘制信号上下文连接线 (Context Link Line)                 |
+//| ✅ 辅助绘图：绘制信号上下文连接线 (Context Link Line)
 //+------------------------------------------------------------------+
 void DrawContextLinkLine(string obj_name, datetime t1, double p1, datetime t2, double p2, color clr)
 {
@@ -103,10 +74,32 @@ void DrawContextLinkLine(string obj_name, datetime t1, double p1, datetime t2, d
    // ObjectSet(obj_name, OBJPROP_HIDDEN, true);          // 隐藏在对象列表中(可选)
 }
 
+//+------------------------------------------------------------------+
+//| ✅ 清理所有上下文连接线 (Context Link Lines)
+//| 作用: 删除所有以前缀 "CtxLink_" 开头的临时连线
+//+------------------------------------------------------------------+
+void CleanOldContextLinks()
+{
+   // 构造连接线的专用前缀
+   // 必须与 CheckSignalContext 中定义的 link_prefix 保持完全一致
+   string link_prefix = g_object_prefix + "CtxLink_";
+   
+   // 删除所有以该前缀开头的对象
+   // 参数说明: 
+   // 0: 当前图表
+   // link_prefix: 要删除的对象名称前缀
+   // -1: 删除所有窗口中的对象 (主图和副图)
+   // OBJ_TREND: 只删除趋势线类型 (更安全，防止误删其他同名前缀对象)
+   ObjectsDeleteAll(0, link_prefix, -1, OBJ_TREND);
+   
+   // 强制刷新图表，让删除立即生效 (这里才需要 ChartRedraw)
+   ChartRedraw(); 
+}
 
 //+------------------------------------------------------------------+
-//| 辅助函数：在图表固定角点显示交易状态信息                           |
-//| 职责：创建、更新或删除一个 OBJ_TEXT 对象。                         |
+//| ❌ 
+//| 辅助函数：在图表固定角点显示交易状态信息
+//| 职责：创建、更新或删除一个 OBJ_TEXT 对象。
 //+------------------------------------------------------------------+
 void DrawTradeStatusInfo(string status_text, string object_name, color text_color=clrRed)
 {
