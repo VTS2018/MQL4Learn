@@ -444,3 +444,53 @@ void CalculateAndPrintTimeOffset()
    Print("4. 说明: 正数代表本机比服务器快，负数代表比服务器慢");
    Print("=======================================");
 }
+
+//+------------------------------------------------------------------+
+//| 功能函数 2: 检查当前时间是否在配置的时段内
+//+------------------------------------------------------------------+
+bool IsCurrentTimeInSlots()
+{
+   // 1. 如果设置为空，默认全天运行
+   if (Local_Trade_Slots == "") return true;
+
+   // 2. 获取当前的服务器时间，并转换为【对应的本地时间】
+   datetime current_server_time = TimeCurrent();
+   // datetime calculated_local_time = current_server_time + g_TimeOffset_Sec;
+   datetime calculated_local_time = (datetime)(current_server_time + g_TimeOffset_Sec);
+   
+   // 3. 提取当前本地时间的小时数 (0-23)
+   int current_local_hour = TimeHour(calculated_local_time);
+   
+   // 4. 解析输入字符串 (例如 "9-11, 16-18")
+   string slots[];
+   // 按逗号分割成多个组
+   int count = StringSplit(Local_Trade_Slots, ',', slots);
+   
+   for (int i = 0; i < count; i++)
+   {
+      string current_slot = slots[i];
+      StringTrimLeft(current_slot);  // 去除空格
+      StringTrimRight(current_slot);
+      
+      // 按连字符 "-" 分割开始和结束时间
+      int hyphen_pos = StringFind(current_slot, "-");
+      if (hyphen_pos > 0)
+      {
+         string str_start = StringSubstr(current_slot, 0, hyphen_pos);
+         string str_end   = StringSubstr(current_slot, hyphen_pos + 1);
+         
+         int start_h = (int)StringToInteger(str_start);
+         int end_h   = (int)StringToInteger(str_end);
+         
+         // 检查是否在范围内
+         // 逻辑: Start <= 当前小时 < End
+         // 例如 9-11，包含 9:00, 9:59, 10:00, 10:59，但不包含 11:00
+         if (current_local_hour >= start_h && current_local_hour < end_h)
+         {
+            return true; // 命中其中一个时段，允许交易
+         }
+      }
+   }
+   
+   return false; // 遍历完所有时段都未命中，禁止交易
+}

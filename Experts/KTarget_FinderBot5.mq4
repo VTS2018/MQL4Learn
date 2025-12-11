@@ -28,7 +28,7 @@ input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执
 //| ✅ 输入参数配置
 //+------------------------------------------------------------------+
 input string   __TIME_SETTINGS__  = "--- 交易时段设置 ---";
-input string   Local_Trade_Slots  = "9-11, 16-18"; // 本地时间交易时段 (24h制, 逗号分隔)
+input string   Local_Trade_Slots  = "1-2, 2-4, 7-11, 14-18, 20-23"; // 本地时间交易时段 (24h制, 逗号分隔)
                                                    // 格式说明: "Start-End"
                                                    // "9-11" 表示 [09:00 到 10:59]
                                                    // 留空则全天运行
@@ -214,7 +214,7 @@ int OnInit()
    InitializeFiboLevels(Fibo_Zone_1, Fibo_Zone_2, Fibo_Zone_3, Fibo_Zone_4);
 
    CalculateAndPrintTimeOffset();
-   
+
    Print("当前品种：Digits() ", Digits());
    Print("当前品种：Point() ", Point());
    Print("当前品种：Period() ", Period());
@@ -247,7 +247,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-
    //+------------------------------------------------------------------+
    // 🚨 1. 全局开关控制 🚨
    if (!EA_Master_Switch)
@@ -255,6 +254,14 @@ void OnTick()
       // 可以在这里添加一个可选的日志，但频繁打印会影响性能
       // Print("EA Master Switch is OFF. Operations suspended.");
       return; // 开关未启用，立即退出 OnTick，不执行任何逻辑。
+   }
+
+   // 1. 检查是否在允许的交易时段
+   if (!IsCurrentTimeInSlots())
+   {
+      // 如果不在时段内，显示注释并退出
+      Print("当前为本地时间: ", TimeToString(TimeCurrent() + g_TimeOffset_Sec, TIME_DATE | TIME_MINUTES), " 不在允许的交易时段: ", Local_Trade_Slots, ",EA 暂停运行...");
+      return; 
    }
    
    // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
