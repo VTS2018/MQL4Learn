@@ -887,10 +887,12 @@ bool CheckKTargetTopCondition(int i, int total_bars)
 
 /**
  * 7.1
- * @param target_index: Argument 1
- * @param P2_index: Argument 2
- * @param K_Geo_Index: Argument 3
- * @param N_Geo: Argument 4
+ * 看涨阴线锚点的索引是开头，它一旦找到了 就可以找到 P1,接着就能找到P2,接着就能找到 最低价K线索引
+ * @param target_index: 看涨阴线锚点的索引
+ * @param P2_index: 突破P2的K线的索引
+ * @param K_Geo_Index: 突破P1的K线的索引
+ * @param N_Geo: 突破P1的K线的数量
+ * @param abs_lowindex 最低价K线的索引  可能等于 target_index 锚点索引
  */
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
