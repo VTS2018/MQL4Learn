@@ -277,6 +277,13 @@ void OnTick()
    // 🚨 NEW: 日内盈亏增量更新
    UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
 
+   // =======================================================
+   // 🚨 3. 核心调用：持仓管理与追踪止损 (最重要！)
+   // =======================================================
+   // 必须放在 New Bar Check 之前！
+   // 因为价格在K线内部跳动时，我们也要随时移动止损，不能等K线收盘才动。
+   // ManageOpenTrades();
+
    // B. CSL 锁定检查 (阻止所有交易)
    if (IsTradingLocked()) return;
 
@@ -665,6 +672,75 @@ void ExecuteTrade(int type, double lots, double sl, double tp, double entry_pric
    // 5. 结果检查 (使用 _Symbol 替代 Symbol()，使用 _Digits 替代 Digits)
    if (ticket > 0)
    {
+      Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type == OP_BUY ? "BUY" : "SELL"), " SL: ", sl, " TP: ", tp);
+   }
+   else
+   {
+      Print("订单执行失败! 错误代码: ", GetLastError(), ", 预期入场价: ", entry_price);
+   }
+}
+
+/**
+ * 执行订单创建版本2
+ * @param type: buy or sell
+ * @param lots: 下单手数
+ * @param cl: 信号确认的收盘价【用来计算】
+ * @param sl: 止损价格
+ * @param tp: 止盈价格
+ * @param entry_price: 入场价
+ * @param comment: 订单备注
+ */
+void ExecuteTrade_V2(int type, double lots, double cl, double sl, double tp, double entry_price, string comment)
+{
+   if (!EA_Trading_Enabled)
+   {
+      Print("没有开启 EA_Trading_Enabled 开关，需要手动根据信号来决定是否开仓！！！");
+      return;
+   }
+
+   // 1. 规范化价格
+   sl = NormalizeDouble(sl, _Digits);
+   tp = NormalizeDouble(tp, _Digits);
+
+   // 2. 确定实际开仓价 (仍然使用市价 Ask/Bid)
+   double open_price = (type == OP_BUY) ? Ask : Bid;
+   open_price = NormalizeDouble(open_price, _Digits);
+
+   // 🚨 3. 可选：滑点检查 (如果实际开仓价 open_price 偏离预期入场价 entry_price 太远，则拒绝交易)
+   /*
+   if (MathAbs(open_price - entry_price) > Max_Allowed_Slippage * Point())
+   {
+       Print("交易被拒绝: 实际开仓价 (", open_price, ") 滑点过大，预期价 (", entry_price, ")");
+       return;
+   }
+   */
+
+   // 4. 发送订单 (使用 Ask/Bid 作为市价单 price)
+   int ticket = OrderSend(_Symbol,
+                          type,
+                          lots,
+                          open_price, // 实际开仓价
+                          Slippage,   // 使用 input 定义的滑点
+                          sl,
+                          tp,
+                          comment,
+                          MagicNumber,
+                          0,
+                          (type == OP_BUY) ? clrGreen : clrRed);
+
+   // 5. 结果检查 (使用 _Symbol 替代 Symbol()，使用 _Digits 替代 Digits)
+   if (ticket > 0)
+   {
+      // 变量命名规则: 前缀_订单号_类型
+      string var_name_E = "KT5_" + IntegerToString(ticket) + "_E";
+      string var_name_S = "KT5_" + IntegerToString(ticket) + "_S";
+
+      // 存储理论价格 (GlobalVariableSet 存的是 double，精度足够)
+      GlobalVariableSet(var_name_E, cl);
+      GlobalVariableSet(var_name_S, sl);
+
+      Print(" [影子账本] 订单 #", ticket, " 数据已绑定: E=", cl, " S=", sl);
+
       Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type == OP_BUY ? "BUY" : "SELL"), " SL: ", sl, " TP: ", tp);
    }
    else
@@ -1163,11 +1239,18 @@ void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
     string comment   = EA_Version_Tag + "|" + signal_id + "|" + risk_info;
 
     // =================================================================
+    // 写入订单的辅助信息
+    // =================================================================
+    // 2. 准备理论价格数据
+    double theoretical_entry = Close[1]; // K[1] 收盘价
+    double original_sl       = sl_price; // 原始止损
+
+    // =================================================================
     // 5. 执行交易
     // =================================================================
     // 假设您已有 ExecuteTrade 封装函数，如果通过测试，可以直接使用
     // 注意：将 trade_lots 传入
-    ExecuteTrade(type, trade_lots, sl_price, tp_price, entry_price, comment);
+    ExecuteTrade_V2(type, trade_lots, theoretical_entry, sl_price, tp_price, entry_price, comment);
 
     // 打印详细执行日志
     Print(" [交易执行 V2.0] 类型:", (type == OP_BUY ? "BUY" : "SELL"),
@@ -1755,3 +1838,209 @@ void InitializeFiboLevels(string zone1, string zone2, string zone3, string zone4
    // }
 }
 
+//+------------------------------------------------------------------+
+//| 核心功能：解析注释并执行斐波那契阶梯追踪 (Fibo Step Trailing)       |
+//+------------------------------------------------------------------+
+void ManageOpenTrades()
+{
+   for(int i = OrdersTotal() - 1; i >= 0; i--)
+   {
+      if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES) == false) continue;
+      if(OrderSymbol() != Symbol() || OrderMagicNumber() != MagicNumber) continue;
+      
+      // 仅处理持仓单 (排除挂单)
+      if(OrderType() > OP_SELL) continue; 
+
+      /** 1.0
+      // =======================================================
+      // 1. 从注释中还原 理论坐标 (Fibo 0 和 Fibo 1)
+      // =======================================================
+      string comment = OrderComment();
+      
+      // 查找标记位置
+      int pos_E = StringFind(comment, "E:");
+      int pos_S = StringFind(comment, "#S:");
+      
+      // 如果找不到标记，说明这是旧版本订单或手动单，跳过处理
+      if (pos_E == -1 || pos_S == -1) continue;
+      
+      // 提取字符串并转为 double
+      // "E:xxxx.x" -> 从 E: 后开始截取，直到 #S: 前
+      string str_entry = StringSubstr(comment, pos_E + 2, pos_S - (pos_E + 2));
+      // "#S:xxxx.x" -> 从 #S: 后开始截取到末尾
+      string str_sl    = StringSubstr(comment, pos_S + 3);
+      
+      double fibo_1_0_price = StringToDouble(str_entry); // 理论入场 (Close[1])
+      double fibo_0_0_price = StringToDouble(str_sl);    // 原始止损
+      
+      // 计算单位距离 (Risk Unit)
+      double unit_dist = MathAbs(fibo_1_0_price - fibo_0_0_price);
+      
+      // 防止除零或极小距离错误
+      if (unit_dist < Point()) continue;
+      */
+
+      // 获取当前订单号
+      int ticket = OrderTicket();
+
+      // =======================================================
+      // 1. 从“影子账本”读取理论坐标
+      // =======================================================
+      string var_name_E = "KT5_" + IntegerToString(ticket) + "_E";
+      string var_name_S = "KT5_" + IntegerToString(ticket) + "_S";
+
+      // 检查是否存在记录
+      if (!GlobalVariableCheck(var_name_E) || !GlobalVariableCheck(var_name_S))
+      {
+          // 如果找不到记录（可能是手动单或旧版本单），则跳过或尝试用当前SL/Open倒推(不推荐)
+          continue; 
+      }
+
+      // 读取数据
+      double fibo_1_0_price = GlobalVariableGet(var_name_E); // 理论入场 (Close[1])
+      double fibo_0_0_price = GlobalVariableGet(var_name_S); // 原始止损
+
+      // 计算单位距离 (Risk Unit)
+      double unit_dist = MathAbs(fibo_1_0_price - fibo_0_0_price);
+      if (unit_dist < Point()) continue;
+
+      // =======================================================
+      // 2. 计算关键斐波那契阶梯位 (Target Levels)
+      // =======================================================
+      // 公式: 目标价 = 入场价 +/- (距离 * 倍数)
+      int dir = (OrderType() == OP_BUY) ? 1 : -1;
+      
+      double level_1_618 = fibo_1_0_price + dir * (unit_dist * 0.618); // 门槛
+      double level_2_000 = fibo_1_0_price + dir * (unit_dist * 1.000); // 1:1
+      double level_2_618 = fibo_1_0_price + dir * (unit_dist * 1.618); // 1:1.618
+      double level_3_000 = fibo_1_0_price + dir * (unit_dist * 2.000); // 1:2
+      double level_4_236 = fibo_1_0_price + dir * (unit_dist * 3.236); // 1:3.236
+
+      // 获取当前实时价格
+      double current_price = (OrderType() == OP_BUY) ? Bid : Ask;
+      double current_sl    = OrderStopLoss();
+      
+      // 定义移动止损的目标位 (New SL)
+      double new_sl = 0;
+      bool modify_needed = false;
+      string action_reason = "";
+
+      // =======================================================
+      // 3. 阶梯战术逻辑 (Ladder Logic) - 只许上，不许下
+      // =======================================================
+      
+      // 场景 A: 价格突破 1.618 -> 移动止损到 保本位 (Fibo 1.0 + 微利)
+      // 必须确保还没移动过 (现在的SL比保本位差)
+      if ( CheckPricePass(current_price, level_1_618, dir) )
+      {
+         // 保本位 = 理论入场 + 少量点差保护
+         double break_even = fibo_1_0_price + dir * (MarketInfo(Symbol(), MODE_SPREAD) * Point());
+         
+         // 如果当前止损比保本位 还要差 (亏损状态)，则上移
+         if ( (dir == 1 && current_sl < break_even) || (dir == -1 && current_sl > break_even) )
+         {
+            new_sl = break_even;
+            modify_needed = true;
+            action_reason = "保本(>1.618)";
+         }
+      }
+      
+      // 场景 B: 价格突破 2.618 -> 锁定 1:1 利润 (Fibo 2.0)
+      if ( CheckPricePass(current_price, level_2_618, dir) )
+      {
+         // 检查当前SL是否已经在 Fibo 2.0 之上，如果没有，则跟进
+         if ( (dir == 1 && current_sl < level_2_000 - Point()) || (dir == -1 && current_sl > level_2_000 + Point()) )
+         {
+            new_sl = level_2_000;
+            modify_needed = true;
+            action_reason = "锁定1:1(>2.618)";
+         }
+      }
+
+      // 场景 C: 价格突破 4.236 -> 锁定 1:2 利润 (Fibo 3.0)
+      if ( CheckPricePass(current_price, level_4_236, dir) )
+      {
+         if ( (dir == 1 && current_sl < level_3_000 - Point()) || (dir == -1 && current_sl > level_3_000 + Point()) )
+         {
+            new_sl = level_3_000;
+            modify_needed = true;
+            action_reason = "锁定1:2(>4.236)";
+         }
+      }
+
+      // =======================================================
+      // 4. 执行修改
+      // =======================================================
+      if (modify_needed && new_sl != 0)
+      {
+         // 规范化价格精度
+         new_sl = NormalizeDouble(new_sl, _Digits);
+         
+         // 执行修改
+         if (OrderModify(OrderTicket(), OrderOpenPrice(), new_sl, OrderTakeProfit(), 0, clrNONE))
+         {
+            Print(" [追踪止损] 订单 #", OrderTicket(), " ", action_reason, 
+                  " | 当前价:", DoubleToString(current_price, _Digits),
+                  " | 新止损:", DoubleToString(new_sl, _Digits));
+         }
+         else
+         {
+            Print(" [追踪止损] 修改失败 #", OrderTicket(), " Error:", GetLastError());
+         }
+      }
+   }
+}
+
+// 辅助函数：检查价格是否【超过】了某条线
+bool CheckPricePass(double current, double target, int dir)
+{
+   if (dir == 1) return (current >= target); // 做多：价格 >= 目标
+   else          return (current <= target); // 做空：价格 <= 目标
+}
+
+//+------------------------------------------------------------------+
+//| 清理已平仓订单的影子数据 (建议在 OnTick 或 OnTimer 中调用)
+//+------------------------------------------------------------------+
+void CleanUpShadowLedger()
+{
+    // 获取终端所有全局变量的总数
+    int total_vars = GlobalVariablesTotal();
+    
+    // 从后向前遍历 (因为删除会改变索引)
+    for(int i = total_vars - 1; i >= 0; i--)
+    {
+        string var_name = GlobalVariableName(i);
+        
+        // 1. 筛选出属于本 EA 的变量 (前缀 KT5_)
+        if(StringFind(var_name, "KT5_") == 0)
+        {
+            // 解析出 Ticket 号
+            // 格式: KT5_123456_E
+            string parts[];
+            StringSplit(var_name, '_', parts);
+            
+            if(ArraySize(parts) == 3)
+            {
+                int ticket = (int)StringToInteger(parts[1]);
+                
+                // 2. 检查该 Ticket 是否还在持仓列表中
+                if(IsTradeOpen(ticket) == false)
+                {
+                    // 如果订单不在持仓中(已平仓或删除)，则删除该全局变量
+                    GlobalVariableDel(var_name);
+                    // Print("🧹 [清理] 删除失效影子数据: ", var_name);
+                }
+            }
+        }
+    }
+}
+
+// 辅助：检查订单是否处于 Open 状态
+bool IsTradeOpen(int ticket)
+{
+    if(OrderSelect(ticket, SELECT_BY_TICKET))
+    {
+        if(OrderCloseTime() == 0) return true; // 还在持仓
+    }
+    return false; // 找不到或已平仓
+}
