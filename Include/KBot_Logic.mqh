@@ -1205,3 +1205,61 @@ bool CheckProfitSpace(int type, double entry_price, double stop_loss_price, Filt
     Print(" [空间充足] ", direction, "信号通过。盈亏比: ", DoubleToString(ratio, 2));
     return true;
 }
+
+//+------------------------------------------------------------------+
+//| ✅ 核心功能：检查是否距离反向持仓太近 (防止震荡磨损)                  |
+//| 返回值: true = 距离足够(允许交易); false = 距离太近(禁止交易)      |
+//+------------------------------------------------------------------+
+bool CheckHedgeDistance(int new_signal_type)
+{
+   // 1. 如果开关关闭，直接放行
+   if (!Use_Hedge_Filter) return true;
+
+   // 2. 获取当前的 ATR 值 (衡量当前市场的波动尺度)
+   // 使用 shift=1 (上一根收盘K线) 以保证数值稳定，不闪烁
+   double current_atr = iATR(NULL, 0, Hedge_ATR_Period, 1);
+   
+   // 异常保护
+   if (current_atr <= 0) return true;
+
+   // 计算最小允许的物理距离 (价格)
+   double min_distance = current_atr * Min_Hedge_Dist_ATR;
+
+   // 3. 遍历所有持仓单
+   int total = OrdersTotal();
+   for (int i = 0; i < total; i++)
+   {
+      if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+      {
+         // 筛选本 EA 的订单
+         if (OrderSymbol() == Symbol() && OrderMagicNumber() == MagicNumber)
+         {
+            // 4. 寻找【反向】持仓
+            // 如果新信号是 BUY，我们要检查有没有很近的 SELL 单
+            // 如果新信号是 SELL，我们要检查有没有很近的 BUY 单
+            if (OrderType() != new_signal_type)
+            {
+               // 计算当前价格与那张持仓单开仓价的距离
+               // 注意：这里用 Close[0] (当前价) 还是 OrderOpenPrice 均可
+               // 建议比较：新信号的入场位(Close[0]) vs 老单子的入场位
+               double distance = MathAbs(OrderOpenPrice() - Close[0]);
+               
+               // 5. 判定
+               if (distance < min_distance)
+               {
+                  // 距离太近！也就是您遇到的 ETHUSD 只有 1.6 美金价差的情况
+                  Print(" [震荡过滤] 距离反向持仓太近！");
+                  Print("   -> 反向单号: ", OrderTicket(), " 类型: ", (OrderType()==OP_BUY?"BUY":"SELL"));
+                  Print("   -> 当前距离: ", DoubleToString(distance, _Digits));
+                  Print("   -> 最小要求: ", DoubleToString(min_distance, _Digits), " (ATR*", Min_Hedge_Dist_ATR, ")");
+                  
+                  return false; // 禁止交易
+               }
+            }
+         }
+      }
+   }
+   
+   // 遍历完如果没有触发拦截，说明距离都足够，或者没有反向单
+   return true;
+}
