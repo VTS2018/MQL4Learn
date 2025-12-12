@@ -494,3 +494,67 @@ bool IsCurrentTimeInSlots()
    
    return false; // 遍历完所有时段都未命中，禁止交易
 }
+
+//+------------------------------------------------------------------+
+//| 功能函数 2: 检查当前时间是否在配置的时段内 (V2.0 - 支持跨午夜) 暂时没有用 保留它
+//+------------------------------------------------------------------+
+bool IsCurrentTimeInSlots_V2()
+{
+   // 1. 如果设置为空，默认全天运行
+   if (Local_Trade_Slots == "") return true;
+
+   // 2. 获取当前的服务器时间，并转换为【对应的本地时间】
+   datetime current_server_time = TimeCurrent();
+   datetime calculated_local_time = (datetime)(current_server_time + g_TimeOffset_Sec);
+
+   // 3. 提取当前本地时间的小时数 (0-23)
+   int current_local_hour = TimeHour(calculated_local_time);
+
+   // 4. 解析输入字符串
+   string slots[];
+   int count = StringSplit(Local_Trade_Slots, ',', slots);
+
+   for (int i = 0; i < count; i++)
+   {
+      string current_slot = slots[i];
+      StringTrimLeft(current_slot);
+      StringTrimRight(current_slot);
+
+      int hyphen_pos = StringFind(current_slot, "-");
+      if (hyphen_pos > 0)
+      {
+         string str_start = StringSubstr(current_slot, 0, hyphen_pos);
+         string str_end   = StringSubstr(current_slot, hyphen_pos + 1);
+
+         int start_h = (int)StringToInteger(str_start);
+         int end_h   = (int)StringToInteger(str_end);
+
+         // --- 核心逻辑修改开始 ---
+
+         // 情况 A: 普通时段 (例如 9-11) -> 结束时间 > 开始时间
+         if (start_h < end_h)
+         {
+             // 逻辑: Start <= 当前 < End
+             if (current_local_hour >= start_h && current_local_hour < end_h)
+                 return true;
+         }
+         // 情况 B: 跨午夜时段 (例如 20-00 或 22-05) -> 结束时间 <= 开始时间
+         else
+         {
+             // 逻辑: (当前 >= Start) 或者 (当前 < End)
+             // 例子 20-00: 
+             //   20, 21, 22, 23 点 -> 满足 >= 20 (True)
+             //   0 点 -> 满足 < 0 (False) -> 所以 00:00 停止
+             // 例子 22-05:
+             //   22, 23 点 -> 满足 >= 22 (True)
+             //   0, 1, 2, 3, 4 点 -> 满足 < 5 (True)
+             if (current_local_hour >= start_h || current_local_hour < end_h)
+                 return true;
+         }
+
+         // --- 核心逻辑修改结束 ---
+      }
+   }
+
+   return false;
+}
