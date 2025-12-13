@@ -1,0 +1,147 @@
+//+------------------------------------------------------------------+
+//| 全局常量与变量
+//+------------------------------------------------------------------+
+#define BTN_CLEANUP_NAME "Btn_CleanShadowData" // 按钮的对象名称
+
+//+------------------------------------------------------------------+
+//| OnInit: 初始化函数
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // ... (其他初始化代码) ...
+
+   // 1. 创建右下角的清理按钮
+   CreateCleanupButton();
+
+   // 2. 启动长周期定时器：每 3 天触发一次
+   // 3天 * 24小时 * 60分 * 60秒 = 259200 秒
+   EventSetTimer(259200); 
+   
+   // 开启图表事件监听 (为了捕获按钮点击)
+   ChartSetInteger(0, CHART_EVENT_OBJECT_DELETE, true); // 可选
+   
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| OnDeinit: 卸载函数
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   // 1. 销毁定时器
+   EventKillTimer();
+   
+   // 2. 删除按钮对象
+   ObjectDelete(0, BTN_CLEANUP_NAME);
+}
+
+//+------------------------------------------------------------------+
+//| OnTimer: 定时事件 (每 3 天触发一次)
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // 定时自动清理 (防止忘记点按钮导致垃圾堆积)
+   CleanUpShadowLedger();
+   Print("🕒 [定时器] 3天周期已到，已自动执行影子数据清理。");
+}
+
+//+------------------------------------------------------------------+
+//| OnChartEvent: 图表事件监听 (用于捕获按钮点击)
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id,         // 事件ID
+                  const long& lparam,   // 长整数参数
+                  const double& dparam, // 浮点数参数
+                  const string& sparam) // 字符串参数 (通常是对象名)
+{
+   // 检测鼠标点击对象事件
+   if (id == CHARTEVENT_OBJECT_CLICK)
+   {
+      // 检查被点击的是不是我们的清理按钮
+      if (sparam == BTN_CLEANUP_NAME)
+      {
+         // 1. 执行清理逻辑
+         CleanUpShadowLedger();
+         
+         // 2. 视觉反馈：让按钮弹起来 (取消按下状态)
+         ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_STATE, false);
+         
+         // 3. 强制刷新图表
+         ChartRedraw();
+         
+         // 4. 弹出提示
+         MessageBox("已成功清理失效的影子账本数据！\n保留了当前持仓的有效数据。", "系统提示", MB_OK|MB_ICONINFORMATION);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 辅助函数：创建清理按钮 (UI)
+//+------------------------------------------------------------------+
+void CreateCleanupButton()
+{
+   if (ObjectFind(0, BTN_CLEANUP_NAME) < 0)
+   {
+      // 创建按钮对象
+      ObjectCreate(0, BTN_CLEANUP_NAME, OBJ_BUTTON, 0, 0, 0);
+      
+      // --- 定位设置 (右下角) ---
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_CORNER, CORNER_RIGHT_LOWER);
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_XDISTANCE, 20);  // 距离右边框 20 像素
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_YDISTANCE, 25);  // 距离下边框 25 像素
+      
+      // --- 尺寸设置 ---
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_XSIZE, 100);     // 宽
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_YSIZE, 30);      // 高
+      
+      // --- 样式设置 ---
+      ObjectSetString(0, BTN_CLEANUP_NAME, OBJPROP_TEXT, "🧹 清理数据");
+      ObjectSetString(0, BTN_CLEANUP_NAME, OBJPROP_FONT, "Microsoft YaHei");
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_FONTSIZE, 9);
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_COLOR, clrWhite);           // 文字颜色
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_BGCOLOR, clrDimGray);       // 按钮背景色
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_BORDER_COLOR, clrSilver);   // 边框颜色
+      
+      // --- 属性设置 ---
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_BACK, false);    // 前置显示
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_STATE, false);   // 初始状态：未按下
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_HIDDEN, true);   // 隐藏在对象列表中(防误删)
+      ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_ZORDER, 10);     // 优先级
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 核心清理函数 (您的原始逻辑，保持不变)
+//+------------------------------------------------------------------+
+void CleanUpShadowLedger()
+{
+    int total_vars = GlobalVariablesTotal();
+    int deleted_count = 0; // 统计一下删了多少
+    
+    for(int i = total_vars - 1; i >= 0; i--)
+    {
+        string var_name = GlobalVariableName(i);
+        
+        // 筛选出属于本 EA 的变量
+        if(StringFind(var_name, "KT5_") == 0)
+        {
+            string parts[];
+            StringSplit(var_name, '_', parts);
+            
+            if(ArraySize(parts) == 3)
+            {
+                int ticket = (int)StringToInteger(parts[1]);
+                
+                // 核心：只删除【已平仓】的订单数据，保留【持仓中】的数据
+                if(IsTradeOpen(ticket) == false)
+                {
+                    GlobalVariableDel(var_name);
+                    deleted_count++;
+                }
+            }
+        }
+    }
+    
+    if(deleted_count > 0)
+        Print("🧹 [清理执行] 共删除了 ", deleted_count, " 条已失效的影子记录。");
+}

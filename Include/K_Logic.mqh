@@ -288,7 +288,7 @@ TuningParameters GetTunedParameters()
             p.Lookahead_Bottom = p.Lookback_Bottom = 12;
             p.Lookahead_Top = p.Lookback_Top = 12;
 
-            p.Max_Signal_Lookforward = 12;
+            p.Max_Signal_Lookforward = 24;
             p.Look_LLHH_Candles = 3;
             break;
             

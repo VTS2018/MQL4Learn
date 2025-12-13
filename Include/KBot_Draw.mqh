@@ -129,3 +129,83 @@ void DrawTradeStatusInfo(string status_text, string object_name, color text_colo
     // 3. 更新对象内容和颜色
     ObjectSetText(object_name, status_text, 0, "Arial", text_color);
 }
+
+//+------------------------------------------------------------------+
+//| 辅助函数：创建清理按钮 (UI)
+//+------------------------------------------------------------------+
+void CreateCleanupButton_V1(string btn_name)
+{
+   if (ObjectFind(0, btn_name) < 0)
+   {
+      // 创建按钮对象
+      ObjectCreate(0, btn_name, OBJ_BUTTON, 0, 0, 0);
+      
+      // --- 定位设置 (右下角) ---
+      ObjectSetInteger(0, btn_name, OBJPROP_CORNER, CORNER_RIGHT_LOWER);
+      ObjectSetInteger(0, btn_name, OBJPROP_XDISTANCE, 20);  // 距离右边框 20 像素
+      ObjectSetInteger(0, btn_name, OBJPROP_YDISTANCE, 25);  // 距离下边框 25 像素
+      
+      // --- 尺寸设置 ---
+      ObjectSetInteger(0, btn_name, OBJPROP_XSIZE, 100);     // 宽
+      ObjectSetInteger(0, btn_name, OBJPROP_YSIZE, 30);      // 高
+      
+      // --- 样式设置 ---
+      ObjectSetString(0, btn_name, OBJPROP_TEXT, "清理数据");
+      ObjectSetString(0, btn_name, OBJPROP_FONT, "Microsoft YaHei");
+      ObjectSetInteger(0, btn_name, OBJPROP_FONTSIZE, 9);
+      ObjectSetInteger(0, btn_name, OBJPROP_COLOR, clrWhite);           // 文字颜色
+      ObjectSetInteger(0, btn_name, OBJPROP_BGCOLOR, clrDimGray);       // 按钮背景色
+      ObjectSetInteger(0, btn_name, OBJPROP_BORDER_COLOR, clrSilver);   // 边框颜色
+      
+      // --- 属性设置 ---
+      ObjectSetInteger(0, btn_name, OBJPROP_BACK, false);    // 前置显示
+      ObjectSetInteger(0, btn_name, OBJPROP_STATE, false);   // 初始状态：未按下
+      ObjectSetInteger(0, btn_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, btn_name, OBJPROP_HIDDEN, true);   // 隐藏在对象列表中(防误删)
+      ObjectSetInteger(0, btn_name, OBJPROP_ZORDER, 10);     // 优先级
+   }
+}
+// 文件：KBot_Draw.mqh
+
+void CreateCleanupButton(string btn_name) 
+{
+   // 🚨 1. 为了确保属性生效，如果对象已存在，先彻底删除它再重建
+   if (ObjectFind(0, btn_name) >= 0) 
+   {
+       ObjectDelete(0, btn_name);
+   }
+
+   // 2. 创建按钮对象
+   ObjectCreate(0, btn_name, OBJ_BUTTON, 0, 0, 0);
+   
+   // --- 定位设置 (右下角) ---
+   ObjectSetInteger(0, btn_name, OBJPROP_CORNER, CORNER_RIGHT_LOWER);
+   ObjectSetInteger(0, btn_name, OBJPROP_XDISTANCE, 120);  // 距离右边框 50 像素 (稍微往里挪一点)
+   ObjectSetInteger(0, btn_name, OBJPROP_YDISTANCE, 40);  // 距离下边框 40 像素
+   
+   // --- 尺寸设置 ---
+   ObjectSetInteger(0, btn_name, OBJPROP_XSIZE, 100);     // 宽
+   ObjectSetInteger(0, btn_name, OBJPROP_YSIZE, 30);      // 高
+   
+   // --- 样式设置 ---
+   // 🚨 注意：先去掉 Emoji 表情，部分 MT4 版本不支持会导致文字消失
+   ObjectSetString(0, btn_name, OBJPROP_TEXT, "清理数据"); 
+   
+   // 字体尝试使用更通用的 SimHei (黑体) 或 Arial
+   ObjectSetString(0, btn_name, OBJPROP_FONT, "Microsoft YaHei"); 
+   ObjectSetInteger(0, btn_name, OBJPROP_FONTSIZE, 9);
+   
+   ObjectSetInteger(0, btn_name, OBJPROP_COLOR, clrWhite);           // 文字颜色 (白)
+   ObjectSetInteger(0, btn_name, OBJPROP_BGCOLOR, clrDimGray);       // 背景颜色 (深灰)
+   ObjectSetInteger(0, btn_name, OBJPROP_BORDER_COLOR, clrSilver);   // 边框颜色
+   
+   // --- 属性设置 ---
+   ObjectSetInteger(0, btn_name, OBJPROP_BACK, false);    // 前置显示
+   ObjectSetInteger(0, btn_name, OBJPROP_STATE, false);   // 初始状态：未按下
+   ObjectSetInteger(0, btn_name, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, btn_name, OBJPROP_HIDDEN, true);   
+   ObjectSetInteger(0, btn_name, OBJPROP_ZORDER, 10);     
+   
+   // 🚨 3. 强制刷新图表，让文字立即渲染出来
+   ChartRedraw();
+}
