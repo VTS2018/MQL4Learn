@@ -1,0 +1,125 @@
+//+------------------------------------------------------------------+
+//| OnTick V2.1: 核心逻辑循环 (最终修正版)
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   // ==================================================================
+   // 1. 全局总开关 (Master Switch) - 优先级最高
+   // ==================================================================
+   if (!EA_Master_Switch) return;
+
+   // ==================================================================
+   // 2. 数据更新 (Data Update) - 必须在做决策前更新数据
+   // ==================================================================
+   // 🚨 修正：移到最前面。无论是否在交易时段，都要更新连损和盈亏状态。
+   // 确保跨天重置逻辑 (Reset) 能在 00:00 准时执行，避免死锁。
+   UpdateCSLByHistory_V2();  // 更新连损计数 & 锁定时间
+   UpdateDailyProfit_V2();   // 更新今日盈亏 & 跨天重置
+
+   // ==================================================================
+   // 3. 持仓管理 (Trade Management) - 必须无论风控与否都执行
+   // ==================================================================
+   // 即使不在交易时段，只要有单子在场内，就必须追踪止损！
+   ManageOpenTrades(); 
+
+   // ==================================================================
+   // 4. 开仓风控检查 (Opening Filters) - 决定是否允许"开新仓"
+   // ==================================================================
+   
+   // A. 交易时段检查
+   if (!IsCurrentTimeInSlots())
+   {
+      // (可选) 减少打印频率，或仅在调试模式打印
+      // Print("当前非交易时段，EA 暂停开新仓..."); 
+      return; 
+   }
+
+   // B. 连续止损锁定检查
+   if (IsTradingLocked()) return; 
+
+   // C. 日内亏损限额检查
+   if (IsDailyLossLimitReached_V2()) return;
+
+   // D. 最大持仓量检查 (提前检查，省去后面复杂的信号计算)
+   if (GetOpenPositionsCount() >= Max_Open_Orders) return;
+
+   // ==================================================================
+   // 5. 新K线检测 (New Bar Check) - 仅限开仓逻辑
+   // ==================================================================
+   if(Time[0] == g_last_bar_time) return;
+   g_last_bar_time = Time[0]; 
+
+   // ==================================================================
+   // 6. 清理工作 (Housekeeping)
+   // ==================================================================
+   CleanOldContextLinks();   // 清理上一根K线的可视化连线
+   CleanUpShadowLedger();    // 清理无效的影子账本数据
+
+   // ==================================================================
+   // 7. 信号收集与执行 (V4.0 核心逻辑)
+   // ==================================================================
+   
+   // 7.1 定义数组
+   FilteredSignal raw_bulls[], raw_bears[];     
+   FilteredSignal clean_bulls[], clean_bears[]; 
+   FilteredSignal sorted_valid_signals[];       
+
+   // 7.2 收集与清洗
+   CollectAllSignals(raw_bulls, raw_bears);
+   FilterWeakBullishSignals(raw_bulls, clean_bulls); 
+   FilterWeakBearishSignals(raw_bears, clean_bears); 
+
+   // (可选) 运行测试查看结果
+   // Test_FilterWeakBullish_And_BearishSignals(raw_bulls, raw_bears, clean_bulls, clean_bears);
+   
+   // 7.3 合并并排序 (生成列表 X)
+   MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
+
+   int total_valid_signals = ArraySize(sorted_valid_signals);
+   // Test_MergeAndSortSignals(sorted_valid_signals);
+
+   if (total_valid_signals <= 0) return; // 无信号，直接退出
+
+   // 7.4 精英信号决策循环
+   for (int i = 0; i < total_valid_signals; i++)
+   {
+      FilteredSignal signal_item = sorted_valid_signals[i];
+      int current_shift = signal_item.shift;
+
+      // A. 获取完整数据
+      KBarSignal full_data = GetIndicatorBarData(current_shift);
+
+      // B. 漏斗层 1: 上下文结构检查 (Context)
+      int context_result = CheckSignalContext(current_shift, signal_item.type, clean_bulls, clean_bears);
+      
+      if (context_result > 0)
+      {
+         // Print("===> [Pass] 上下文检查通过 (代码:", context_result, ")。进入空间检查...");
+
+         // C. 漏斗层 2: 利润空间检查 (Reward/Risk)
+         bool is_space_sufficient = false;
+         double check_entry = Close[current_shift];
+         double check_sl = (signal_item.type == OP_SELL) ? full_data.BearishStopLossPrice : full_data.BullishStopLossPrice;
+         
+         if (signal_item.type == OP_SELL)
+             is_space_sufficient = CheckProfitSpace(OP_SELL, check_entry, check_sl, clean_bulls);
+         else
+             is_space_sufficient = CheckProfitSpace(OP_BUY, check_entry, check_sl, clean_bears);
+         
+         if (!is_space_sufficient) continue; // 空间不足，跳过
+
+         // D. 漏斗层 3: 反向持仓距离检查 (Hedge Distance)
+         if (CheckHedgeDistance(signal_item.type) == false) return; // 距离太近，放弃本次开仓
+
+         // E. 漏斗层 4: 技术指标共振 (Filters) & 执行
+         int trade_command = CheckSignalAndFilter_V2(full_data, current_shift);
+
+         if (trade_command != OP_NONE)
+         {
+            // F. 最终执行交易
+            CalculateTradeAndExecute_V2(full_data, trade_command);
+            return; // 开完一单就休息，遵循一根K线只做一单原则
+         }
+      }
+   }
+}
