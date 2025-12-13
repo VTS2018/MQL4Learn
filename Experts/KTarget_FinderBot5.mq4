@@ -287,6 +287,14 @@ void OnTick()
       return; // 开关未启用，立即退出 OnTick，不执行任何逻辑。
    }
 
+   // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
+   // UpdateCSLByHistory();
+   UpdateCSLByHistory_V2();
+
+   // 🚨 NEW: 日内盈亏增量更新
+   // UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
+   UpdateDailyProfit_V2();
+
    // =======================================================
    // 🚨 3. 核心调用：持仓管理与追踪止损 (最重要！)
    // =======================================================
@@ -301,14 +309,6 @@ void OnTick()
       Print("当前为本地时间: ", TimeToString(TimeCurrent() + g_TimeOffset_Sec, TIME_DATE | TIME_MINUTES), " 不在允许的交易时段: ", Local_Trade_Slots, ",EA 暂停运行...");
       return; 
    }
-   
-   // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
-   // UpdateCSLByHistory();
-   UpdateCSLByHistory_V2();
-
-   // 🚨 NEW: 日内盈亏增量更新
-   // UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
-   UpdateDailyProfit_V2();
 
    // B. CSL 锁定检查 (阻止所有交易)
    if (IsTradingLocked()) return;
@@ -460,11 +460,9 @@ void OnTick()
    // 运行测试 查看结果
    Test_FilterWeakBullish_And_BearishSignals(raw_bulls,raw_bears,clean_bulls,clean_bears);
 
-   
    // 4. 合并并排序 (生成列表 X)
    // 此时 sorted_valid_signals[0] 就是距离现价最近的那个有效结构信号
    MergeAndSortSignals(clean_bulls, clean_bears, sorted_valid_signals);
-
    int total_valid_signals = ArraySize(sorted_valid_signals);
    Test_MergeAndSortSignals(sorted_valid_signals);
    if (total_valid_signals <= 0)
@@ -590,15 +588,15 @@ void OnTimer()
 //+------------------------------------------------------------------+
 //| Tester function                                                  |
 //+------------------------------------------------------------------+
-double OnTester()
-{
-  //---
-  double ret = 0.0;
-  //---
+// double OnTester()
+// {
+//   //---
+//   double ret = 0.0;
+//   //---
 
-  //---
-  return (ret);
-}
+//   //---
+//   return (ret);
+// }
 
 //+------------------------------------------------------------------+
 //| ChartEvent function                                              |
@@ -1198,8 +1196,8 @@ void CalculateTradeAndExecute(const KBarSignal &data, int type)
 }
 
 //+------------------------------------------------------------------+
-//| CalculateTradeAndExecute V2.0                                    |
-//| 功能：集成固定手数与以损定仓模式，执行交易                           |
+//| CalculateTradeAndExecute V2.0
+//| 功能：集成固定手数与以损定仓模式，执行交易
 //+------------------------------------------------------------------+
 void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
 {
@@ -1884,7 +1882,7 @@ void InitializeFiboLevels(string zone1, string zone2, string zone3, string zone4
 }
 
 //+------------------------------------------------------------------+
-//| 核心功能：解析注释并执行斐波那契阶梯追踪 (Fibo Step Trailing)       |
+//| 核心功能：解析注释并执行斐波那契阶梯追踪 (Fibo Step Trailing)
 //+------------------------------------------------------------------+
 void ManageOpenTrades()
 {
@@ -2036,7 +2034,9 @@ void ManageOpenTrades()
    }
 }
 
-// 辅助函数：检查价格是否【超过】了某条线
+//+------------------------------------------------------------------+
+//| ✅ 辅助函数：检查价格是否【超过】了某条线
+//+------------------------------------------------------------------+
 bool CheckPricePass(double current, double target, int dir)
 {
    if (dir == 1) return (current >= target); // 做多：价格 >= 目标
@@ -2044,7 +2044,7 @@ bool CheckPricePass(double current, double target, int dir)
 }
 
 //+------------------------------------------------------------------+
-//| 清理已平仓订单的影子数据 (建议在 OnTick 或 OnTimer 中调用)
+//| ✅ 清理已平仓订单的影子数据 (建议在 OnTick 或 OnTimer 中调用)
 //+------------------------------------------------------------------+
 void CleanUpShadowLedger()
 {
@@ -2084,7 +2084,9 @@ void CleanUpShadowLedger()
        Print(" [清理执行] 共删除了 ", deleted_count, " 条已失效的影子记录。");
 }
 
-// 辅助：检查订单是否处于 Open 状态
+//+------------------------------------------------------------------+
+//| ✅ 辅助：检查订单是否处于 Open 状态
+//+------------------------------------------------------------------+
 bool IsTradeOpen(int ticket)
 {
     if(OrderSelect(ticket, SELECT_BY_TICKET))
