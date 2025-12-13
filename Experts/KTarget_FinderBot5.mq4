@@ -289,7 +289,7 @@ void OnTick()
 
    // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
    // UpdateCSLByHistory();
-   UpdateCSLByHistory_V2();
+   UpdateCSLByHistory_V3();
 
    // 🚨 NEW: 日内盈亏增量更新
    // UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
