@@ -25,51 +25,15 @@ input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 f
 input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执行开仓和平仓操作
 //+------------------------------------------------------------------+
 
-//+------------------------------------------------------------------+
-//| ✅ 输入参数配置
-//+------------------------------------------------------------------+
-input string   __TIME_SETTINGS__  = "--- 交易时段设置 ---";
-input string   Local_Trade_Slots  = "1-2, 2-4, 7-11, 14-18, 20-23"; // 本地时间交易时段 (24h制, 逗号分隔)
-                                                   // 格式说明: "Start-End"
-                                                   // "9-11" 表示 [09:00 到 10:59]
-                                                   // 留空则全天运行
-
-//+------------------------------------------------------------------+
-//| ✅ 全局变量
-//+------------------------------------------------------------------+
-long g_TimeOffset_Sec = 0; // 保存本地时间与服务器时间的差值 (秒)
-
 //====================================================================
 //| ✅ 策略参数设置 (Strategy Inputs)
 //====================================================================
 input string   __STRATEGY_SETTINGS__ = "--- Strategy Settings ---";
 input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
 
-input ENUM_POS_SIZE_MODE Position_Mode = POS_FIXED_LOT;    // 仓位计算模式选择
-input double   FixedLot       = 0.01;        // 固定交易手数
-input int      Slippage       = 3;           // 允许滑点 (点)
-input double   RewardRatio    = 1.0;         // 盈亏比 (TP = SL距离 * Ratio)
+#include <Config_CalcPosition.mqh>
 
-//====================================================================
-//| ✅ 指标参数映射 (Indicator Inputs)
-//| 🚨 注意：为了让 iCustom 正确工作，这里的参数必须与指标的 extern 参数完全一致且顺序相同
-//====================================================================
-input string   __INDICATOR_SETTINGS__ = "--- Indicator Settings ---";
-input string   IndicatorName          = "KTarget_Finder5"; // 指标文件名(不带后缀)
-
-// 对应 KTarget_Finder5.mq4 的输入参数
-input bool     Indi_Is_EA_Mode        = true;  // 必须设置为 TRUE，以触发指标写入 SL 价格
-input bool     Indi_Smart_Tuning      = true;  // Smart_Tuning_Enabled
-input int      Indi_Scan_Range        = 500;   // Scan_Range
-input int      Indi_Lookahead_Bottom  = 20;    // Lookahead_Bottom
-input int      Indi_Lookback_Bottom   = 20;    // Lookback_Bottom
-input int      Indi_Lookahead_Top     = 20;    // Lookahead_Top
-input int      Indi_Lookback_Top      = 20;    // Lookback_Top
-input int      Indi_Max_Signal_Look   = 20;    // Max_Signal_Lookforward
-input int      Indi_DB_Threshold      = 3;     // DB_Threshold_Candles
-input int      Indi_LLHH_Candles      = 3;     // FindAbsoluteLowIndex
-input int      Indi_Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
-input bool     Indi_DrawFibonacci     = false;  // Is_DrawFibonacciLines
+#include <Config_Indicator.mqh>
 
 //====================================================================
 //| ✅ 全局变量
@@ -92,29 +56,7 @@ input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=
 //+------------------------------------------------------------------+
 extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
 
-//+------------------------------------------------------------------+
-//| ✅ L2: 趋势过滤器参数 用处不是很大 以后升级成 150 100 或者21EMA/8ema
-//+------------------------------------------------------------------+
-input string   __Separator_9__ = "--- Separator  9 ---";
-input bool   Use_Trend_Filter    = false;   // 是否开启均线大趋势过滤
-input int    Trend_MA_Period     = 200;    // 均线周期 (默认200，牛熊分界线)
-input int    Trend_MA_Method     = MODE_EMA; // 均线类型: 0=SMA, 1=EMA, 2=SMMA, 3=LWMA
-
-//+------------------------------------------------------------------+
-//| ✅ 让斐波阻力/支撑区域的参数可以实现配置
-//| 斐波那契上下文设置 (Fibonacci Context Inputs)                     
-//| 如果需要更多区域，可以仿照此格式继续添加 Fibo_Zone_4, Fibo_Zone_5..
-//+------------------------------------------------------------------+
-input string   __FIBO_CONTEXT__    = "--- Fibo Exhaustion Levels ---";
-input string   Fibo_Zone_1         = "1.618, 1.88";     // 斐波那契衰竭区 1 (格式: Level_A, Level_B)
-input string   Fibo_Zone_2         = "2.618, 2.88";     // 斐波那契衰竭区 2
-input string   Fibo_Zone_3         = "4.236, 4.88";     // 斐波那契衰竭区 3
-input string   Fibo_Zone_4         = "6.0, 7.0";        // 斐波那契衰竭区 4
-
-// 定义全局存储空间和计数器
-#define MAX_FIBO_ZONES 10 // 最大支持的斐波那契区域数量
-double g_FiboExhaustionLevels[MAX_FIBO_ZONES][2]; // 全局数组用于存储解析结果
-int    g_FiboZonesCount = 0;                     // 实际加载的区域数量
+#include <Config_Fibo.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 调试/日志输出设置 (Debug/Logging)
@@ -123,48 +65,7 @@ input string   __DEBUG_LOGGING__    = "--- Debug/Logging ---";
 input bool     Debug_Print_Valid_List = false; // 是否在日志中打印清洗合并后的有效信号列表 (sorted_valid_signals)
 // input int      Log_Level            = 1;      // 日志级别 (例如 0=关, 1=关键信息, 2=详细)
 
-//+------------------------------------------------------------------+
-//| ✅ 连续止损风险管理 (Consecutive SL Risk Management)
-//+------------------------------------------------------------------+
-input string   __RISK_CSL__         = "--- Consecutive SL Settings ---";
-input bool     Enable_CSL           = true;     // CSL 功能总开关
-input int      CSL_Max_Losses       = 3;        // 允许的最大连续止损次数 (例如: 连续止损3次)
-input int      CSL_Lockout_Duration = 4;        // 交易锁定小时数 (例如: 锁定4小时)
-
-//+------------------------------------------------------------------+
-//| 全局状态变量 (CSL Tracking)
-//+------------------------------------------------------------------+
-int      g_ConsecutiveLossCount = 0;   // 当前连续止损计数器
-datetime g_CSLLockoutEndTime    = 0;   // 交易锁定解除的时间戳 (0表示未锁定)
-datetime g_LastCSLCheckTime     = 0;   // 🚨 轮询核心：上次检查历史订单的时间戳
-
-//+------------------------------------------------------------------+
-//| ✅ 交易执行限制 (Trade Execution Limits)
-//+------------------------------------------------------------------+
-input string   __EXECUTION_LIMITS__ = "--- Max Orders Limit ---";
-input int      Max_Open_Orders      = 2;     // 当前品种允许同时持有的最大持仓数量 (例如: 1 或 2)
-
-//+------------------------------------------------------------------+
-//| ✅ 交易执行限制 (Trade Execution Limits)
-//+------------------------------------------------------------------+
-input string   __RISK_STOP__              = "--- Daily Equity Stop ---";
-input double   Daily_Max_Loss_Amount      = 100.0; // 日内允许的最大亏损金额（美元或账户货币）
-input bool     Check_Daily_Loss_Strictly  = true;  // 是否启用严格的日内亏损检查
-
-//+------------------------------------------------------------------+
-//| 全局状态变量 (Daily Limit Tracking)
-//| 采用与 CSL 相同的策略：增量更新 来实现 日内允许的最大亏损金额
-//+------------------------------------------------------------------+
-double   g_Today_Realized_PL     = 0.0;     // 累计今日盈亏
-datetime g_Last_Daily_Check_Time = 0;       // 上次检查历史订单的时间点
-datetime g_Last_Calc_Date        = 0;       // 上次计算的日期 (用于隔日重置)
-
-//+------------------------------------------------------------------+
-//| ✅ 资金管理设置
-//+------------------------------------------------------------------+
-input string         __MONEY_MGMT__ = "--- 资金管理设置 ---";
-input ENUM_RISK_MODE Risk_Mode      = RISK_FIXED_MONEY; // 风险模式
-input double         Risk_Value     = 10.0;            // 风险值 ($100 或 3%)
+#include <Config_Risk.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 唯一对象名前缀

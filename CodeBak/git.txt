@@ -67,3 +67,15 @@ git checkout ca0f236 -- Experts/KTarget_FinderBot.mq4
 git show 7adcf32:Experts/MQLTA MT4 One-Click Trade Pro.mq4 > Experts/temp_version.mq4
 
 git show ec9f81a6e6dae73cbd1a4f26815301eeea1c149d:Indicators/KTarget_Finder5.mq4 > Indicators/KTarget_Finder5_old.mq4
+
+
+
+# 使用 -f 强制添加这些原本被忽略的文件
+git add -f Include/Config_Risk.mqh
+git add -f Experts/KTarget_FinderBot6.mq4
+git commit -m "Refactor: KTarget_FinderBot6."
+
+git add -f Include/Config_CalcPosition.mqh
+git add -f Include/Config_Fibo.mqh
+git add -f Include/Config_Indicator.mqh
+git commit -m "Refactor: Config."
