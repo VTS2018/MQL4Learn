@@ -79,3 +79,11 @@ git add -f Include/Config_CalcPosition.mqh
 git add -f Include/Config_Fibo.mqh
 git add -f Include/Config_Indicator.mqh
 git commit -m "Refactor: Config."
+
+git add -f Include/KBot_Logic_Start.mqh
+
+git add -f Include/KBot_Logic_Second.mqh
+git add -f Include/KBot_Logic6.mqh
+git add -f Include/KBot_Utils6.mqh
+git add -f Include/Lib_RiskControl.mqh
+git commit -m "Refactor: KBot_Logic_Second."
