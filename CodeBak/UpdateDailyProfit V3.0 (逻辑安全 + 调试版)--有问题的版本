@@ -1,0 +1,67 @@
+//+------------------------------------------------------------------+
+//| UpdateDailyProfit V3.0 (逻辑安全 + 调试版)
+//| 修复：防止因性能优化逻辑导致跨天重置被跳过
+//+------------------------------------------------------------------+
+void UpdateDailyProfit_V3()
+{
+   // =========================================================
+   // 1. 获取基础数据
+   // =========================================================
+   datetime today_start = iTime(NULL, PERIOD_D1, 0); // 今天 00:00
+   
+   // =========================================================
+   // 2. 🚨 跨天重置逻辑 (最高优先级 - 必须先执行) 🚨
+   // =========================================================
+   if (g_Last_Calc_Date != today_start)
+   {
+      Print("📅 [新的一天] 日期变更: ", TimeToString(g_Last_Calc_Date), " -> ", TimeToString(today_start));
+      Print("   [重置前] 昨日盈亏: ", DoubleToString(g_Today_Realized_PL, 2));
+      
+      // 强制归零
+      g_Today_Realized_PL = 0.0;
+      
+      // 更新日期标记
+      g_Last_Calc_Date = today_start;
+      
+      Print("   [重置后] 今日盈亏已归零。");
+   }
+
+   // =========================================================
+   // 3. 性能优化逻辑 (只有在处理完跨天重置后，才允许 Return)
+   // =========================================================
+   static int s_last_history_total = 0;
+   int current_history_total = OrdersHistoryTotal();
+
+   // 如果历史订单数没变，说明没有新平仓，不需要重新计算累加
+   // 注意：这里 return 之前，上面的重置逻辑已经执行过了，所以是安全的。
+   if (current_history_total == s_last_history_total) return;
+
+   // =========================================================
+   // 4. 全量扫描逻辑 (计算盈亏)
+   // =========================================================
+   double temp_daily_profit = 0.0;
+   
+   for (int i = 0; i < current_history_total; i++)
+   {
+      if (OrderSelect(i, SELECT_BY_POS, MODE_HISTORY) == false) continue;
+      if (OrderSymbol() != Symbol() || OrderMagicNumber() != MagicNumber) continue;
+      if (OrderType() > OP_SELL) continue;
+
+      // 只计算今天产生的订单
+      if (OrderCloseTime() < today_start) continue;
+
+      temp_daily_profit += OrderProfit() + OrderCommission() + OrderSwap();
+   }
+
+   // =========================================================
+   // 5. 更新全局状态
+   // =========================================================
+   g_Today_Realized_PL = temp_daily_profit;
+   
+   // 更新缓存快照
+   s_last_history_total = current_history_total; 
+   g_Last_Daily_Check_Time = TimeCurrent();
+   
+   // 仅在数据变化时打印，避免刷屏
+   // Print("[盈亏变动] 最新今日盈亏: ", DoubleToString(g_Today_Realized_PL, 2));
+}

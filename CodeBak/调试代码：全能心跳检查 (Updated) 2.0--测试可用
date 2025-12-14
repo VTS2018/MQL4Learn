@@ -1,0 +1,36 @@
+// ==================================================================
+   // 🚨 调试代码：全能心跳检查 (Updated)
+   // ==================================================================
+   if (EA_Master_Switch) 
+   {
+       static datetime last_debug_print = 0;
+       // 每 15 分钟打印一次，或者当状态异常时打印
+       if (TimeCurrent() - last_debug_print > 900 || g_ConsecutiveLossCount >= 1 || g_Today_Realized_PL <= -10)
+       {
+          // 1. 获取两个风控函数的状态
+          bool is_csl_locked   = IsTradingLocked();            // 连损锁
+          bool is_daily_locked = IsDailyLossLimitReached_V2(); // 日内锁
+          
+          string debug_info = "";
+          debug_info += "\n=== 🏥 EA 全能心跳检查 (" + TimeToString(TimeCurrent()) + ") ===\n";
+          
+          // --- CSL 状态 ---
+          debug_info += "[CSL 连损] 计数: " + IntegerToString(g_ConsecutiveLossCount) + 
+                        " / 阈值: " + IntegerToString(CSL_Max_Losses) + "\n";
+          debug_info += "[CSL 状态] " + (is_csl_locked ? "⛔ 已锁定 (直到 " + TimeToString(g_CSLLockoutEndTime) + ")" : "✅ 正常") + "\n";
+          
+          // --- 日内风控状态 ---
+          debug_info += "[日内盈亏] 今日: $" + DoubleToString(g_Today_Realized_PL, 2) + 
+                        " / 限额: $" + DoubleToString(Daily_Max_Loss_Amount, 2) + "\n";
+          debug_info += "[日内状态] " + (is_daily_locked ? "⛔ 已熔断 (停止交易)" : "✅ 正常") + "\n";
+          
+          // --- 最终结论 ---
+          if (is_csl_locked || is_daily_locked)
+             debug_info += ">>> 🚨 结论: 交易已暂停！ 🚨 <<<\n";
+          else
+             debug_info += ">>> 🟢 结论: 正在运行... <<<\n";
+             
+          Print(debug_info);
+          last_debug_print = TimeCurrent();
+       }
+   }
