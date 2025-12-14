@@ -775,8 +775,9 @@ void ExecuteTrade_V2(int type, double lots, double cl, double sl, double tp, dou
    if (ticket > 0)
    {
       // 变量命名规则: 前缀_订单号_类型
-      string var_name_E = "KT5_" + IntegerToString(ticket) + "_E";
-      string var_name_S = "KT5_" + IntegerToString(ticket) + "_S";
+      string var_prefix = ShortenObjectNameBot(WindowExpertName()) + "_";
+      string var_name_E = var_prefix + IntegerToString(ticket) + "_E";
+      string var_name_S = var_prefix + IntegerToString(ticket) + "_S";
 
       // 存储理论价格 (GlobalVariableSet 存的是 double，精度足够)
       GlobalVariableSet(var_name_E, cl);
@@ -1929,8 +1930,9 @@ void ManageOpenTrades()
       // =======================================================
       // 1. 从“影子账本”读取理论坐标
       // =======================================================
-      string var_name_E = "KT5_" + IntegerToString(ticket) + "_E";
-      string var_name_S = "KT5_" + IntegerToString(ticket) + "_S";
+      string var_prefix = ShortenObjectNameBot(WindowExpertName()) + "_";
+      string var_name_E = var_prefix + IntegerToString(ticket) + "_E";
+      string var_name_S = var_prefix + IntegerToString(ticket) + "_S";
 
       // 检查是否存在记录
       if (!GlobalVariableCheck(var_name_E) || !GlobalVariableCheck(var_name_S))
@@ -2058,7 +2060,8 @@ void CleanUpShadowLedger()
         string var_name = GlobalVariableName(i);
         
         // 1. 筛选出属于本 EA 的变量 (前缀 KT5_)
-        if(StringFind(var_name, "KT5_") == 0)
+        string var_prefix = ShortenObjectNameBot(WindowExpertName()) + "_";
+        if(StringFind(var_name, var_prefix) == 0)
         {
             // 解析出 Ticket 号
             // 格式: KT5_123456_E
