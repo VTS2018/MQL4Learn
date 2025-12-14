@@ -165,7 +165,6 @@ void CreateCleanupButton_V1(string btn_name)
       ObjectSetInteger(0, btn_name, OBJPROP_ZORDER, 10);     // 优先级
    }
 }
-// 文件：KBot_Draw.mqh
 
 void CreateCleanupButton(string btn_name) 
 {
