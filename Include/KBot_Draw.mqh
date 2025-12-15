@@ -131,6 +131,7 @@ void DrawTradeStatusInfo(string status_text, string object_name, color text_colo
 }
 
 //+------------------------------------------------------------------+
+//| ❌ 
 //| 辅助函数：创建清理按钮 (UI)
 //+------------------------------------------------------------------+
 void CreateCleanupButton_V1(string btn_name)
@@ -166,6 +167,9 @@ void CreateCleanupButton_V1(string btn_name)
    }
 }
 
+//+------------------------------------------------------------------+
+//| ✅ 清理数据
+//+------------------------------------------------------------------+
 void CreateCleanupButton(string btn_name) 
 {
    // 🚨 1. 为了确保属性生效，如果对象已存在，先彻底删除它再重建
@@ -206,5 +210,242 @@ void CreateCleanupButton(string btn_name)
    ObjectSetInteger(0, btn_name, OBJPROP_ZORDER, 10);     
    
    // 🚨 3. 强制刷新图表，让文字立即渲染出来
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 辅助函数：创建或更新屏幕上的文字标签
+//+------------------------------------------------------------------+
+void DrawLabel(string name, string text, int x, int y, color clr, int fontSize=10)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER); // 设定在右上角 (不挡左边的开单按钮)
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER); // 对齐方式
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fontSize);
+      ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+   }
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+}
+
+//+------------------------------------------------------------------+
+//| 核心功能：更新商场显示屏 (Dashboard)
+//+------------------------------------------------------------------+
+void UpdateDashboard()
+{
+   int start_x = 20; // 距离右边框的距离
+   int start_y = 30; // 距离上边框的距离
+   int step_y  = 20; // 行间距
+
+   // --- 1. 标题 ---
+   DrawLabel("Dash_Title", "=== 风控监控面板 ===", start_x, start_y, clrGold, 11);
+   
+   // --- 2. 交易时段状态 ---
+   color timeColor = IsCurrentTimeInSlots() ? clrLime : clrRed;
+   string timeText = IsCurrentTimeInSlots() ? "交易时段: ✅ 允许交易" : "交易时段: ⛔ 休息中";
+   DrawLabel("Dash_Time", timeText, start_x, start_y + step_y*1, timeColor);
+
+   // --- 3. 连续止损 (CSL) 状态 ---
+   bool isCSLLocked = (g_CSLLockoutEndTime > TimeCurrent());
+   color cslColor = isCSLLocked ? clrRed : clrLime;
+   string cslText = "连损风控: " + IntegerToString(g_ConsecutiveLossCount) + " / " + IntegerToString(CSL_Max_Losses);
+   
+   if (isCSLLocked) cslText += " (锁定至 " + TimeToString(g_CSLLockoutEndTime, TIME_MINUTES) + ")";
+   else cslText += " (正常)";
+   
+   DrawLabel("Dash_CSL", cslText, start_x, start_y + step_y*2, cslColor);
+
+   // --- 4. 日内盈亏状态 ---
+   bool isDailyLocked = (g_Today_Realized_PL <= -Daily_Max_Loss_Amount);
+   color dailyColor = isDailyLocked ? clrRed : (g_Today_Realized_PL >= 0 ? clrLime : clrOrange);
+   
+   string dailyText = "今日盈亏: $" + DoubleToString(g_Today_Realized_PL, 2) + " / 限额: -$" + DoubleToString(Daily_Max_Loss_Amount, 0);
+   if (isDailyLocked) dailyText += " (熔断)";
+   
+   DrawLabel("Dash_Daily", dailyText, start_x, start_y + step_y*3, dailyColor);
+   
+   // --- 5. 持仓数量 ---
+   DrawLabel("Dash_Pos", "当前持仓: " + IntegerToString(GetOpenPositionsCount()) + " 单", start_x, start_y + step_y*4, clrWhite);
+   
+   ChartRedraw(); // 强制刷新图表，让文字立即更新
+}
+
+//+------------------------------------------------------------------+
+//| 核心功能：刷新风控显示屏 (UpdateDashboard)
+//+------------------------------------------------------------------+
+void UpdateDashboard_V2()
+{
+   // 定义位置参数 (您可以根据屏幕分辨率微调)
+   int base_x = 30;  // 距离右边缘 30 像素
+   int base_y = 50;  // 距离上边缘 50 像素
+   int step_y = 22;  // 每行文字间隔 22 像素
+   
+   // -----------------------------------------------------------
+   // 1. 标题栏
+   // -----------------------------------------------------------
+   DrawLabel("Dash_Title", "=== 🛡️ 智能风控面板 ===", base_x, base_y, clrGold, 11);
+   
+   // -----------------------------------------------------------
+   // 2. 交易时段 (Time Slot)
+   // -----------------------------------------------------------
+   bool isTimeOK = IsCurrentTimeInSlots();
+   string txtTime = isTimeOK ? "交易时段: ✅ 允许开仓" : "交易时段: 💤 休息中";
+   color  clrTime = isTimeOK ? clrLime : clrGray; // 休息时显示灰色
+   
+   DrawLabel("Dash_Time", txtTime, base_x, base_y + step_y * 1, clrTime);
+   
+   // -----------------------------------------------------------
+   // 3. 连续止损 (CSL) 监控
+   // -----------------------------------------------------------
+   // 直接读取全局变量判断状态
+   bool isCSLLocked = (g_CSLLockoutEndTime > TimeCurrent());
+   
+   string txtCSL = "连损风控: " + IntegerToString(g_ConsecutiveLossCount) + " / " + IntegerToString(CSL_Max_Losses);
+   color  clrCSL = clrLime; // 默认绿色
+   
+   if (isCSLLocked)
+   {
+      // 如果锁定了，显示红色，并告知解锁时间
+      txtCSL += " ⛔ 锁定至 " + TimeToString(g_CSLLockoutEndTime, TIME_MINUTES);
+      clrCSL  = clrRed;
+   }
+   else
+   {
+      txtCSL += " (运行中)";
+   }
+   
+   DrawLabel("Dash_CSL", txtCSL, base_x, base_y + step_y * 2, clrCSL);
+
+   // -----------------------------------------------------------
+   // 4. 日内亏损 (Daily Limit) 监控
+   // -----------------------------------------------------------
+   // 直接计算是否触及红线
+   bool isDailyLocked = (g_Today_Realized_PL <= -MathAbs(Daily_Max_Loss_Amount));
+   
+   string txtDaily = "今日盈亏: $" + DoubleToString(g_Today_Realized_PL, 2) + " / Limit: -$" + DoubleToString(Daily_Max_Loss_Amount, 0);
+   color  clrDaily = clrLime; // 默认绿色
+   
+   if (isDailyLocked)
+   {
+      // 如果熔断了，显示红色大字
+      txtDaily += " ⛔ [已熔断]";
+      clrDaily  = clrRed;
+   }
+   else if (g_Today_Realized_PL < 0)
+   {
+      // 如果亏损但还没熔断，显示橙色警示
+      clrDaily = clrOrange;
+   }
+   
+   DrawLabel("Dash_Daily", txtDaily, base_x, base_y + step_y * 3, clrDaily);
+   
+   // -----------------------------------------------------------
+   // 5. 总体状态汇总 (Summary)
+   // -----------------------------------------------------------
+   string txtStatus = "系统状态: 🟢 正常运行";
+   color  clrStatus = clrWhite;
+   
+   if (!EA_Master_Switch) { txtStatus = "系统状态: ⚫ 总开关关闭"; clrStatus = clrGray; }
+   else if (isCSLLocked)  { txtStatus = "系统状态: 🔴 连损风控暂停"; clrStatus = clrRed; }
+   else if (isDailyLocked){ txtStatus = "系统状态: 🔴 日内风控暂停"; clrStatus = clrRed; }
+   else if (!isTimeOK)    { txtStatus = "系统状态: 🟡 等待时段..."; clrStatus = clrYellow; }
+   
+   DrawLabel("Dash_Status", txtStatus, base_x, base_y + step_y * 4 + 5, clrStatus, 11); // 稍微隔开一点
+
+   // 强制刷新图表
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| UpdateDashboard 2.0 (MT4 兼容版 - 纯字符风格)
+//| 修复：移除导致乱码的 Emoji，改用 ASCII 字符模拟状态
+//+------------------------------------------------------------------+
+void UpdateDashboard_V3()
+{
+   // 定义位置参数
+   int base_x = 30;  // 距离右边缘
+   int base_y = 50;  // 距离上边缘
+   int step_y = 22;  // 行间距
+   
+   // -----------------------------------------------------------
+   // 1. 标题栏 (使用等号和中括号装饰)
+   // -----------------------------------------------------------
+   DrawLabel("Dash_Title", "[ SYSTEM MONITOR ]", base_x, base_y, clrGold, 10);
+   
+   // -----------------------------------------------------------
+   // 2. 交易时段 (Time Slot)
+   // -----------------------------------------------------------
+   bool isTimeOK = IsCurrentTimeInSlots();
+   string txtTime = isTimeOK ? "Time Check: [ OK ] Active" : "Time Check: [ -- ] Sleep";
+   color  clrTime = isTimeOK ? clrLime : clrGray; 
+   
+   DrawLabel("Dash_Time", txtTime, base_x, base_y + step_y * 1, clrTime);
+   
+   // -----------------------------------------------------------
+   // 3. 连续止损 (CSL) 监控
+   // -----------------------------------------------------------
+   bool isCSLLocked = (g_CSLLockoutEndTime > TimeCurrent());
+   
+   string txtCSL = "CSL Count : " + IntegerToString(g_ConsecutiveLossCount) + " / " + IntegerToString(CSL_Max_Losses);
+   color  clrCSL = clrLime; 
+   
+   if (isCSLLocked)
+   {
+      // 锁定状态
+      txtCSL += "  >>> [ LOCKED ] Until " + TimeToString(g_CSLLockoutEndTime, TIME_MINUTES);
+      clrCSL  = clrRed;
+   }
+   else
+   {
+      // 正常状态
+      txtCSL += "  [ RUNNING ]";
+   }
+   
+   DrawLabel("Dash_CSL", txtCSL, base_x, base_y + step_y * 2, clrCSL);
+
+   // -----------------------------------------------------------
+   // 4. 日内亏损 (Daily Limit) 监控
+   // -----------------------------------------------------------
+   bool isDailyLocked = (g_Today_Realized_PL <= -MathAbs(Daily_Max_Loss_Amount));
+   
+   // 格式化金额显示
+   string txtDaily = "Daily P/L : $" + DoubleToString(g_Today_Realized_PL, 2) + " / Limit: -$" + DoubleToString(Daily_Max_Loss_Amount, 0);
+   color  clrDaily = clrLime;
+   
+   if (isDailyLocked)
+   {
+      txtDaily += "  >>> [ STOPPED ]"; // 熔断
+      clrDaily  = clrRed;
+   }
+   else if (g_Today_Realized_PL < 0)
+   {
+      txtDaily += "  [ Warning ]"; // 亏损中
+      clrDaily = clrOrange;
+   }
+   else
+   {
+      txtDaily += "  [ Profit ]"; // 盈利中
+   }
+   
+   DrawLabel("Dash_Daily", txtDaily, base_x, base_y + step_y * 3, clrDaily);
+   
+   // -----------------------------------------------------------
+   // 5. 总体状态汇总 (Summary)
+   // -----------------------------------------------------------
+   string txtStatus = "STATUS: [ OK ] System Online";
+   color  clrStatus = clrWhite;
+   
+   if (!EA_Master_Switch) { txtStatus = "STATUS: [ OFF ] Master Switch is OFF"; clrStatus = clrGray; }
+   else if (isCSLLocked)  { txtStatus = "STATUS: [ BLOCKED ] CSL Protection Active"; clrStatus = clrRed; }
+   else if (isDailyLocked){ txtStatus = "STATUS: [ BLOCKED ] Daily Limit Hit"; clrStatus = clrRed; }
+   else if (!isTimeOK)    { txtStatus = "STATUS: [ WAIT ] Waiting for Time Slot"; clrStatus = clrYellow; }
+   
+   DrawLabel("Dash_Status", txtStatus, base_x, base_y + step_y * 4 + 5, clrStatus, 10); 
+
+   // 强制刷新
    ChartRedraw();
 }

@@ -282,14 +282,14 @@ bool IsTradingLocked()
    if (TimeCurrent() >= g_CSLLockoutEndTime)
    {
       // 锁定时间已过，解除锁定并重置状态
-      Print("风险解除: 连续止损锁定已到期，EA 恢复正常交易。");
+      // Print("风险解除: 连续止损锁定已到期，EA 恢复正常交易。");
       g_CSLLockoutEndTime = 0;
       // g_ConsecutiveLossCount = 0; // 锁定结束后，必须重置计数器===>2.0版本下此行代码注销
       return false;
    }
 
    // 4. 仍在锁定期间
-   Print("交易锁定中: CSL 触发，等待解除时间: ", TimeToString(g_CSLLockoutEndTime, TIME_DATE | TIME_SECONDS));
+   // Print("交易锁定中: CSL 触发，等待解除时间: ", TimeToString(g_CSLLockoutEndTime, TIME_DATE | TIME_SECONDS));
    return true;
 }
 

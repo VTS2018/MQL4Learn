@@ -1,0 +1,41 @@
+//+------------------------------------------------------------------+
+//| OnChartEvent: 图表事件监听 (兼容测试器版)
+//+------------------------------------------------------------------+
+void OnChartEvent(const int id,         // 事件ID
+                  const long& lparam,   // 长整数参数
+                  const double& dparam, // 浮点数参数
+                  const string& sparam) // 字符串参数 (通常是对象名)
+{
+   // 检测鼠标点击对象事件
+   if (id == CHARTEVENT_OBJECT_CLICK)
+   {
+      // 检查被点击的是不是我们的清理按钮
+      if (sparam == BTN_CLEANUP_NAME)
+      {
+         // 1. 执行清理逻辑
+         CleanUpShadowLedger();
+         
+         // 2. 视觉反馈：让按钮弹起来
+         ObjectSetInteger(0, BTN_CLEANUP_NAME, OBJPROP_STATE, false);
+         ChartRedraw();
+         
+         // =======================================================
+         // 🚨 3. 兼容性处理：测试器里用 Print，实盘用 MessageBox
+         // =======================================================
+         if (IsTesting()) 
+         {
+             // 策略测试器模式：只能看日志
+             Print("✅ [测试模式] 手动清理执行完毕！请查看日志确认删除数量。");
+             
+             // 强制在图表左上角显示一下，确保您能看见
+             Comment("✅ [系统提示] 影子数据已清理 (测试模式不弹窗)");
+         }
+         else
+         {
+             // 实盘/模拟盘模式：弹出窗口
+             MessageBox("已成功清理失效的影子账本数据！\n保留了当前持仓的有效数据。", "系统提示", MB_OK|MB_ICONINFORMATION);
+             Comment(""); // 清空注释
+         }
+      }
+   }
+}
