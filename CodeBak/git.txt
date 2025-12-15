@@ -55,6 +55,10 @@ git tag -a v1.1.3 -m "V1.1.3 - 已经实现了 基础版本的 位置过滤" 5b7
 git push origin v1.1.3
 
 
+
+git tag -a v1.2 -m "V1.2 - KBot6" 3f322e7
+git push origin v1.2
+
 git checkout d1798ade669335af9d1d932219eee8c456ec05b2 -- Indicators/KTarget_Finder4_FromGemini.mq4
 
 
@@ -87,3 +91,6 @@ git add -f Include/KBot_Logic6.mqh
 git add -f Include/KBot_Utils6.mqh
 git add -f Include/Lib_RiskControl.mqh
 git commit -m "Refactor: KBot_Logic_Second."
+
+git add -f Include/Lib_OrderTrack.mqh
+git commit -m "Refactor: Lib_OrderTrack."

@@ -4,36 +4,6 @@
 //|                                                 https://mql5.com |
 //| 09.12.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
-// #property copyright "Copyright 2025, YourName"
-// #property link      "https://mql5.com"
-// #property strict
-
-//+------------------------------------------------------------------+
-//| defines                                                          |
-//+------------------------------------------------------------------+
-
-// #define MacrosHello   "Hello, world!"
-// #define MacrosYear    2025
-
-//+------------------------------------------------------------------+
-//| DLL imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "user32.dll"
-//    int      SendMessageA(int hWnd,int Msg,int wParam,int lParam);
-// #import "my_expert.dll"
-//    int      ExpertRecalculate(int wParam,int lParam);
-// #import
-
-//+------------------------------------------------------------------+
-//| EX5 imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "stdlib.ex5"
-//    string ErrorDescription(int error_code);
-// #import
-
-//+------------------------------------------------------------------+
 
 //+------------------------------------------------------------------+
 //| MQL4 缺失函数：StringTrim (用于移除字符串首尾空格)                |
