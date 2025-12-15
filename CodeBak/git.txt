@@ -94,3 +94,7 @@ git commit -m "Refactor: KBot_Logic_Second."
 
 git add -f Include/Lib_OrderTrack.mqh
 git commit -m "Refactor: Lib_OrderTrack."
+
+git add -f Include/KBot_Init_GetInfo.mqh
+git add -f Include/Lib_CalcPosition.mqh
+git commit -m "Lib_CalcPosition."

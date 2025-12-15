@@ -101,6 +101,7 @@ input double Min_Hedge_Dist_ATR     = 0.5;   // 最小距离系数 (建议 0.5 �
 #include <Lib_RiskControl.mqh>
 #include <Lib_OrderTrack.mqh>
 #include <Lib_CalcPosition.mqh>
+#include <KBot_Init_GetInfo.mqh>
 #include <KBot_Logic_Start.mqh>
 #include <KBot_Logic_Second.mqh>
 //+------------------------------------------------------------------+
@@ -141,7 +142,7 @@ int OnInit()
    // 🚨 计算本机与服务器时间差值 🚨
    CalculateAndPrintTimeOffset();
 
-#include <KBot_Init_GetInfo.mqh>
+   Init_GetInfo();
 
    // 🚨 创建右下角的清理按钮 🚨
    CreateCleanupButton(BTN_CLEANUP_NAME);
