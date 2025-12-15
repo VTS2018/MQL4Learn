@@ -449,3 +449,97 @@ void UpdateDashboard_V3()
    // 强制刷新
    ChartRedraw();
 }
+
+//+------------------------------------------------------------------+
+//| UpdateDashboard 2.1 (亮色背景专用版)
+//| 适配：白色/浅色图表背景
+//| 配色：深色字体 (黑色、深绿、暗红) 以增强对比度
+//+------------------------------------------------------------------+
+void UpdateDashboard_V4()
+{
+   // 定义位置参数
+   int base_x = 30;  // 距离右边缘
+   int base_y = 50;  // 距离上边缘
+   int step_y = 22;  // 行间距
+   
+   // -----------------------------------------------------------
+   // 1. 标题栏 (使用黑色，或者深蓝色增强专业感)
+   // -----------------------------------------------------------
+   DrawLabel("Dash_Title", "[ SYSTEM MONITOR ]", base_x, base_y, clrBlack, 10);
+   
+   // -----------------------------------------------------------
+   // 2. 交易时段 (Time Slot)
+   // -----------------------------------------------------------
+   bool isTimeOK = IsCurrentTimeInSlots();
+   string txtTime = isTimeOK ? "Time Check: [ OK ] Active" : "Time Check: [ -- ] Sleep";
+   
+   // 浅色背景下，用深绿色代表 OK，暗灰色代表休息
+   color  clrTime = isTimeOK ? clrGreen : clrDimGray; 
+   
+   DrawLabel("Dash_Time", txtTime, base_x, base_y + step_y * 1, clrTime);
+   
+   // -----------------------------------------------------------
+   // 3. 连续止损 (CSL) 监控
+   // -----------------------------------------------------------
+   bool isCSLLocked = (g_CSLLockoutEndTime > TimeCurrent());
+   
+   string txtCSL = "CSL Count : " + IntegerToString(g_ConsecutiveLossCount) + " / " + IntegerToString(CSL_Max_Losses);
+   color  clrCSL = clrGreen; // 默认深绿
+   
+   if (isCSLLocked)
+   {
+      // 锁定状态
+      txtCSL += "  >>> [ LOCKED ] Until " + TimeToString(g_CSLLockoutEndTime, TIME_MINUTES);
+      clrCSL  = clrRed; // 红色在白底上也醒目
+   }
+   else
+   {
+      // 正常状态
+      txtCSL += "  [ RUNNING ]";
+   }
+   
+   DrawLabel("Dash_CSL", txtCSL, base_x, base_y + step_y * 2, clrCSL);
+
+   // -----------------------------------------------------------
+   // 4. 日内亏损 (Daily Limit) 监控
+   // -----------------------------------------------------------
+   bool isDailyLocked = (g_Today_Realized_PL <= -MathAbs(Daily_Max_Loss_Amount));
+   
+   // 格式化金额显示
+   string txtDaily = "Daily P/L : $" + DoubleToString(g_Today_Realized_PL, 2) + " / Limit: -$" + DoubleToString(Daily_Max_Loss_Amount, 0);
+   color  clrDaily = clrGreen;
+   
+   if (isDailyLocked)
+   {
+      txtDaily += "  >>> [ STOPPED ]"; // 熔断
+      clrDaily  = clrRed;
+   }
+   else if (g_Today_Realized_PL < 0)
+   {
+      txtDaily += "  [ Warning ]"; // 亏损中
+      // 浅色背景下，橙色如果太亮也看不清，建议用深橙色或巧克力色
+      clrDaily = clrChocolate; 
+   }
+   else
+   {
+      txtDaily += "  [ Profit ]"; // 盈利中
+   }
+   
+   DrawLabel("Dash_Daily", txtDaily, base_x, base_y + step_y * 3, clrDaily);
+   
+   // -----------------------------------------------------------
+   // 5. 总体状态汇总 (Summary)
+   // -----------------------------------------------------------
+   string txtStatus = "STATUS: [ OK ] System Online";
+   color  clrStatus = clrBlack; // 默认状态用黑色，最清晰
+   
+   if (!EA_Master_Switch) { txtStatus = "STATUS: [ OFF ] Master Switch is OFF"; clrStatus = clrDimGray; }
+   else if (isCSLLocked)  { txtStatus = "STATUS: [ BLOCKED ] CSL Protection Active"; clrStatus = clrRed; }
+   else if (isDailyLocked){ txtStatus = "STATUS: [ BLOCKED ] Daily Limit Hit"; clrStatus = clrRed; }
+   else if (!isTimeOK)    { txtStatus = "STATUS: [ WAIT ] Waiting for Time Slot"; clrStatus = clrDarkGoldenrod; } // 暗金色代替黄色
+   
+   DrawLabel("Dash_Status", txtStatus, base_x, base_y + step_y * 4 + 5, clrStatus, 10); 
+
+   // 强制刷新
+   ChartRedraw();
+}

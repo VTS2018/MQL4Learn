@@ -204,7 +204,7 @@ void OnTick()
    // 此时，变量(数据)是最新的。
    // 此时，EA 还没有被风控踢出去。
    // 这里刷新，能确保屏幕准确显示 "红色锁定" 或 "绿色正常"。
-   UpdateDashboard_V3();
+   UpdateDashboard_V4();
 
    // 1. 检查是否在允许的交易时段
    if (!IsCurrentTimeInSlots())
