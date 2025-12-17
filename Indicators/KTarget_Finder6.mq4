@@ -771,7 +771,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBullishSignalConfirmationV1_v4(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
+            CheckBullishSignalConfirmationV3(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -822,7 +822,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBearishSignalConfirmationV1_v4(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
+            CheckBearishSignalConfirmationV3(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
         }
     }
 }
@@ -1115,7 +1115,7 @@ void DrawTargetTop(int target_index)
 //| 2. 在信号确认点植入 EvaluateSignal 评分系统
 //| 3. 集成 SendRichAlert 和 DrawFiboZones
 //+------------------------------------------------------------------+
-void CheckBullishSignalConfirmationV1_v3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+void CheckBullishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
     // ClearSignalRectangle_v2(abs_lowindex, true);
@@ -1161,7 +1161,7 @@ void CheckBullishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
                          
                          // 斐波那契 (仅 Grade A/S)
                          if (sq.grade >= GRADE_A)
-                             DrawFiboZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1213,7 +1213,7 @@ void CheckBullishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
                      SendRichAlert(Symbol(), Period(), "Bullish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                  
                  if (sq.grade >= GRADE_A)
-                     DrawFiboZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
             }
         }
         // =========================================================
@@ -1240,7 +1240,7 @@ void CheckBullishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
 //| ------------------------------------------------------------------
 //| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
 //+------------------------------------------------------------------+
-void CheckBearishSignalConfirmationV1_v3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
+void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
 {
     // *** 清除旧矩形 (如有) ***
     // ClearSignalRectangle_v2(abs_highindex, false);
@@ -1286,7 +1286,7 @@ void CheckBearishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
                              SendRichAlert(Symbol(), Period(), "Bearish(P2-Break)", Close[j], SL_price, sq);
                          
                          if (sq.grade >= GRADE_A)
-                             DrawFiboZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1333,7 +1333,7 @@ void CheckBearishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
                      SendRichAlert(Symbol(), Period(), "Bearish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                  
                  if (sq.grade >= GRADE_A)
-                     DrawFiboZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
             }
         }
         // =========================================================
@@ -1360,12 +1360,12 @@ void CheckBearishSignalConfirmationV1_v3(int target_index, int P2_index, int K_G
 //| ------------------------------------------------------------------
 //| 包含功能：
 //| 1. v3 评分系统 (EvaluateSignal)
-//| 2. 斐波那契自动绘图 (DrawFiboZones_v3)
+//| 2. 斐波那契自动绘图 (DrawFiboGradeZones_v3)
 //| 3. 智能战报 (SendRichAlert)
 //| 4. [新增] 历史信号过滤 (j <= 1)
 //| 5. [新增] 防重复报警时间锁 (g_LastAlertTime)
 //+------------------------------------------------------------------+
-void CheckBullishSignalConfirmationV1_v4(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 数据准备 ***
     double P1_price = Open[target_index];
@@ -1421,7 +1421,7 @@ void CheckBullishSignalConfirmationV1_v4(int target_index, int P2_index, int K_G
                          // 斐波那契绘图 (无需过滤历史，历史也要画)
                          // 传入 true (做多) 和 全局前缀
                          if (sq.grade >= GRADE_A)
-                             DrawFiboZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1477,7 +1477,7 @@ void CheckBullishSignalConfirmationV1_v4(int target_index, int P2_index, int K_G
                  
                  // 斐波那契绘图
                  if (sq.grade >= GRADE_A)
-                     DrawFiboZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
             }
         }
         // =========================================================
@@ -1504,7 +1504,7 @@ void CheckBullishSignalConfirmationV1_v4(int target_index, int P2_index, int K_G
 //| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
 //| 集成了 v3 评分系统、斐波那契投影、以及历史报警过滤器
 //+------------------------------------------------------------------+
-void CheckBearishSignalConfirmationV1_v4(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
+void CheckBearishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
 {
     // *** 1. 数据准备 (Data Prep) ***
     double P1_price = Open[target_index]; // 锚点开盘价
@@ -1558,7 +1558,7 @@ void CheckBearishSignalConfirmationV1_v4(int target_index, int P2_index, int K_G
                          // 斐波那契绘图 (无需过滤历史，历史也要画)
                          // 传入 false (做空) 和 全局前缀
                          if (sq.grade >= GRADE_A)
-                             DrawFiboZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1617,7 +1617,7 @@ void CheckBearishSignalConfirmationV1_v4(int target_index, int P2_index, int K_G
                  
                  // 斐波那契绘图
                  if (sq.grade >= GRADE_A)
-                     DrawFiboZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
             }
         }
         // =========================================================

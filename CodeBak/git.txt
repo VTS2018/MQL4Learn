@@ -98,3 +98,8 @@ git commit -m "Refactor: Lib_OrderTrack."
 git add -f Include/KBot_Init_GetInfo.mqh
 git add -f Include/Lib_CalcPosition.mqh
 git commit -m "Lib_CalcPosition."
+
+
+git add -f Indicators/KTarget_Finder6.mq4
+git add -f Include/K_Logic_v3.mqh
+git commit -m "KTarget_Finder6  K_Logic_v3."

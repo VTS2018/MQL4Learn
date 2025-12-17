@@ -120,8 +120,9 @@ void SendRichAlert(string sym, int period, string type, double price, double sl,
    SendNotification(msg);
 }
 
+/*
 // 绘制斐波那契矩形 (仅供 Grade A/S 使用)
-void DrawFiboZones(string sym, int idx, double sl, double close, bool bullish) {
+void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bullish) {
    string name = "KT_Fib_" + IntegerToString(idx);
    double range = MathAbs(close - sl);
    datetime t1 = iTime(sym, 0, idx);
@@ -141,16 +142,17 @@ void DrawFiboZones(string sym, int idx, double sl, double close, bool bullish) {
    ObjectSetInteger(0, name, OBJPROP_FILL, true);
    ObjectSetInteger(0, name, OBJPROP_BACK, true);
 }
+*/
 
 //+------------------------------------------------------------------+
-//| DrawFiboZones_v3 (最终完整版)
+//| DrawFiboGradeZones_v3 (最终完整版)
 //| ------------------------------------------------------------------
 //| 改进点：
 //| 1. 接收外部 prefix，统一对象管理
 //| 2. 使用 iTime 时间戳替代 K线索引，防止对象随行情漂移
 //| 3. 具备存在性检查 (ObjectFind)
 //+------------------------------------------------------------------+
-void DrawFiboZones_v3(string sym, int idx, double sl, double close, bool bullish, string prefix)
+void DrawFiboGradeZones_v3(string sym, int idx, double sl, double close, bool bullish, string prefix)
 {
    // 1. 基础计算
    double range = MathAbs(close - sl);
