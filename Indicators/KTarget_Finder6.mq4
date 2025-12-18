@@ -124,6 +124,13 @@ input ENUM_SIGNAL_GRADE Min_Alert_Grade = GRADE_B; // 报警最低门槛 (建议
 // --- 全局变量 ---
 datetime g_LastAlertTime = 0; // 记录上一次成功报警的K线时间
 
+// --------------------------------------------------------
+// 🎨 [新增] 斐波那契绘图过滤器
+// --------------------------------------------------------
+input bool Show_History_Fibo   = false;  // [开关] 是否显示历史信号的斐波投影 (False=只看当前最新)
+input bool Hide_Invalid_Fibo   = true;   // [智能] 是否隐藏已失效(止损)或已完成(止盈)的信号
+// --------------------------------------------------------
+
 // --- 指标缓冲区 ---
 double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
 double BearishTargetBuffer[]; // 1: 用于标记看跌K-Target锚点 (顶部)
@@ -1109,7 +1116,7 @@ void DrawTargetTop(int target_index)
 */
 
 //+------------------------------------------------------------------+
-//| CheckBullishSignalConfirmationV1_v3 (高级增强版)
+//| CheckBullishSignalConfirmationV2 (高级增强版)
 //| ------------------------------------------------------------------
 //| 变更日志：
 //| 1. 引入 Enable_V3_Logic 开关
@@ -1237,7 +1244,7 @@ void CheckBullishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
 }
 
 //+------------------------------------------------------------------+
-//| CheckBearishSignalConfirmationV1_v3 (做空方向高级增强版)
+//| CheckBearishSignalConfirmationV2 (做空方向高级增强版)
 //| ------------------------------------------------------------------
 //| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
 //+------------------------------------------------------------------+
@@ -1356,7 +1363,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
 }
 
 //+------------------------------------------------------------------+
-//| CheckBullishSignalConfirmationV1_v3 (做多方向最终完整版)
+//| CheckBullishSignalConfirmationV3 (做多方向最终完整版)
 //| ------------------------------------------------------------------
 //| 包含功能：
 //| 1. v3 评分系统 (EvaluateSignal)
@@ -1417,11 +1424,19 @@ void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
                              // 🔒 更新时间锁
                              g_LastAlertTime = iTime(Symbol(), Period(), j); 
                          }
-                         
+
+                         // ---------------------------------------------------
+                         // 🎨 [绘图控制] 智能斐波那契
+                         // ---------------------------------------------------
+                         // 1. 检查信号生存状态
+                         bool is_active = CheckSignalStatus(j, SL_price, true); // true=做多
+
                          // 斐波那契绘图 (无需过滤历史，历史也要画)
                          // 传入 true (做多) 和 全局前缀
-                         if (sq.grade >= GRADE_A)
+                         if (sq.grade >= GRADE_A && is_active)
+                         {
                              DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                         }
                     }
                 }
                 // =========================================================
@@ -1438,10 +1453,10 @@ void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
                 }
 
                 // 旧版报警 (互斥)
-                if (!Enable_V3_Logic && Is_EA_Mode == false) 
-                {
-                    // Alert("Old Signal...");
-                }
+                // if (!Enable_V3_Logic && Is_EA_Mode == false) 
+                // {
+                //     // Alert("Old Signal...");
+                // }
 
                 return; 
             }
@@ -1474,10 +1489,13 @@ void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
                      SendRichAlert(Symbol(), Period(), "Bullish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                      g_LastAlertTime = iTime(Symbol(), Period(), K_Geo_Index);
                  }
-                 
+
+                 bool is_active = CheckSignalStatus(K_Geo_Index, SL_price, true); // true=做多
                  // 斐波那契绘图
-                 if (sq.grade >= GRADE_A)
+                 if (sq.grade >= GRADE_A && is_active)
+                 {
                      DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                 }
             }
         }
         // =========================================================
@@ -1499,7 +1517,7 @@ void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
 }
 
 //+------------------------------------------------------------------+
-//| CheckBearishSignalConfirmationV1_v3 (做空方向高级增强版)
+//| CheckBearishSignalConfirmationV3 (做空方向高级增强版)
 //| ------------------------------------------------------------------
 //| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
 //| 集成了 v3 评分系统、斐波那契投影、以及历史报警过滤器
@@ -1554,11 +1572,19 @@ void CheckBearishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
                              // 更新全局时间锁
                              g_LastAlertTime = iTime(Symbol(), Period(), j);
                          }
-                         
+
+                         // ---------------------------------------------------
+                         // 🎨 [绘图控制] 智能斐波那契
+                         // ---------------------------------------------------
+                         // 1. 检查信号生存状态 (注意：is_bullish = false)
+                         bool is_active = CheckSignalStatus(j, SL_price, false);
+
                          // 斐波那契绘图 (无需过滤历史，历史也要画)
                          // 传入 false (做空) 和 全局前缀
-                         if (sq.grade >= GRADE_A)
+                         if (sq.grade >= GRADE_A && is_active)
+                         {
                              DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                         }
                     }
                 }
                 // =========================================================
@@ -1614,10 +1640,13 @@ void CheckBearishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
                      SendRichAlert(Symbol(), Period(), "Bearish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                      g_LastAlertTime = iTime(Symbol(), Period(), K_Geo_Index);
                  }
-                 
+
+                 bool is_active = CheckSignalStatus(K_Geo_Index, SL_price, false);
                  // 斐波那契绘图
-                 if (sq.grade >= GRADE_A)
+                 if (sq.grade >= GRADE_A && is_active)
+                 {
                      DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                 }
             }
         }
         // =========================================================
@@ -1636,4 +1665,55 @@ void CheckBearishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
     }
     
     return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckSignalStatus
+//| 功能: 检查历史信号是否依然有效 (Active)
+//| 返回: true=有效(应绘制), false=无效(已止损或已止盈，应隐藏)
+//+------------------------------------------------------------------+
+bool CheckSignalStatus(int signal_index, double sl_price, bool is_bullish)
+{
+    // 1. 如果是当前最新信号 (0 或 1)，永远视为有效
+    if (signal_index <= 1) return true;
+
+    // 2. 如果用户不想看任何历史信号，直接返回 false
+    if (!Show_History_Fibo) return false;
+
+    // 3. 如果用户选择显示历史，但不隐藏失效的，那就都显示
+    if (!Hide_Invalid_Fibo) return true;
+
+    // 4. --- 智能判断逻辑 (Trader's Eye) ---
+    // 遍历从信号发生后(signal_index - 1) 到 当前(0) 的所有K线
+    // 注意：MT4索引越小越新
+    
+    // 设定“完美止盈”的标准：斐波那契 4.236 (动能耗尽点)
+    // 估算 range
+    double entry_price = (is_bullish ? High[signal_index] : Low[signal_index]); // 估算
+    double range = MathAbs(entry_price - sl_price);
+    
+    for (int k = signal_index - 1; k >= 0; k--)
+    {
+        if (is_bullish)
+        {
+            // A. 检查止损 (失效)
+            if (Low[k] <= sl_price) return false; // 价格跌破 SL，信号死亡
+
+            // B. 检查止盈 (完成) -> 斐波 4.236
+            double tp_final = sl_price + range * 4.236;
+            if (High[k] >= tp_final) return false; // 价格到达终点，信号使命结束
+        }
+        else // 做空
+        {
+            // A. 检查止损
+            if (High[k] >= sl_price) return false; // 价格涨破 SL
+
+            // B. 检查止盈
+            double tp_final = sl_price - range * 4.236;
+            if (Low[k] <= tp_final) return false;
+        }
+    }
+
+    // 如果没死也没毕业，那就是“依然在战斗中” (Active)
+    return true;
 }
