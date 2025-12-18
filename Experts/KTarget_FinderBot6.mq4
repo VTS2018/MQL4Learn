@@ -10,12 +10,12 @@
 
 #define OP_NONE -1
 
-#include <K_Data.mqh>
-#include <K_Utils.mqh>
-#include <KBot_Utils6.mqh>
-#include <KBot_Logic6.mqh>
-#include <KBot_Test.mqh>
-#include <KBot_Draw.mqh>
+#include <K5/K_Data.mqh>
+#include <K5/K_Utils.mqh>
+#include <K6Bot/KBot_Utils.mqh>
+#include <K6Bot/KBot_Logic.mqh>
+#include <K5Bot/KBot_Test.mqh>
+#include <K5Bot/KBot_Draw.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ --- Bot Core Settings ---
@@ -31,9 +31,9 @@ input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执
 input string   __STRATEGY_SETTINGS__ = "--- Strategy Settings ---";
 input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
 
-#include <Config_CalcPosition.mqh>
+#include <ConfigBot6/Config_CalcPosition.mqh>
 
-#include <Config_Indicator.mqh>
+#include <ConfigBot6/Config_Indicator.mqh>
 
 //====================================================================
 //| ✅ 全局变量
@@ -56,7 +56,7 @@ input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=
 //+------------------------------------------------------------------+
 extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
 
-#include <Config_Fibo.mqh>
+#include <ConfigBot6/Config_Fibo.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 调试/日志输出设置 (Debug/Logging)
@@ -65,7 +65,7 @@ input string   __DEBUG_LOGGING__    = "--- Debug/Logging ---";
 input bool     Debug_Print_Valid_List = false; // 是否在日志中打印清洗合并后的有效信号列表 (sorted_valid_signals)
 // input int      Log_Level            = 1;      // 日志级别 (例如 0=关, 1=关键信息, 2=详细)
 
-#include <Config_Risk.mqh>
+#include <ConfigBot6/Config_Risk.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 唯一对象名前缀
@@ -98,12 +98,12 @@ input double Min_Hedge_Dist_ATR     = 0.5;   // 最小距离系数 (建议 0.5 �
 //====================================================================
 // 函数引入
 //====================================================================
-#include <Lib_RiskControl.mqh>
-#include <Lib_OrderTrack.mqh>
-#include <Lib_CalcPosition.mqh>
-#include <KBot_Init_GetInfo.mqh>
-#include <KBot_Logic_Start.mqh>
-#include <KBot_Logic_Second.mqh>
+#include <FunBot6/Lib_RiskControl.mqh>
+#include <FunBot6/Lib_OrderTrack.mqh>
+#include <FunBot6/Lib_CalcPosition.mqh>
+#include <FunBot6/KBot_Init_GetInfo.mqh>
+#include <FunBot6/KBot_Logic_Start.mqh>
+#include <FunBot6/KBot_Logic_Second.mqh>
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+

@@ -10,12 +10,12 @@
 
 #define OP_NONE -1
 
-#include <K_Data.mqh>
-#include <K_Utils.mqh>
-#include <KBot_Utils.mqh>
-#include <KBot_Logic.mqh>
-#include <KBot_Test.mqh>
-#include <KBot_Draw.mqh>
+#include <K5/K_Data.mqh>
+#include <K5/K_Utils.mqh>
+#include <K5Bot/KBot_Utils.mqh>
+#include <K5Bot/KBot_Logic.mqh>
+#include <K5Bot/KBot_Test.mqh>
+#include <K5Bot/KBot_Draw.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ --- Bot Core Settings ---
