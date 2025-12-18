@@ -48,11 +48,11 @@
 //+------------------------------------------------------------------+
 //| ✅ 配置 数据 工具函数
 //+------------------------------------------------------------------+
-#include <K_Data.mqh>
-#include <K_Utils.mqh>
-#include <K_Logic.mqh>
+#include <K5/K_Data.mqh>
+#include <K5/K_Utils.mqh>
+#include <K5/K_Logic.mqh>
 #include <K_Logic_v3.mqh>
-#include <K_Drawing_Funcs.mqh>
+#include <K5/K_Drawing_Funcs.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 所有的指标打印日志行为 只能在!Is_EA_Mode 模式下运行
@@ -152,7 +152,7 @@ double BearishSignalBuffer[]; // 3: 最终看跌信号 (P2 或 P1-DB突破确认
 #property indicator_type3  DRAW_ARROW
 #property indicator_color3 clrLimeGreen
 #property indicator_style3 STYLE_SOLID
-#property indicator_width3 2
+#property indicator_width3 1
 #define ARROW_CODE_SIGNAL_UP 233 
 
 // Plot 4: 最终看跌信号 
@@ -160,7 +160,7 @@ double BearishSignalBuffer[]; // 3: 最终看跌信号 (P2 或 P1-DB突破确认
 #property indicator_type4  DRAW_ARROW
 #property indicator_color4 clrDarkViolet
 #property indicator_style4 STYLE_SOLID
-#property indicator_width4 2
+#property indicator_width4 1
 #define ARROW_CODE_SIGNAL_DOWN 234
 
 //+------------------------------------------------------------------+
@@ -172,7 +172,7 @@ bool CheckKTargetTopCondition(int i, int total_bars);
 void DrawTargetBottom(int target_index);
 void DrawTargetTop(int target_index);
 
-// V1.31 UPD: 流程协调者模式，传入所有几何参数，实现解耦
+//| 流程协调者模式，传入所有几何参数，实现解耦
 void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
 void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
 
@@ -239,11 +239,11 @@ int OnInit()
     SetIndexArrow(1, ARROW_CODE_DOWN);
     
     SetIndexBuffer(2, BullishSignalBuffer);
-    SetIndexStyle(2, DRAW_ARROW, STYLE_SOLID, 2, clrLimeGreen); 
+    SetIndexStyle(2, DRAW_ARROW, STYLE_SOLID, 1, clrLimeGreen); 
     SetIndexArrow(2, ARROW_CODE_SIGNAL_UP);
     
     SetIndexBuffer(3, BearishSignalBuffer);
-    SetIndexStyle(3, DRAW_ARROW, STYLE_SOLID, 2, clrDarkViolet); 
+    SetIndexStyle(3, DRAW_ARROW, STYLE_SOLID, 1, clrDarkViolet); 
     SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
     
     // 初始化所有缓冲区数据为 0.0
@@ -341,7 +341,7 @@ void OnDeinit(const int reason)
 
         // ------------------- 0.0 下面的代码保持不变 -------------------
         ChartRedraw();
-        Print("---->[KTarget_Finder5.mq4:249]: OnDeinit 指标卸载 ");
+        Print("---->[KTarget_Finder5.mq4:344]: OnDeinit 指标卸载 ");
     }
 }
 
@@ -1084,6 +1084,7 @@ void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
     // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
     return;
 }
+
 /*
 //========================================================================
 // 12. DrawTargetBottom: 绘图函数，用向上箭头标记 K-Target Bottom (无变化)
@@ -1353,7 +1354,6 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
     
     return;
 }
-
 
 //+------------------------------------------------------------------+
 //| CheckBullishSignalConfirmationV1_v3 (做多方向最终完整版)
