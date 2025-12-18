@@ -17,7 +17,8 @@
 * 当前主要开发分支：`master`
 * 项目主要有 KTarget_Finder5.mq4
 * 调用的子文件有 如下
-* #include <K_Data.mqh>
-* #include <K_Utils.mqh>
-* #include <K_Logic.mqh>
-* #include <K_Drawing_Funcs.mqh>
+* #include <K5/K_Data.mqh>
+* #include <K5/K_Utils.mqh>
+* #include <K5/K_Logic.mqh>
+* #include <K5/K_Drawing_Funcs.mqh>
+* 保证 KTarget_Finder5 的独立性

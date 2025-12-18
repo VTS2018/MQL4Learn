@@ -103,3 +103,10 @@ git commit -m "Lib_CalcPosition."
 git add -f Indicators/KTarget_Finder6.mq4
 git add -f Include/K_Logic_v3.mqh
 git commit -m "KTarget_Finder6  K_Logic_v3."
+
+
+git add -f Include/K5/K_Data.mqh
+git add -f Include/K5/K_Utils.mqh
+git add -f Include/K5/K_Logic.mqh
+git add -f Include/K5/K_Drawing_Funcs.mqh
+git commit -m "K5."

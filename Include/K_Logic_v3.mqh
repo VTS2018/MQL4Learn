@@ -3,8 +3,6 @@
 //|                         Core Logic for KTarget Finder & Bot v3.0 |
 //|                                  Senior EA Architect Integration |
 //+------------------------------------------------------------------+
-// #property copyright "YourName"
-// #property strict
 
 // ==========================================================================
 // 1. 数据结构定义 (Data Structures)
