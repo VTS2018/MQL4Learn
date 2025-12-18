@@ -226,7 +226,7 @@ color GetHighlightColorByPeriod(bool is_bullish)
     
     return rect_color;
 }
-//-------------------------------
+
 /**
  * 根据当前图表周期 (_Period) 返回一组优化的参数。
  * 调优逻辑：在短周期增加K线数，在长周期减少K线数，以使时间范围更合理。

@@ -4,36 +4,7 @@
 //|                                                 https://mql5.com |
 //| 25.11.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
-// #property copyright "Copyright 2025, YourName"
-// #property link      "https://mql5.com"
-// #property strict
 
-//+------------------------------------------------------------------+
-//| defines                                                          |
-//+------------------------------------------------------------------+
-
-// #define MacrosHello   "Hello, world!"
-// #define MacrosYear    2025
-
-//+------------------------------------------------------------------+
-//| DLL imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "user32.dll"
-//    int      SendMessageA(int hWnd,int Msg,int wParam,int lParam);
-// #import "my_expert.dll"
-//    int      ExpertRecalculate(int wParam,int lParam);
-// #import
-
-//+------------------------------------------------------------------+
-//| EX5 imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "stdlib.ex5"
-//    string ErrorDescription(int error_code);
-// #import
-
-//+------------------------------------------------------------------+
 //========================================================================
 // 11. DrawBreakoutTrendLine: 绘制突破趋势线 (P1)
 //========================================================================
@@ -571,7 +542,7 @@ void ClearSignalRectangle_v2(int target_index, bool is_bullish)
     }
 }
 */
-//------------------------
+
 void DrawFiboHighlightRectangles(int target_index, int P2_index, bool is_bullish)
 {
     // 根据信号类型，将对应的全局数组传递给核心函数
@@ -761,7 +732,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
         }
     }
 }
-//--------------------------------
+
 /**
  * 绘制斐波那契高亮区域的文本说明 (OBJ_TEXT)
  * @param text_name: 文本对象的唯一名称 (应包含父矩形名称)
