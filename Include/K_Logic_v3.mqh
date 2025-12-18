@@ -55,7 +55,7 @@ SignalQuality EvaluateSignal(
    if(atr==0) atr = Point;
    
    double close_price = iClose(sym, period, breakout_idx);
-   int n_geo = breakout_idx - anchor_idx;
+   int n_geo = MathAbs(anchor_idx - breakout_idx);
    
    sq.is_IB = (n_geo <= 2);
    sq.is_DB = (n_geo > 2);
