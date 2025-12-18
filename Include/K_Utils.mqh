@@ -4,36 +4,6 @@
 //|                                                 https://mql5.com |
 //| 25.11.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
-// #property copyright "Copyright 2025, YourName"
-// #property link      "https://mql5.com"
-// #property strict
-
-//+------------------------------------------------------------------+
-//| defines                                                          |
-//+------------------------------------------------------------------+
-
-// #define MacrosHello   "Hello, world!"
-// #define MacrosYear    2025
-
-//+------------------------------------------------------------------+
-//| DLL imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "user32.dll"
-//    int      SendMessageA(int hWnd,int Msg,int wParam,int lParam);
-// #import "my_expert.dll"
-//    int      ExpertRecalculate(int wParam,int lParam);
-// #import
-
-//+------------------------------------------------------------------+
-//| EX5 imports                                                      |
-//+------------------------------------------------------------------+
-
-// #import "stdlib.ex5"
-//    string ErrorDescription(int error_code);
-// #import
-
-//+------------------------------------------------------------------+
 
 //========================================================================
 // 14. ShortenObjectName: 辅助函数，移除对象名中的指定字符串以缩短名称 (修正版)
@@ -58,6 +28,7 @@ string ShortenObjectName(string original_name)
     // 3. 返回修改后的字符串。
     return new_name;
 }
+
 string ShortenObjectNameBot(string original_name)
 {
     // 定义要移除的子字符串
@@ -193,9 +164,9 @@ bool ParseRectangleName_v1(const string rect_name, ParsedRectInfo &info)
     return true;
 }
 
-// K_Drawing_Funcs.mqh 或 K_Utils.mqh
-
-// 这是一个辅助函数，将 _Period 的分钟数转换为 MT4 期望的位标志
+//+------------------------------------------------------------------+
+//| 辅助函数，将 _Period 的分钟数转换为 MT4 期望的位标志
+//+------------------------------------------------------------------+
 int GetTimeframeFlag(int timeframe_period)
 {
     // MQL4 中 _Period 返回的值是分钟数
@@ -214,8 +185,6 @@ int GetTimeframeFlag(int timeframe_period)
     // 如果是自定义周期或其他未知周期，返回 0 (表示所有周期可见或不设置)
     return(0); 
 }
-
-// K_Drawing_Funcs.mqh (新增函数)
 
 /**
  * 将 _Period 的分钟数值转换为对应的周期名称字符串 (例如 M1, H4, MN1)。
@@ -240,7 +209,7 @@ string GetTimeframeName(int timeframe_period)
     // 如果是自定义周期或无法识别的周期
     return("Custom/Unknown"); 
 }
-//-----
+
 /**
  * 辅助函数：计算斐波那契水平线的价格
  * @param P1_price: 斐波那契起始价格 (Open[target_index])
@@ -264,7 +233,9 @@ double CalculateFiboPrice(double P1_price, double P2_price, double level)
     return NormalizeDouble(raw_fibo_price, _Digits);
 }
 
-//-----------------------------------
+//+------------------------------------------------------------------+
+//| GetBarTimeID 再用
+//+------------------------------------------------------------------+
 string GetBarTimeID(int bar_index)
 {
     datetime target_time;
@@ -302,7 +273,10 @@ string GetBarTimeID(int bar_index)
     // 示例返回: "251120_0400"
     return time_id_str;
 }
-//----------------------------------
+
+//+------------------------------------------------------------------+
+//| ParseRectangleName 再用
+//+------------------------------------------------------------------+
 bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
 {
     // 1. 检查类型并确定字符串起始位置
