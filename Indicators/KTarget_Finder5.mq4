@@ -1099,3 +1099,23 @@ void DrawTargetTop(int target_index)
     // BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
 }
 */
+
+void Init_Smart_Tuning()
+{
+
+}
+
+void Init_Object_prefix()
+{
+    
+}
+
+void Init_Buffer()
+{
+
+}
+
+void DeInit_DelObject()
+{
+    
+}
