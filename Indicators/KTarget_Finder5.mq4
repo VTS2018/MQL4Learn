@@ -48,10 +48,10 @@
 //+------------------------------------------------------------------+
 //| ✅ 配置 数据 工具函数
 //+------------------------------------------------------------------+
-#include <K_Data.mqh>
-#include <K_Utils.mqh>
-#include <K_Logic.mqh>
-#include <K_Drawing_Funcs.mqh>
+#include <K5/K_Data.mqh>
+#include <K5/K_Utils.mqh>
+#include <K5/K_Logic.mqh>
+#include <K5/K_Drawing_Funcs.mqh>
 
 //+------------------------------------------------------------------+
 //| ✅ 所有的指标打印日志行为 只能在!Is_EA_Mode 模式下运行
