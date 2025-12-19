@@ -46,7 +46,7 @@ input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
 
 #include <ConfigBot6/Config_CalcPosition.mqh>
 
-#include <ConfigBot6/Config_Indicator.mqh>
+#include <ConfigBot7/Config_Indicator.mqh>
 
 //====================================================================
 //| ✅ 全局变量
