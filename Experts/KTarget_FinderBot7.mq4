@@ -25,6 +25,19 @@ input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 f
 input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执行开仓和平仓操作
 //+------------------------------------------------------------------+
 
+// --- 信号质量评级定义 (与指标保持一致) ---
+enum ENUM_SIGNAL_GRADE {
+   GRADE_S = 5, // 完美信号 (0.5)
+   GRADE_A = 4, // 优秀信号 (0.4)
+   GRADE_B = 3, // 良好信号 (0.3)
+   GRADE_C = 2, //及格信号 (0.2)
+   GRADE_D = 1, // 勉强信号 (0.1)
+   GRADE_F = 0  // 垃圾信号 (0.0)
+};
+
+// --- 策略参数新增 ---
+input ENUM_SIGNAL_GRADE Min_Trade_Grade = GRADE_B; // [过滤器] 最低交易评级：低于此等级不交易
+
 //====================================================================
 //| ✅ 策略参数设置 (Strategy Inputs)
 //====================================================================
@@ -392,6 +405,55 @@ void OnTick()
       // 虽然 FilteredSignal 有部分数据，但 CheckSignalAndFilter 可能需要完整的 KBarSignal 结构
       KBarSignal full_data = GetIndicatorBarData(current_shift);
 
+      // =======================================================================
+      // 🧠 [新增] 共享大脑解码器 (Brain Decoder)
+      // =======================================================================
+      // 为了获取含评级的小数(如 3.4)，我们必须直接读取 Buffer，防止被底层截断
+      double raw_signal_value = 0.0;
+      int    signal_type_int  = 0;
+      int    signal_grade_int = 0;
+
+      // 1. 根据信号方向读取对应的指标缓冲区 (2=Buy, 3=Sell)
+      if (signal_item.type == OP_BUY)
+      {
+          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
+                                     Indi_Smart_Tuning, Indi_Scan_Range, 
+                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
+                                     Indi_Lookahead_Top, Indi_Lookback_Top,
+                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
+                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
+                                     // Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo, // 注意：Bot7如果还没加这两个新参数，就先去掉
+                                     2, current_shift); // Buffer 2
+      }
+      else if (signal_item.type == OP_SELL)
+      {
+          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
+                                     // ... 同上的参数 ...
+                                     Indi_Smart_Tuning, Indi_Scan_Range, 
+                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
+                                     Indi_Lookahead_Top, Indi_Lookback_Top,
+                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
+                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
+                                     // Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo,
+                                     3, current_shift); // Buffer 3
+      }
+
+      // 2. 解码 (例如 3.4 -> Type=3, Grade=4)
+      DecodeSignalQuality(raw_signal_value, signal_type_int, signal_grade_int);
+      ENUM_SIGNAL_GRADE current_grade = (ENUM_SIGNAL_GRADE)signal_grade_int;
+
+      // 3. 评级过滤 (Quality Gate)
+      if (current_grade < Min_Trade_Grade)
+      {
+          string grade_str = EnumToString(current_grade);
+          string limit_str = EnumToString(Min_Trade_Grade);
+          Print(" [Bot7过滤] 信号 K[", current_shift, "] 被拒绝。评级不足: ", grade_str, " < 门槛: ", limit_str);
+          continue; // 🚨 跳过当前信号，直接进入下一轮循环
+      }
+      
+      Print(" [Bot7通过] 发现优质信号! 评级: ", EnumToString(current_grade), " (Raw: ", DoubleToString(raw_signal_value, 1), ")");
+      // =======================================================================      
+
       // ----------------------------------------------------
       // 🚨 核心调用更新 🚨
       // 此时的逻辑是：位置优先原则的实现，先进行上下文的检查，只有上下文 位置通过 以后 才再次进行信号的过滤
@@ -735,3 +797,20 @@ void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
 // 1. 确保读取出来的 double 值在 CalculateTradeAndExecute 中被正确转换为 int (质量)。
 // 2. 斐波那契的 Reference Price 必须改为直接使用 Close[1] 来获取，如 CalculateTradeAndExecute 中所示。
 //+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| DecodeSignalQuality
+//| 功能: 解码指标传来的浮点数 (例如 3.4 -> Type=3, Grade=4)
+//| 输出: 引用传递 type 和 grade
+//+------------------------------------------------------------------+
+void DecodeSignalQuality(double raw_value, int &out_type, int &out_grade)
+{
+   // 1. 提取整数部分作为信号类型 (3=P2, 2=DB)
+   out_type = (int)raw_value;
+   
+   // 2. 提取小数部分作为评级
+   // 算法: (3.4 - 3.0) * 10 = 0.4 * 10 = 4.0 -> Round -> 4
+   // 加上 0.001 防止浮点数精度误差 (如 0.399999)
+   double decimal_part = raw_value - out_type;
+   out_grade = (int)MathRound(decimal_part * 10);
+}
