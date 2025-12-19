@@ -180,8 +180,8 @@ void DrawTargetBottom(int target_index);
 void DrawTargetTop(int target_index);
 
 //| 流程协调者模式，传入所有几何参数，实现解耦
-void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
-void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
+void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
+void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
 
 //========================================================================
 // 1. OnInit: 指标初始化
@@ -778,7 +778,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBullishSignalConfirmationV3(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
+            CheckBullishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -829,7 +829,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBearishSignalConfirmationV3(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
+            CheckBearishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
         }
     }
 }
@@ -1372,7 +1372,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
 //| 4. [新增] 历史信号过滤 (j <= 1)
 //| 5. [新增] 防重复报警时间锁 (g_LastAlertTime)
 //+------------------------------------------------------------------+
-void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 数据准备 ***
     double P1_price = Open[target_index];
@@ -1522,7 +1522,7 @@ void CheckBullishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_
 //| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
 //| 集成了 v3 评分系统、斐波那契投影、以及历史报警过滤器
 //+------------------------------------------------------------------+
-void CheckBearishSignalConfirmationV3(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
+void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
 {
     // *** 1. 数据准备 (Data Prep) ***
     double P1_price = Open[target_index]; // 锚点开盘价
