@@ -348,7 +348,7 @@ void OnDeinit(const int reason)
 
         // ------------------- 0.0 下面的代码保持不变 -------------------
         ChartRedraw();
-        Print("---->[KTarget_Finder5.mq4:344]: OnDeinit 指标卸载 ");
+        Print("---->[KTarget_Finder6.mq4:351]: OnDeinit 指标卸载 ");
     }
 }
 
@@ -834,14 +834,13 @@ void FindAndDrawTargetCandles(int total_bars)
     }
 }
 
-
 //========================================================================
 // 5. CheckKTargetBottomCondition: 检查目标反转阴线 (K-Target Bottom) (无变化)
 //========================================================================
 /*
    条件: 阴线，且收盘价是左右两侧周期内的最低收盘价。
 */
-bool CheckKTargetBottomCondition(int i, int total_bars)
+bool CheckKTargetBottomCondition1(int i, int total_bars)
 {
     // 1. 必须是阴线 (Bearish Candle)
     if (Close[i] >= Open[i]) return false;
@@ -874,7 +873,7 @@ bool CheckKTargetBottomCondition(int i, int total_bars)
 /*
    条件: 阳线，且收盘价是左右两侧周期内的最高收盘价。
 */
-bool CheckKTargetTopCondition(int i, int total_bars)
+bool CheckKTargetTopCondition1(int i, int total_bars)
 {
     // 1. 必须是阳线 (Bullish Candle)
     if (Close[i] <= Open[i]) return false;
@@ -895,6 +894,86 @@ bool CheckKTargetTopCondition(int i, int total_bars)
         if (past_index >= total_bars) break; 
         // 必须是最高收盘价
         if (Close[past_index] > Close[i]) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// 5. [V2 Upgrade] CheckKTargetBottomCondition
+// 功能：查找看涨锚点 (底部被动买单区)
+// 核心哲学：必须是阴线(主动卖盘撞击)，且引线创出区域最低点(流动性极限)
+//========================================================================
+bool CheckKTargetBottomCondition(int i, int total_bars)
+{
+    // 1. 身份验证 (Identity Check)
+    // 必须是阴线。
+    // 含义：价格下跌，但这根K线所在的位置是被动买单(Limit Buys)的密集区。
+    // 如果是阳线(Hammer)，说明当根K线买方已经反攻，不再是纯粹的"锚点"定义。
+    if (Close[i] >= Open[i]) return false;
+
+    // 2. 地位验证 (Geometry Check - V2 Upgrade)
+    // 使用 Low (引线) 进行比较，而不是 Close。
+    // 含义：我们要找的是被动买单防守的"极限位置"。
+    double anchor_low = Low[i];
+
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= Lookahead_Bottom; k++)
+    {
+        int future_index = i - k;
+        if (future_index < 0) break;
+        
+        // 如果右边有K线的 Low 更低(或相等)，说明当前位置不是最低防守点
+        if (Low[future_index] <= anchor_low) return false; 
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= Lookback_Bottom; k++)
+    {
+        int past_index = i + k;
+        if (past_index >= total_bars) break; 
+        
+        // 如果左边有K线的 Low 更低(或相等)，说明当前位置不是新结构低点
+        if (Low[past_index] <= anchor_low) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// 6. [V2 Upgrade] CheckKTargetTopCondition
+// 功能：查找看跌锚点 (顶部被动卖单区)
+// 核心哲学：必须是阳线(主动买盘撞击)，且引线创出区域最高点(流动性极限)
+//========================================================================
+bool CheckKTargetTopCondition(int i, int total_bars)
+{
+    // 1. 身份验证 (Identity Check)
+    // 必须是阳线。
+    // 含义：价格上涨，撞击上方的被动卖单(Limit Sells)。
+    if (Close[i] <= Open[i]) return false;
+
+    // 2. 地位验证 (Geometry Check - V2 Upgrade)
+    // 使用 High (引线) 进行比较。
+    double anchor_high = High[i];
+
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= Lookahead_Top; k++)
+    {
+        int future_index = i - k;
+        if (future_index < 0) break; 
+        
+        // 如果右边有更高的 High，说明这里没挡住，不是有效锚点
+        if (High[future_index] >= anchor_high) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= Lookback_Top; k++)
+    {
+        int past_index = i + k;
+        if (past_index >= total_bars) break; 
+        
+        // 如果左边有更高的 High，说明这里不是新结构高点
+        if (High[past_index] >= anchor_high) return false;
     }
     
     return true;
@@ -1114,6 +1193,26 @@ void DrawTargetTop(int target_index)
     // BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
 }
 */
+
+void Init_Smart_Tuning()
+{
+
+}
+
+void Init_Object_prefix()
+{
+    
+}
+
+void Init_Buffer()
+{
+
+}
+
+void DeInit_DelObject()
+{
+    
+}
 
 //+------------------------------------------------------------------+
 //| CheckBullishSignalConfirmationV2 (高级增强版)
