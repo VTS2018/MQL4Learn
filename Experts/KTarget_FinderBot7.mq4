@@ -944,6 +944,6 @@ void CalculateAndConfirm_Trade(const KBarSignal &data, int type, ENUM_SIGNAL_GRA
         CreateConfirmPanel(type, trade_lots, entry_price, sl_price, tp_price, g_PendingRequest.grade_str, risk_money_est);
         
         PlaySound("alert.wav"); // 声音提示
-        Print("⚖️ [人工审核] 信号已挂起，等待确认... 评级: ", g_PendingRequest.grade_str);
+        Print(" [人工审核] 信号已挂起，等待确认... 评级: ", g_PendingRequest.grade_str);
     }
 }

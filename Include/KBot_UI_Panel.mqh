@@ -35,9 +35,9 @@ void CreateConfirmPanel(int type, double lots, double price, double sl, double t
    
    // 5. 绘制交互按钮
    // 确认按钮 (绿色/深红)
-   CreateButton("Btn_Confirm_Trade", "✅ EXECUTE", -x_base-160, y_base+170, 70, 30, clrWhite, clrDarkGreen);
+   CreateButton("Btn_Confirm_Trade", "EXECUTE", -x_base-160, y_base+170, 70, 30, clrWhite, clrDarkGreen);
    // 拒绝按钮 (灰色)
-   CreateButton("Btn_Reject_Trade", "❌ IGNORE", -x_base-80, y_base+170, 70, 30, clrWhite, clrDimGray);
+   CreateButton("Btn_Reject_Trade", "IGNORE", -x_base-80, y_base+170, 70, 30, clrWhite, clrDimGray);
    
    // 6. 绘制图表预览线 (Preview Lines)
    DrawPreviewLine("Line_Entry", price, clrBlue, STYLE_SOLID);
