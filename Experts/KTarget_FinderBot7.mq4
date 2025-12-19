@@ -38,6 +38,34 @@ enum ENUM_SIGNAL_GRADE {
 // --- 策略参数新增 ---
 input ENUM_SIGNAL_GRADE Min_Trade_Grade = GRADE_B; // [过滤器] 最低交易评级：低于此等级不交易
 
+#include <KBot_UI_Panel.mqh> // [新增] 引入 UI 库
+
+// [新增] 定义人工确认模式枚举
+enum ENUM_EXECUTION_MODE {
+   MODE_AUTO_TRADE,      // 全自动模式
+   MODE_MANUAL_CONFIRM   // 人工审核模式
+};
+
+// [新增] 交易请求暂存结构体
+struct PendingTradeRequest {
+   bool     is_active;        // 是否有待处理请求
+   int      type;             // OP_BUY / OP_SELL
+   double   lots;             // 手数
+   double   entry_price;      // 理论入场价
+   double   sl_price;         // 止损
+   double   tp_price;         // 止盈
+   string   comment;          // 注释
+   string   grade_str;        // 评级文本
+   datetime expire_time;      // 超时时间
+};
+
+// [新增] 全局变量
+PendingTradeRequest g_PendingRequest;
+
+// --- 交易执行模式设置 ---
+input ENUM_EXECUTION_MODE Execution_Mode = MODE_MANUAL_CONFIRM; // 交易模式
+input int Confirm_Timeout_Seconds = 300; // 人工确认超时(秒)
+
 //====================================================================
 //| ✅ 策略参数设置 (Strategy Inputs)
 //====================================================================
