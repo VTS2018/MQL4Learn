@@ -110,3 +110,11 @@ git add -f Include/K5/K_Utils.mqh
 git add -f Include/K5/K_Logic.mqh
 git add -f Include/K5/K_Drawing_Funcs.mqh
 git commit -m "K5."
+
+git add -f K6/
+git add -f Include/K6Bot/
+git add -f Include/FunBot6/
+git add -f Include/ConfigBot6/
+git add -f Include/K5Bot/
+git add -f Include/K5/
+git commit -m "完成强制添加"
