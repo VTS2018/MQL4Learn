@@ -165,8 +165,8 @@ void DrawTargetBottom(int target_index);
 void DrawTargetTop(int target_index);
 
 //| 流程协调者模式，传入所有几何参数，实现解耦
-void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
-void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
+void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
+void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
 
 //========================================================================
 // 1. OnInit: 指标初始化
@@ -763,7 +763,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBullishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
+            CheckBullishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
         }
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
@@ -814,7 +814,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // --- END V1.35 NEW ---
 
             // 调用信号标记器 (仅传入数据)
-            CheckBearishSignalConfirmationV1(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
+            CheckBearishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
         }
     }
 }
@@ -894,7 +894,7 @@ bool CheckKTargetTopCondition(int i, int total_bars)
  * @param N_Geo: 突破P1的K线的数量
  * @param abs_lowindex 最低价K线的索引  可能等于 target_index 锚点索引
  */
-void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
     // ClearSignalRectangle_v2(abs_lowindex, true); 
@@ -994,7 +994,7 @@ void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_
 }
 
 
-void CheckBearishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
+void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
     // ClearSignalRectangle_v2(abs_hightindex, false); 
