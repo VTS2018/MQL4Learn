@@ -1393,6 +1393,10 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
             // [确认点] P2 突破
             if (Close[j] > P2_price) 
             {
+                // [修复 1] 在 if (Enable_V3_Logic) 之前声明变量，提升作用域
+                SignalQuality sq;
+                sq.grade = GRADE_NONE; // 默认初始化
+
                 // 绘制基础线条
                 DrawP2Baseline(P2_index, j, true);
                 if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, j, true);
@@ -1403,7 +1407,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Enable_V3_Logic)
                 {
                     // 1. 调用内核评分
-                    SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, true);
+                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, true);
                     
                     // 2. 执行高级动作
                     if (sq.grade >= GRADE_D)
@@ -1445,7 +1449,10 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Is_EA_Mode)
                 {
                     if (abs_lowindex != -1) BullishTargetBuffer[j] = Low[abs_lowindex];
-                    BullishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    // BullishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    // 核心修改：计算编码值
+                    double grade_val = GetGradeWeight(sq.grade);
+                    BullishSignalBuffer[j] = 3.0 + grade_val; // 例如 3.4
                 }
                 else
                 {
@@ -1466,6 +1473,9 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
     // 2. 次优先级: 查找 P1-DB 突破 (K_DB)
     if (N_Geo >= DB_Threshold_Candles)
     {
+        SignalQuality sq;
+        sq.grade = GRADE_NONE;
+
         DrawP2Baseline(P2_index, K_Geo_Index, true);
         if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
 
@@ -1475,7 +1485,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Enable_V3_Logic)
         {
             // 1. 调用内核评分 (传入 K_Geo_Index)
-            SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, true);
+            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, true);
             
             // 2. 执行高级动作
             if (sq.grade >= GRADE_D)
@@ -1503,7 +1513,9 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Is_EA_Mode)
         {
             if (abs_lowindex != -1) BullishTargetBuffer[K_Geo_Index] = Low[abs_lowindex];
-            BullishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            // BullishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            double grade_val = GetGradeWeight(sq.grade);
+            BullishSignalBuffer[K_Geo_Index] = 2.0 + grade_val;
         }
         else
         {
@@ -1544,6 +1556,9 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
             // [确认点] P2 向下突破 (Close < P2)
             if (Close[j] < P2_price) 
             {
+                SignalQuality sq;
+                sq.grade = GRADE_NONE; // 默认初始化
+
                 // 绘制基础线条 (原逻辑: false 代表 Bearish)
                 DrawP2Baseline(P2_index, j, false); 
                 if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, j, false);
@@ -1554,7 +1569,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Enable_V3_Logic)
                 {
                     // 1. 调用内核评分 (注意最后参数 false 代表 Bearish)
-                    SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, false);
+                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, false);
                     
                     // 2. 执行高级动作 (仅处理非垃圾信号)
                     if (sq.grade >= GRADE_D)
@@ -1593,7 +1608,9 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Is_EA_Mode)
                 {
                     if (abs_highindex != -1) BearishTargetBuffer[j] = High[abs_highindex];
-                    BearishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    // BearishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    double grade_val = GetGradeWeight(sq.grade);
+                    BearishSignalBuffer[j] = 3.0 + grade_val; 
                 }
                 else
                 {
@@ -1616,6 +1633,9 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
     
     if (N_Geo >= DB_Threshold_Candles)
     {
+        SignalQuality sq;
+        sq.grade = GRADE_NONE;
+
         // 绘制基础线条
         DrawP2Baseline(P2_index, K_Geo_Index, false);
         if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, K_Geo_Index, false);
@@ -1626,7 +1646,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Enable_V3_Logic)
         {
             // 1. 调用内核评分 (传入 K_Geo_Index)
-            SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, false);
+            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, false);
             
             // 2. 执行高级动作
             if (sq.grade >= GRADE_D)
@@ -1654,7 +1674,9 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Is_EA_Mode)
         {
             if (abs_highindex != -1) BearishTargetBuffer[K_Geo_Index] = High[abs_highindex];
-            BearishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            // BearishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            double grade_val = GetGradeWeight(sq.grade);
+            BearishSignalBuffer[K_Geo_Index] = 2.0 + grade_val;
         }
         else
         {
