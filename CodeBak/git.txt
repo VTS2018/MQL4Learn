@@ -118,3 +118,6 @@ git add -f Include/ConfigBot6/
 git add -f Include/K5Bot/
 git add -f Include/K5/
 git commit -m "完成强制添加"
+
+git add -f Experts/KTarget_FinderBot7.mq4
+git commit -m "add KTarget_FinderBot7"

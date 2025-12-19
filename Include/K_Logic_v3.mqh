@@ -105,6 +105,11 @@ SignalQuality EvaluateSignal(
 
 // 发送富文本提醒
 void SendRichAlert(string sym, int period, string type, double price, double sl, SignalQuality &sq) {
+   if (Is_EA_Mode)
+   {
+      return;
+   }
+   
    if (sq.grade <= GRADE_D) return; // 过滤低质量
    
    string msg = StringFormat(
@@ -152,6 +157,11 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
 //+------------------------------------------------------------------+
 void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bullish, string prefix)
 {
+   if (Is_EA_Mode)
+   {
+      return;
+   }
+   
    // 1. 基础计算
    double range = MathAbs(close - sl);
    
@@ -209,5 +219,19 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
        ObjectSetInteger(0, obj_name, OBJPROP_TIME2, t2);
        ObjectSetDouble (0, obj_name, OBJPROP_PRICE2, level_end);
        ObjectSetInteger(0, obj_name, OBJPROP_COLOR, zone_colors[k]);
+   }
+}
+
+// 将枚举等级转换为协议小数
+double GetGradeWeight(ENUM_SIGNAL_GRADE grade)
+{
+   switch(grade)
+   {
+      case GRADE_S: return 0.5;
+      case GRADE_A: return 0.4;
+      case GRADE_B: return 0.3;
+      case GRADE_C: return 0.2;
+      case GRADE_D: return 0.1;
+      default:      return 0.0;
    }
 }
