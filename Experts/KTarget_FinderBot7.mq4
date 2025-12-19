@@ -552,7 +552,8 @@ void OnTick()
          if (trade_command != OP_NONE)
          {
             // D. 找到最新且通过所有检查的信号，执行交易
-            CalculateTradeAndExecute_V2(full_data, trade_command);
+            // CalculateTradeAndExecute_V2(full_data, trade_command);
+            CalculateAndConfirm_Trade(full_data, trade_command, current_grade);
 
             // E. 立即退出！
             // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
@@ -634,6 +635,44 @@ void OnChartEvent(const int id,
          }
 
       }
+
+      // 👇👇👇 [新增] 人工确认按钮响应 👇👇👇
+      
+      // 🟢 交易员点击 [确认开仓]
+      if (sparam == "KBot_UI_Btn_Confirm_Trade") 
+      {
+         if (g_PendingRequest.is_active)
+         {
+            // 1. 超时检查
+            if (TimeCurrent() > g_PendingRequest.expire_time)
+            {
+               Alert("请求已超时失效，无法执行！");
+               RemoveConfirmPanel();
+               g_PendingRequest.is_active = false;
+               return;
+            }
+            
+            // 2. 执行交易 (提取暂存的数据)
+            // 注意：theoretical_entry 这里我们用暂存的 entry_price 代替
+            ExecuteTrade(g_PendingRequest.type, g_PendingRequest.lots, 
+                         g_PendingRequest.entry_price, g_PendingRequest.sl_price, 
+                         g_PendingRequest.tp_price, g_PendingRequest.entry_price, g_PendingRequest.comment);
+                         
+            // 3. 清理现场
+            RemoveConfirmPanel();
+            g_PendingRequest.is_active = false;
+         }
+      }
+
+      // 🔴 交易员点击 [拒绝/忽略]
+      if (sparam == "KBot_UI_Btn_Reject_Trade")
+      {
+         Print(" 人工拒绝了交易信号。");
+         RemoveConfirmPanel();
+         g_PendingRequest.is_active = false;
+      }
+      // 👆👆👆 [新增结束] 👆👆👆
+
    }
 }
 
@@ -841,4 +880,70 @@ void DecodeSignalQuality(double raw_value, int &out_type, int &out_grade)
    // 加上 0.001 防止浮点数精度误差 (如 0.399999)
    double decimal_part = raw_value - out_type;
    out_grade = (int)MathRound(decimal_part * 10);
+}
+
+//+------------------------------------------------------------------+
+//| CalculateAndConfirm_Trade
+//| 功能：替代 CalculateTradeAndExecute_V2，增加人工确认逻辑
+//+------------------------------------------------------------------+
+void CalculateAndConfirm_Trade(const KBarSignal &data, int type, ENUM_SIGNAL_GRADE grade)
+{
+    // 1. 基础价格准备 (复用 V2 逻辑)
+    double entry_price = Open[0]; 
+    double sl_price    = (type == OP_BUY) ? data.BullishStopLossPrice : data.BearishStopLossPrice;
+    
+    if (sl_price == 0) { Print("错误：止损价格无效 (0)，取消开仓。"); return; }
+
+    // 2. 计算止盈 (TP)
+    double risk_dist = MathAbs(entry_price - sl_price);
+    double tp_price  = (type == OP_BUY) ? (entry_price + risk_dist * RewardRatio) : (entry_price - risk_dist * RewardRatio);
+
+    // 3. 仓位计算 (调用现有风控逻辑)
+    double trade_lots = 0.0;
+    if (Position_Mode == POS_FIXED_LOT) trade_lots = NormalizeLots(FixedLot);
+    else if (Position_Mode == POS_RISK_BASED) trade_lots = GetPositionSize_V1(entry_price, sl_price, Risk_Mode, Risk_Value);
+
+    if (trade_lots <= 0) { Print("错误：计算手数无效。"); return; }
+
+    // 4. 生成注释
+    string signal_id = GenerateSignalID(data.OpenTime);
+    string risk_info = (Position_Mode == POS_FIXED_LOT) ? "FixLot" : ("Risk:" + DoubleToString(Risk_Value, 1));
+    string comment   = EA_Version_Tag + "|" + signal_id + "|" + risk_info;
+    
+    // 辅助参数
+    double theoretical_entry = Close[1]; 
+    double risk_money_est    = (Position_Mode == POS_RISK_BASED) ? Risk_Value : 0.0; // 仅用于显示
+
+    // ==============================================================
+    // 🚦 核心分流：全自动 vs 人工确认
+    // ==============================================================
+    if (Execution_Mode == MODE_AUTO_TRADE)
+    {
+        // 模式A: 全自动 - 直接开火 (调用原有的 ExecuteTrade)
+        ExecuteTrade(type, trade_lots, theoretical_entry, sl_price, tp_price, entry_price, comment);
+    }
+    else // MODE_MANUAL_CONFIRM
+    {
+        // 模式B: 人工模式 - 拦截并弹窗
+        
+        // 1. 检查是否已有等待中的请求 (防刷屏)
+        if (g_PendingRequest.is_active) return; 
+        
+        // 2. 填充全局请求结构体 (暂存数据)
+        g_PendingRequest.is_active = true;
+        g_PendingRequest.type = type;
+        g_PendingRequest.lots = trade_lots;
+        g_PendingRequest.entry_price = entry_price;
+        g_PendingRequest.sl_price = sl_price;
+        g_PendingRequest.tp_price = tp_price;
+        g_PendingRequest.comment = comment;
+        g_PendingRequest.grade_str = EnumToString(grade);
+        g_PendingRequest.expire_time = TimeCurrent() + Confirm_Timeout_Seconds;
+        
+        // 3. 🎨 绘制 UI 面板 (调用库函数)
+        CreateConfirmPanel(type, trade_lots, entry_price, sl_price, tp_price, g_PendingRequest.grade_str, risk_money_est);
+        
+        PlaySound("alert.wav"); // 声音提示
+        Print("⚖️ [人工审核] 信号已挂起，等待确认... 评级: ", g_PendingRequest.grade_str);
+    }
 }
