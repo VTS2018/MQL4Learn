@@ -143,14 +143,14 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
 */
 
 //+------------------------------------------------------------------+
-//| DrawFiboGradeZones_v3 (最终完整版)
+//| DrawFiboGradeZones (最终完整版)
 //| ------------------------------------------------------------------
 //| 改进点：
 //| 1. 接收外部 prefix，统一对象管理
 //| 2. 使用 iTime 时间戳替代 K线索引，防止对象随行情漂移
 //| 3. 具备存在性检查 (ObjectFind)
 //+------------------------------------------------------------------+
-void DrawFiboGradeZones_v3(string sym, int idx, double sl, double close, bool bullish, string prefix)
+void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bullish, string prefix)
 {
    // 1. 基础计算
    double range = MathAbs(close - sl);

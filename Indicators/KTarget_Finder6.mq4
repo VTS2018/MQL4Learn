@@ -1169,7 +1169,7 @@ void CheckBullishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
                          
                          // 斐波那契 (仅 Grade A/S)
                          if (sq.grade >= GRADE_A)
-                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1221,7 +1221,7 @@ void CheckBullishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
                      SendRichAlert(Symbol(), Period(), "Bullish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                  
                  if (sq.grade >= GRADE_A)
-                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
             }
         }
         // =========================================================
@@ -1294,7 +1294,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
                              SendRichAlert(Symbol(), Period(), "Bearish(P2-Break)", Close[j], SL_price, sq);
                          
                          if (sq.grade >= GRADE_A)
-                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
                     }
                 }
                 // =========================================================
@@ -1341,7 +1341,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
                      SendRichAlert(Symbol(), Period(), "Bearish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
                  
                  if (sq.grade >= GRADE_A)
-                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
             }
         }
         // =========================================================
@@ -1367,7 +1367,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
 //| ------------------------------------------------------------------
 //| 包含功能：
 //| 1. v3 评分系统 (EvaluateSignal)
-//| 2. 斐波那契自动绘图 (DrawFiboGradeZones_v3)
+//| 2. 斐波那契自动绘图 (DrawFiboGradeZones)
 //| 3. 智能战报 (SendRichAlert)
 //| 4. [新增] 历史信号过滤 (j <= 1)
 //| 5. [新增] 防重复报警时间锁 (g_LastAlertTime)
@@ -1435,7 +1435,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                          // 传入 true (做多) 和 全局前缀
                          if (sq.grade >= GRADE_A && is_active)
                          {
-                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
                          }
                     }
                 }
@@ -1494,7 +1494,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                  // 斐波那契绘图
                  if (sq.grade >= GRADE_A && is_active)
                  {
-                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
                  }
             }
         }
@@ -1583,7 +1583,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                          // 传入 false (做空) 和 全局前缀
                          if (sq.grade >= GRADE_A && is_active)
                          {
-                             DrawFiboGradeZones_v3(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
                          }
                     }
                 }
@@ -1645,7 +1645,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                  // 斐波那契绘图
                  if (sq.grade >= GRADE_A && is_active)
                  {
-                     DrawFiboGradeZones_v3(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
                  }
             }
         }
