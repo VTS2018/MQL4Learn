@@ -140,7 +140,7 @@ void UpdateCSLByHistory_V2()
 //| 特性：抗手动排序干扰，自动计算手续费和库存费
 //| 修复：解决了"过期锁定时间"导致的无限重置死锁问题
 //+------------------------------------------------------------------+
-void UpdateCSLByHistory_V3()
+void UpdateCSLByHistory()
 {
    // 1. 如果功能没开，直接重置并返回
    if(!Enable_CSL) 
@@ -433,7 +433,7 @@ void UpdateDailyProfit_V3()
 //| 核心思想：无状态计算。每一帧都根据当前时间，重新统计当日盈亏。
 //| 修复：彻底解决 iTime 延迟和静态变量导致的数据冻结问题。
 //+------------------------------------------------------------------+
-void UpdateDailyProfit_V4()
+void UpdateDailyProfit()
 {
    // =========================================================
    // 1. 手动计算“今天 00:00:00”的时间戳 (不依赖 iTime)
@@ -507,7 +507,7 @@ void UpdateDailyProfit_V4()
 //| IsDailyLossLimitReached V2.0
 //| 功能：检查是否触及日内亏损红线
 //+------------------------------------------------------------------+
-bool IsDailyLossLimitReached_V2()
+bool IsDailyLossLimitReached()
 {
    // 1. 如果开关没开，直接放行
    if (!Check_Daily_Loss_Strictly) return false;

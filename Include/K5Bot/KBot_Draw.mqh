@@ -235,7 +235,7 @@ void DrawLabel(string name, string text, int x, int y, color clr, int fontSize=1
 //+------------------------------------------------------------------+
 //| 核心功能：更新商场显示屏 (Dashboard)
 //+------------------------------------------------------------------+
-void UpdateDashboard()
+void UpdateDashboard_V1()
 {
    int start_x = 20; // 距离右边框的距离
    int start_y = 30; // 距离上边框的距离
@@ -455,7 +455,7 @@ void UpdateDashboard_V3()
 //| 适配：白色/浅色图表背景
 //| 配色：深色字体 (黑色、深绿、暗红) 以增强对比度
 //+------------------------------------------------------------------+
-void UpdateDashboard_V4()
+void UpdateDashboard()
 {
    // 定义位置参数
    int base_x = 30;  // 距离右边缘

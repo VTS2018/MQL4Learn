@@ -184,12 +184,10 @@ void OnTick()
    }
 
    // A. 🚨 CSL 状态更新（每个 Tick 都检查历史记录）🚨
-   // UpdateCSLByHistory();
-   UpdateCSLByHistory_V3();
+   UpdateCSLByHistory();
 
    // 🚨 NEW: 日内盈亏增量更新
-   // UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
-   UpdateDailyProfit_V4();
+   UpdateDailyProfit(); // 每次Tick都调用，更新 g_Today_Realized_PL
 
    // =======================================================
    // 🚨 3. 核心调用：持仓管理与追踪止损 (最重要！)
@@ -204,13 +202,13 @@ void OnTick()
    // 此时，变量(数据)是最新的。
    // 此时，EA 还没有被风控踢出去。
    // 这里刷新，能确保屏幕准确显示 "红色锁定" 或 "绿色正常"。
-   UpdateDashboard_V4();
+   UpdateDashboard();
 
    // 1. 检查是否在允许的交易时段
    if (!IsCurrentTimeInSlots())
    {
       // 如果不在时段内，显示注释并退出
-      Print("当前为本地时间: ", TimeToString(TimeCurrent() + g_TimeOffset_Sec, TIME_DATE | TIME_MINUTES), " 不在允许的交易时段: ", Local_Trade_Slots, ",EA 暂停运行...");
+      // Print("当前为本地时间: ", TimeToString(TimeCurrent() + g_TimeOffset_Sec, TIME_DATE | TIME_MINUTES), " 不在允许的交易时段: ", Local_Trade_Slots, ",EA 暂停运行...");
       return; 
    }
 
@@ -218,8 +216,7 @@ void OnTick()
    if (IsTradingLocked()) return;
 
    // 2. 日内亏损限额检查 (直接读取全局变量)
-   // if (IsDailyLossLimitReached()) return;
-   if (IsDailyLossLimitReached_V2()) return;
+   if (IsDailyLossLimitReached()) return;
 
    // ----------------------------------------------------
    // 🚨 优先级 1.5: 最大持仓限制检查 (NEW!) 🚨
@@ -563,7 +560,7 @@ void OnChartEvent(const int id,
  * @param entry_price: 入场价
  * @param comment: 订单备注
  */
-void ExecuteTrade_V2(int type, double lots, double cl, double sl, double tp, double entry_price, string comment)
+void ExecuteTrade(int type, double lots, double cl, double sl, double tp, double entry_price, string comment)
 {
    if (!EA_Trading_Enabled)
    {
@@ -721,7 +718,7 @@ void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
     // =================================================================
     // 假设您已有 ExecuteTrade 封装函数，如果通过测试，可以直接使用
     // 注意：将 trade_lots 传入
-    ExecuteTrade_V2(type, trade_lots, theoretical_entry, sl_price, tp_price, entry_price, comment);
+    ExecuteTrade(type, trade_lots, theoretical_entry, sl_price, tp_price, entry_price, comment);
 
     // 打印详细执行日志
     Print(" [交易执行 V2.0] 类型:", (type == OP_BUY ? "BUY" : "SELL"),
