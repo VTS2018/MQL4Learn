@@ -144,3 +144,45 @@ struct SignalQuality
     double rr_ratio;          // 盈亏比
     double target_fib_1618;   // 斐波目标1
 };
+
+//+------------------------------------------------------------------+
+//| 信号统计报告器 (放在 K_Data.mqh 或主文件头部)
+//+------------------------------------------------------------------+
+struct SignalStatReport
+{
+   int s_count;
+   int a_count;
+   int b_count;
+   int c_count;
+   int d_count;
+   int f_count;
+   int total;
+
+   // 归零
+   void Reset() {
+      s_count = 0; a_count = 0; b_count = 0; 
+      c_count = 0; d_count = 0; f_count = 0; 
+      total = 0;
+   }
+
+   // 记账
+   void Add(int grade) {
+      total++;
+      switch(grade) {
+         case GRADE_S: s_count++; break;
+         case GRADE_A: a_count++; break;
+         case GRADE_B: b_count++; break;
+         case GRADE_C: c_count++; break;
+         case GRADE_D: d_count++; break;
+         case GRADE_F: f_count++; break;
+      }
+   }
+
+   // 生成报告字符串
+   string ToString() {
+      return StringFormat(
+         "统计报告 | 总信号: %d | S级: %d | A级: %d | B级: %d | C级: %d | D级: %d | 无效: %d",
+         total, s_count, a_count, b_count, c_count, d_count, f_count
+      );
+   }
+};
