@@ -1,0 +1,1551 @@
+//+------------------------------------------------------------------+
+//|                                                      K_Logic.mqh |
+//|                                         Copyright 2025, YourName |
+//|                                                 https://mql5.com |
+//| 25.11.2025 - Initial release                                     |
+//+------------------------------------------------------------------+
+
+bool IsKTargetBottom(int i, int total_bars)
+{
+    if (Find_Target_Model == 2)
+    {
+        return CheckKTargetBottomCondition(i, total_bars, Lookahead_Bottom, Lookback_Bottom);
+    }
+
+    return CheckKTargetBottom_Default(i, total_bars, Lookahead_Bottom, Lookback_Bottom);
+}
+
+bool IsKTargetTop(int i, int total_bars)
+{
+    if (Find_Target_Model == 2)
+    {
+        return CheckKTargetTopCondition(i, total_bars, Lookahead_Top, Lookback_Top);
+    }
+
+    return CheckKTargetTop_Default(i, total_bars, Lookahead_Top, Lookback_Top);
+}
+
+//========================================================================
+// CheckKTargetBottom_Default: 检查目标反转阴线 (K-Target Bottom) (无变化)
+//========================================================================
+/*
+   条件: 阴线，且收盘价是左右两侧周期内的最低收盘价。
+*/
+bool CheckKTargetBottom_Default(int i, int total_bars, int lookahead, int lookback)
+{
+    // 1. 必须是阴线 (Bearish Candle)
+    if (Close[i] >= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= lookahead; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        // 必须是最低收盘价
+        if (Close[future_index] < Close[i]) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= lookback; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最低收盘价
+        if (Close[past_index] < Close[i]) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// CheckKTargetTop_Default: 检查目标反转阳线 (K-Target Top) (无变化)
+//========================================================================
+/*
+   条件: 阳线，且收盘价是左右两侧周期内的最高收盘价。
+*/
+bool CheckKTargetTop_Default(int i, int total_bars, int lookahead, int lookback)
+{
+    // 1. 必须是阳线 (Bullish Candle)
+    if (Close[i] <= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= lookahead; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        // 必须是最高收盘价
+        if (Close[future_index] > Close[i]) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= lookback; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最高收盘价
+        if (Close[past_index] > Close[i]) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// [V2 Upgrade] CheckKTargetBottomCondition
+// 功能：查找看涨锚点 (底部被动买单区)
+// 核心哲学：必须是阴线(主动卖盘撞击)，且引线创出区域最低点(流动性极限)
+//========================================================================
+bool CheckKTargetBottomCondition(int i, int total_bars, int lookahead, int lookback)
+{
+    // 1. 身份验证 (Identity Check)
+    // 必须是阴线。
+    // 含义：价格下跌，但这根K线所在的位置是被动买单(Limit Buys)的密集区。
+    // 如果是阳线(Hammer)，说明当根K线买方已经反攻，不再是纯粹的"锚点"定义。
+    if (Close[i] >= Open[i]) return false;
+
+    // 2. 地位验证 (Geometry Check - V2 Upgrade)
+    // 使用 Low (引线) 进行比较，而不是 Close。
+    // 含义：我们要找的是被动买单防守的"极限位置"。
+    double anchor_low = Low[i];
+
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= lookahead; k++)
+    {
+        int future_index = i - k;
+        if (future_index < 0) break;
+        
+        // 如果右边有K线的 Low 更低(或相等)，说明当前位置不是最低防守点
+        if (Low[future_index] <= anchor_low) return false; 
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= lookback; k++)
+    {
+        int past_index = i + k;
+        if (past_index >= total_bars) break; 
+        
+        // 如果左边有K线的 Low 更低(或相等)，说明当前位置不是新结构低点
+        if (Low[past_index] <= anchor_low) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// [V2 Upgrade] CheckKTargetTopCondition
+// 功能：查找看跌锚点 (顶部被动卖单区)
+// 核心哲学：必须是阳线(主动买盘撞击)，且引线创出区域最高点(流动性极限)
+//========================================================================
+bool CheckKTargetTopCondition(int i, int total_bars, int lookahead, int lookback)
+{
+    // 1. 身份验证 (Identity Check)
+    // 必须是阳线。
+    // 含义：价格上涨，撞击上方的被动卖单(Limit Sells)。
+    if (Close[i] <= Open[i]) return false;
+
+    // 2. 地位验证 (Geometry Check - V2 Upgrade)
+    // 使用 High (引线) 进行比较。
+    double anchor_high = High[i];
+
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= lookahead; k++)
+    {
+        int future_index = i - k;
+        if (future_index < 0) break; 
+        
+        // 如果右边有更高的 High，说明这里没挡住，不是有效锚点
+        if (High[future_index] >= anchor_high) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= lookback; k++)
+    {
+        int past_index = i + k;
+        if (past_index >= total_bars) break; 
+        
+        // 如果左边有更高的 High，说明这里不是新结构高点
+        if (High[past_index] >= anchor_high) return false;
+    }
+    
+    return true;
+}
+
+/**
+ * 根据看涨K-target阴线锚点 寻找出收复P1的第一根K线的索引
+ * @param target_index: 看涨K-target阴线锚点
+ * @param is_bullish: 阳线还是阴线
+ * @return ( int ) P1的K线索引。注意P1和P2 可能是同一根K线
+ */
+int FindFirstP1BreakoutIndex(int target_index, bool is_bullish)
+{
+    double P1_price = Open[target_index];
+    //Print(">[KTarget_Finder4_FromGemini.mq4:771]: P1_price: ", P1_price);
+
+    //向右边寻找 初始索引减去1 然后到最大前瞻
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+    {
+        if (j < 0) break;
+
+        if (is_bullish)
+        {
+            // 看涨突破 P1: Close > P1_price
+            if (Close[j] > P1_price) return j;
+        }
+        else
+        {
+            // 看跌突破 P1: Close < P1_price
+            if (Close[j] < P1_price) return j;
+        }
+    }
+    return -1; // 未找到 P1 突破
+}
+
+//========================================================================
+// FindSecondBaseline: 查找第二基准价格线 (P2)
+//========================================================================
+/**
+   查找 P2 价格：从 K-Target 锚点向左回溯，直到找到第一根符合条件的 K 线。
+   看涨 (Bullish): 锚点左侧第一根阳线 (Close > Open) 的收盘价。
+   看跌 (Bearish): 锚点左侧第一根阴线 (Close < Open) 的收盘价。
+   约束条件 [V1.23 NEW]: P2 价格必须在 P1 价格之外 (看涨 P2 > P1, 看跌 P2 < P1)。
+
+ * 根据看涨K-target阴线锚点，寻找到反向P2的索引，同时P2的价格一定要大于P1的价格（看涨），反之P2<P1(看跌)
+ * @param target_index: 看涨K-target阴线锚点
+ * @param is_bullish: 看涨或者看跌
+ * @return ( int ) P2 反向K线的索引
+ */
+int FindP2Index(int target_index, bool is_bullish)
+{
+    double P1_price = Open[target_index];
+
+    // P2 价格 (初始为 0.0)
+    double P2_price = 0.0;
+
+    int P2_index = -1;
+
+    // 从锚点 K 线的左侧 (历史 K 线，索引 i+k) 开始回溯
+    // 使用外部参数 Scan_Range 作为回溯上限
+    for (int k = 1; k <= Scan_Range; k++)
+    {
+        int past_index = target_index + k;
+        
+        if (past_index >= Bars) break; // 边界检查
+        
+        bool condition_met = false;
+        double candidate_P2 = 0.0;
+        
+        if (is_bullish)
+        {
+            // 看涨 P2: 锚点左侧第一根阳线 (Close > Open) 的收盘价
+            if (Close[past_index] > Open[past_index])
+            {
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须高于 P1 价格
+                if (candidate_P2 > P1_price)
+                {
+                    P2_price = candidate_P2;
+                    P2_index = past_index;
+                    condition_met = true;
+                }
+            }
+        }
+        else // is_bearish
+        {
+            // 看跌 P2: 锚点左侧第一根阴线 (Close < Open) 的收盘价
+            if (Close[past_index] < Open[past_index])
+            {
+                candidate_P2 = Close[past_index];
+                // 2. [新增约束] P2 价格必须低于 P1 价格
+                if (candidate_P2 < P1_price)
+                {
+                    P2_price = candidate_P2;
+                    P2_index = past_index;
+                    condition_met = true;
+                }
+            }
+        }
+
+        if (condition_met) 
+        {
+            break; // 找到即退出
+        }
+    }
+
+    // 3. 打印差值信息到日志 [V1.25 FIX]：仅在首次调试运行时打印
+    // if (Debug_Print_Info_Once && !initial_debug_prints_done)
+    // {
+    //     Print("FindP2Index Info: P2_price = ", DoubleToString(P2_price, Digits), " points.", " P2_index = ", IntegerToString(P2_index));
+    // }
+    
+    return P2_index; 
+}
+
+//========================================================================
+// FindAbsoluteLowIndex: 查找指定范围内的绝对最低价/最高价K线索引 (V1.35 NEW)
+//========================================================================
+/**
+ * 查找以 target_index 为中心，左右两侧 K 线内的绝对最低价 K 线索引。
+ * * @param target_index: K-Target 锚点索引。
+ * @param lookback_range: 向左（历史）回溯的 K 线数量 (例如 20)。
+ * @param lookahead_range: 向右（较新）前瞻的 K 线数量 (例如 20)。
+ * @param is_bullish: 查找最低价 (true) 还是最高价 (false)。
+ * @return ( int ) 具有绝对最低/最高价的 K 线索引。
+ */
+int FindAbsoluteLowIndex(int target_index, int lookback_range, int lookahead_range, bool is_bullish)
+{
+    // 初始化
+    double extreme_price = is_bullish ? Low[target_index] : High[target_index]; // 初始值使用 K-Target 本身的价格
+    //Print("-->[KTarget_Finder4_FromGemini.mq4:959]: extreme_price: ", extreme_price);//先测试看涨的是否能 找到最低价格
+    int extreme_index = target_index;
+
+    // 1. 向右 (较新 K 线, i-k) 查找
+    for (int k = 1; k <= lookahead_range; k++)
+    {
+        int current_index = target_index - k;
+        if (current_index < 0) break;
+
+        if (is_bullish) // 查找绝对最低价 (Lowest Low)
+        {
+            if (Low[current_index] < extreme_price)
+            {
+                extreme_price = Low[current_index];
+                extreme_index = current_index;
+            }
+        }
+        else // 查找绝对最高价 (Highest High)
+        {
+            if (High[current_index] > extreme_price)
+            {
+                extreme_price = High[current_index];
+                extreme_index = current_index;
+            }
+        }
+    }
+
+    // 2. 向左 (历史 K 线, i+k) 查找
+    for (int k = 1; k <= lookback_range; k++)
+    {
+        int current_index = target_index + k;
+        if (current_index >= Bars) break;
+
+        if (is_bullish) // 查找绝对最低价 (Lowest Low)
+        {
+            if (Low[current_index] < extreme_price)
+            {
+                extreme_price = Low[current_index];
+                extreme_index = current_index;
+            }
+        }
+        else // 查找绝对最高价 (Highest High)
+        {
+            if (High[current_index] > extreme_price)
+            {
+                extreme_price = High[current_index];
+                extreme_index = current_index;
+            }
+        }
+    }
+
+    return extreme_index;
+}
+
+/**
+ * 根据当前图表周期和信号类型，返回高亮矩形应使用的颜色。
+ * 颜色选择注重与黑色字体的高对比度。
+ * @param is_bullish: 是否为看涨信号 (true=看涨, false=看跌)。
+ * @return 最终确定的颜色常量。
+ */
+color GetHighlightColorByPeriod(bool is_bullish)
+{
+    color rect_color;
+    int current_period = _Period; // 获取当前周期 (分钟数)
+    
+    // 1. 默认颜色
+    rect_color = is_bullish ? HIGHLIGHT_COLOR_B : HIGHLIGHT_COLOR_S;
+
+    // 2. 周期特定颜色覆盖
+    if (current_period == PERIOD_D1) // 日周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_D1_B : HIGHLIGHT_COLOR_D1_S;
+    }
+    else if (current_period == PERIOD_H4) // 4H 周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_H4_B : HIGHLIGHT_COLOR_H4_S;
+    }
+    else if (current_period == PERIOD_H1) // 1H 周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_H1_B : HIGHLIGHT_COLOR_H1_S;
+    }
+    // 3. 未来扩展区域 (例如 W1, MN1)
+    else if (current_period == PERIOD_W1) // 周周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_W1_B : HIGHLIGHT_COLOR_W1_S;
+    }
+    else if (current_period == PERIOD_MN1) // 月周期
+    {
+        rect_color = is_bullish ? HIGHLIGHT_COLOR_MN1_B : HIGHLIGHT_COLOR_MN1_S;
+    }
+    
+    return rect_color;
+}
+
+/**
+ * 根据当前图表周期 (_Period) 返回一组优化的参数。
+ * 调优逻辑：在短周期增加K线数，在长周期减少K线数，以使时间范围更合理。
+ */
+TuningParameters GetTunedParameters()
+{
+    TuningParameters p;
+    
+    // 设置默认值 (如果周期不匹配，则使用 M15/H1 附近的基准值)
+    p.Scan_Range             = 500;
+    p.Lookahead_Bottom       = 20;
+    p.Lookback_Bottom        = 20;
+    p.Lookahead_Top          = 20;
+    p.Lookback_Top           = 20;
+    p.Max_Signal_Lookforward = 20;
+    p.Look_LLHH_Candles      = 3;
+    
+    // 根据周期动态调整参数
+    switch (_Period)
+    {
+        case PERIOD_M1: // M1：波动极快，需要更多的K线来定义结构
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 30;
+            p.Lookahead_Top = p.Lookback_Top = 30;
+
+            p.Max_Signal_Lookforward = 30;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        case PERIOD_M5: // M5：比 M1 稳定，但仍需比默认值大一些
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 25;
+            p.Lookahead_Top = p.Lookback_Top = 25;
+
+            p.Max_Signal_Lookforward = 25;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        case PERIOD_M15: // M15：基准周期，略低于默认值，专注于近期结构
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 18;
+            p.Lookahead_Top = p.Lookback_Top = 18;
+
+            p.Max_Signal_Lookforward = 18;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        case PERIOD_M30: // M30：更稳定，可进一步减少
+            p.Scan_Range = 1440;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 15;
+            p.Lookahead_Top = p.Lookback_Top = 15;
+
+            p.Max_Signal_Lookforward = 15;
+            p.Look_LLHH_Candles = 3;
+            break;
+
+        case PERIOD_H1: // H1：稳定的中周期
+            p.Scan_Range = 500;
+            p.Lookahead_Bottom = p.Lookback_Bottom = 12;
+            p.Lookahead_Top = p.Lookback_Top = 12;
+
+            p.Max_Signal_Lookforward = 24;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        case PERIOD_H4: // H4：长周期开始，K线代表的市场意义大增
+            // 扫描范围覆盖约 2-3 周
+            p.Scan_Range = 500; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 8;
+            p.Lookahead_Top = p.Lookback_Top = 8;
+
+            // 也就是说 前瞻扫描的范围可以大一些 没关系 这个地方 会影响锚点的标注 如果过小会导致一些锚点 无法识别出来
+            // 按说 不应该影响锚点的 标注，这里代码可能还有一些问题
+            // 按理论上讲 锚点标注的逻辑 不应该收到前瞻 信号扫描的 范围影响的
+            // 是不是由于 低开K线的影响导致的标注呢？
+            p.Max_Signal_Lookforward = 15;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        // 开始调整 日周期 确认K前瞻 是5根 5天    
+        case PERIOD_D1: // D1：日周期，遵循您的思路 (约 1-1.5 周)
+            // 扫描范围覆盖约 1 个月
+            p.Scan_Range = 500; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 2;
+            p.Lookahead_Top = p.Lookback_Top = 2;
+
+            p.Max_Signal_Lookforward = 5;
+            //周期越大 数值可以设置的越小 如果是2 至少保证 5日内的最高价和最低价
+            p.Look_LLHH_Candles = 2;
+            break;
+            
+        case PERIOD_W1: // W1：周周期，只需要关注最近几周或几个月的结构
+            // 扫描范围覆盖约 3 个月
+            p.Scan_Range = 500; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 3;
+            p.Lookahead_Top = p.Lookback_Top = 3;
+
+            p.Max_Signal_Lookforward = 3;
+            p.Look_LLHH_Candles = 3;
+            break;
+            
+        // 月线调整为2    
+        case PERIOD_MN1: // MN1：月周期，只需关注最近半年
+            // 扫描范围覆盖约 6 个月
+            p.Scan_Range = 300; 
+            p.Lookahead_Bottom = p.Lookback_Bottom = 2;
+            p.Lookahead_Top = p.Lookback_Top = 2;
+
+            p.Max_Signal_Lookforward = 3;
+            p.Look_LLHH_Candles = 2;
+            break;
+    }
+    
+    return p;
+}
+
+/**
+ * ✅
+ * 看涨阴线锚点的索引是开头，它一旦找到了 就可以找到 P1,接着就能找到P2,接着就能找到 最低价K线索引
+ * @param target_index: 看涨阴线锚点的索引
+ * @param P2_index: 突破P2的K线的索引
+ * @param K_Geo_Index: 突破P1的K线的索引
+ * @param N_Geo: 突破P1的K线的数量
+ * @param abs_lowindex 最低价K线的索引  可能等于 target_index 锚点索引
+ */
+void CheckBullishSignalConfirmation_Default(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+{
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    // ClearSignalRectangle_v2(abs_lowindex, true); 
+    // ***************************************************************
+
+    // K_Geo_Index 必须有效，否则协调者已经跳过了。
+    // P2_price 必须有效，否则协调者已经跳过了。
+
+    // P1 价格，用于判断 P2 是否高于 P1 (安全检查)
+    double P1_price = Open[target_index];
+    
+    double P2_price = Close[P2_index];
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    // P2 价格必须高于 P1 价格，否则 P2 突破不成立
+    if (P2_price > P1_price)
+    {
+        // 查找范围从锚点右侧到 Max_Signal_Lookforward 结束
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            // 检查 P2 突破条件：收盘价高于 P2 价格
+            if (Close[j] > P2_price) 
+            {
+                // **绘制 P2 辅助线** (职责：只有在 P2 突破时才绘制 P2 线)
+                DrawP2Baseline(P2_index, j, true);
+
+                if (abs_lowindex != -1)
+                {
+                    /* 只有信号成立才绘制矩形 */
+                    DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                    //DrawP1P2Fibonacci(abs_lowindex, j, true); 这里会绘制出所有的 斐波所以我设置了一个开关 所以这里取消就行了
+                }
+
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+
+                if (Is_EA_Mode)
+                {
+                    // 🚨 修正：Buffer 0 和 Buffer 2 赋值必须同步且在 j 索引上 🚨
+                    if (abs_lowindex != -1)
+                    {
+                        // 1. 写入 SL 价格 (Buffer 0) 到确认 K 线索引 'j'
+                        BullishTargetBuffer[j] = Low[abs_lowindex];
+                    }
+                    BullishSignalBuffer[j] = 3.0;
+                }
+                else
+                {
+                    BullishSignalBuffer[j] = Low[j] - 30 * Point();
+                }
+
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。同时还说明 没有找到P2突破 但是一定有P1突破的索引 一定有P1突破
+    
+    // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        //**绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
+
+        if (abs_lowindex != -1)
+        {
+            /* 只有信号成立才绘制矩形 */
+            DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+        }
+
+        // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+        // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
+        if (Is_EA_Mode)
+        {
+            // 🚨 修正：Buffer 0 和 Buffer 2 赋值必须同步且在 K_Geo_Index 索引上 🚨
+            if (abs_lowindex != -1)
+            {
+                // 1. 写入 SL 价格 (Buffer 0) 到确认 K 线索引 K_Geo_Index
+                BullishTargetBuffer[K_Geo_Index] = Low[abs_lowindex];
+            }
+            BullishSignalBuffer[K_Geo_Index] = 2.0;
+        }
+        else
+        {
+            BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point();
+        }
+
+        return; // 找到次高级别信号，立即退出函数
+    }
+    
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}
+
+
+void CheckBearishSignalConfirmation_Default(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
+{
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    // ClearSignalRectangle_v2(abs_hightindex, false); 
+    // ***************************************************************
+    
+    double P1_price = Open[target_index];
+    double P2_price = Close[P2_index];
+
+    // --- 阶段 B: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price < P1_price) // 看跌信号 P2 < P1
+    {
+        // 只需检查到 K_Geo_Index (第一次 P1 突破点) 为止
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            if (Close[j] < P2_price) // 🚨 看跌：Close < P2
+            {
+                // 绘制P2线
+                DrawP2Baseline(P2_index, j, false);
+                if (abs_hightindex != -1)
+                {
+                    DrawP1P2Rectangle(abs_hightindex, j, false);
+                }
+
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+                if (Is_EA_Mode)
+                {
+                    if (abs_hightindex != -1)
+                    {
+                        BearishTargetBuffer[j] = High[abs_hightindex];
+                    }
+
+                    BearishSignalBuffer[j] = 3.0;
+                }
+                else
+                {
+                    BearishSignalBuffer[j] = High[j] + 30 * Point();
+                }
+
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。
+    
+    // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        // **绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
+        DrawP2Baseline(P2_index, K_Geo_Index, false);
+
+        if (abs_hightindex != -1)
+        {
+            DrawP1P2Rectangle(abs_hightindex, K_Geo_Index, false);
+        }
+
+        // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+        // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
+        if (Is_EA_Mode)
+        {
+            if (abs_hightindex != -1)
+            {
+                BearishTargetBuffer[K_Geo_Index] = High[abs_hightindex];
+            }
+            BearishSignalBuffer[K_Geo_Index] = 2.0;
+        }
+        else
+        {
+            BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point();
+        }
+        
+        return; // 找到次高级别信号，立即退出函数
+    }
+
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckBullishSignalConfirmationV2 (高级增强版)
+//| ------------------------------------------------------------------
+//| 变更日志：
+//| 1. 引入 Enable_V3_Logic 开关
+//| 2. 在信号确认点植入 EvaluateSignal 评分系统
+//| 3. 集成 SendRichAlert 和 DrawFiboZones
+//+------------------------------------------------------------------+
+void CheckBullishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+{
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    // ClearSignalRectangle_v2(abs_lowindex, true);
+    // ***************************************************************
+
+    // 数据准备 (为 V3 内核准备原材料)
+    double P1_price = Open[target_index];
+    double P2_price = Close[P2_index];
+    
+    // 安全检查：如果没有找到绝对低点，使用锚点最低价作为止损兜底
+    double SL_price = (abs_lowindex != -1) ? Low[abs_lowindex] : Low[target_index]; 
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price > P1_price)
+    {
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            
+            // [确认点] P2 突破
+            if (Close[j] > P2_price) 
+            {
+                // 绘制基础线条 (原逻辑)
+                DrawP2Baseline(P2_index, j, true);
+                if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                // =========================================================
+                // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
+                // =========================================================
+                if (Enable_V3_Logic)
+                {
+                    // 1. 调用内核评分 (传入 j 作为突破索引)
+                    SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, true);
+                    
+                    // 2. 执行高级动作 (仅处理非垃圾信号)
+                    if (sq.grade >= GRADE_D)
+                    {
+                         // 打印 & 报警
+                         if (sq.grade >= Min_Alert_Grade) 
+                             SendRichAlert(Symbol(), Period(), "Bullish(P2-Break)", Close[j], SL_price, sq);
+                         
+                         // 斐波那契 (仅 Grade A/S)
+                         if (sq.grade >= GRADE_A)
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                    }
+                }
+                // =========================================================
+
+                // 设置 Buffer (原逻辑保持兼容)
+                if (Is_EA_Mode)
+                {
+                    if (abs_lowindex != -1) BullishTargetBuffer[j] = Low[abs_lowindex];
+                    BullishSignalBuffer[j] = 3.0; // 3.0 代表 P2 突破
+                }
+                else
+                {
+                    BullishSignalBuffer[j] = Low[j] - 30 * Point();
+                }
+
+                // 旧版报警 (互斥)
+                if (!Enable_V3_Logic && Is_EA_Mode == false) 
+                {
+                    // 这里可以放原来的简单 Alert...
+                }
+
+                return; // 找到最高优信号，退出
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB)
+    // 如果代码执行到这里，说明没有 P2 突破，但协调者确认有 P1 突破
+    
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        // 绘制基础线条 (原逻辑)
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
+        if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+
+        // =========================================================
+        // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
+        // =========================================================
+        if (Enable_V3_Logic)
+        {
+            // 1. 调用内核评分 (传入 K_Geo_Index 作为突破索引)
+            // 注意：虽然这里是 DB，但也要评估是否顺便过了 P2 (内核会自动判断)
+            SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, true);
+            
+            // 2. 执行高级动作
+            if (sq.grade >= GRADE_D)
+            {
+                 if (sq.grade >= Min_Alert_Grade) 
+                     SendRichAlert(Symbol(), Period(), "Bullish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
+                 
+                 if (sq.grade >= GRADE_A)
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+            }
+        }
+        // =========================================================
+
+        // 设置 Buffer (原逻辑保持兼容)
+        if (Is_EA_Mode)
+        {
+            if (abs_lowindex != -1) BullishTargetBuffer[K_Geo_Index] = Low[abs_lowindex];
+            BullishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 代表 DB 突破
+        }
+        else
+        {
+            BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point();
+        }
+
+        return; // 找到次优信号，退出
+    }
+    
+    return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckBearishSignalConfirmationV2 (做空方向高级增强版)
+//| ------------------------------------------------------------------
+//| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
+//+------------------------------------------------------------------+
+void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
+{
+    // *** 清除旧矩形 (如有) ***
+    // ClearSignalRectangle_v2(abs_highindex, false);
+    // ***************************************************************
+
+    // 数据准备
+    double P1_price = Open[target_index]; // 锚点开盘价
+    double P2_price = Close[P2_index];    // 左侧支撑价 (注意：做空时 P2 是支撑)
+    
+    // 安全检查：如果没有找到绝对高点，使用锚点最高价作为止损
+    double SL_price = (abs_highindex != -1) ? High[abs_highindex] : High[target_index]; 
+
+    // --- 阶段 A: 信号箭头标记 ---
+
+    // 1. 最高优先级: 查找 P2 向下突破 (K_P2)
+    // 逻辑：P2(支撑) 必须低于 P1，否则结构不成立 (或者您保留原始逻辑不做此检查)
+    // 这里的 if 取决于您原始代码是否要求 P2 < P1。通常做空要求 P2 在下方。
+    if (P2_price < P1_price) 
+    {
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            
+            // [确认点] P2 向下突破 (Close < P2)
+            if (Close[j] < P2_price) 
+            {
+                // 绘制基础线条
+                DrawP2Baseline(P2_index, j, false); // false 代表 Bearish
+                if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, j, false);
+
+                // =========================================================
+                // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
+                // =========================================================
+                if (Enable_V3_Logic)
+                {
+                    // 1. 调用内核评分 (注意最后参数 false 代表 Bearish)
+                    SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, false);
+                    
+                    // 2. 执行高级动作
+                    if (sq.grade >= GRADE_D)
+                    {
+                         if (sq.grade >= Min_Alert_Grade) 
+                             SendRichAlert(Symbol(), Period(), "Bearish(P2-Break)", Close[j], SL_price, sq);
+                         
+                         if (sq.grade >= GRADE_A)
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                    }
+                }
+                // =========================================================
+
+                // 设置 Buffer
+                if (Is_EA_Mode)
+                {
+                    if (abs_highindex != -1) BearishTargetBuffer[j] = High[abs_highindex];
+                    BearishSignalBuffer[j] = 3.0; 
+                }
+                else
+                {
+                    BearishSignalBuffer[j] = High[j] + 30 * Point(); // 箭头在K线上方
+                }
+
+                // 旧版报警 (互斥)
+                if (!Enable_V3_Logic && Is_EA_Mode == false) 
+                {
+                    // Alert("Bearish P2 Break...");
+                }
+
+                return; 
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 向下突破 (K_DB)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        DrawP2Baseline(P2_index, K_Geo_Index, false);
+        if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, K_Geo_Index, false);
+
+        // =========================================================
+        // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
+        // =========================================================
+        if (Enable_V3_Logic)
+        {
+            // 调用内核评分 (is_bullish = false)
+            SignalQuality sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, false);
+            
+            if (sq.grade >= GRADE_D)
+            {
+                 if (sq.grade >= Min_Alert_Grade) 
+                     SendRichAlert(Symbol(), Period(), "Bearish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
+                 
+                 if (sq.grade >= GRADE_A)
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+            }
+        }
+        // =========================================================
+
+        if (Is_EA_Mode)
+        {
+            if (abs_highindex != -1) BearishTargetBuffer[K_Geo_Index] = High[abs_highindex];
+            BearishSignalBuffer[K_Geo_Index] = 2.0; 
+        }
+        else
+        {
+            BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point();
+        }
+
+        return;
+    }
+    
+    return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckBullishSignalConfirmationV3 (做多方向最终完整版)
+//| ------------------------------------------------------------------
+//| 包含功能：
+//| 1. v3 评分系统 (EvaluateSignal)
+//| 2. 斐波那契自动绘图 (DrawFiboGradeZones)
+//| 3. 智能战报 (SendRichAlert)
+//| 4. [新增] 历史信号过滤 (j <= 1)
+//| 5. [新增] 防重复报警时间锁 (g_LastAlertTime)
+//+------------------------------------------------------------------+
+void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+{
+    // *** 数据准备 ***
+    double P1_price = Open[target_index];
+    double P2_price = Close[P2_index];
+    
+    // 安全检查：如果没有找到绝对低点，使用锚点最低价作为止损兜底
+    double SL_price = (abs_lowindex != -1) ? Low[abs_lowindex] : Low[target_index]; 
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    if (P2_price > P1_price)
+    {
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            
+            // [确认点] P2 突破
+            if (Close[j] > P2_price)
+            {
+                // [修复 1] 在 if (Enable_V3_Logic) 之前声明变量，提升作用域
+                SignalQuality sq;
+                sq.grade = GRADE_NONE; // 默认初始化
+
+                // 绘制基础线条
+                DrawP2Baseline(P2_index, j, true);
+                if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                // =========================================================
+                // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
+                // =========================================================
+                if (Enable_V3_Logic)
+                {
+                    // 1. 调用内核评分
+                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, true);
+                    g_Stats.Add(sq.grade);
+                    // [日志] 做多详情
+                    if (Test_Print_Detail)
+                    {
+                        Print("Pass: [BUY] Time:", TimeToString(Time[j]), " Grade:", sq.description);
+                    }
+
+                    // 2. 执行高级动作
+                    if (sq.grade >= GRADE_D)
+                    {
+                         // -----------------------------------------------------------
+                         // 🛡️ [报警过滤器] 核心风控逻辑
+                         // -----------------------------------------------------------
+                         // 规则1：只在最新K线(0)或刚收盘K线(1)触发，过滤历史
+                         bool is_live_signal = (j <= 1); 
+                         // 规则2：时间戳必须大于上一次报警时间，防止单根K线重复报
+                         bool is_new_time    = (iTime(Symbol(), Period(), j) > g_LastAlertTime);
+                         
+                         if (sq.grade >= Min_Alert_Grade && is_live_signal && is_new_time) 
+                         {
+                             // 发送战报
+                             SendRichAlert(Symbol(), Period(), "Bullish(P2-Break)", Close[j], SL_price, sq);
+                             
+                             // 🔒 更新时间锁
+                             g_LastAlertTime = iTime(Symbol(), Period(), j); 
+                         }
+
+                         // ---------------------------------------------------
+                         // 🎨 [绘图控制] 智能斐波那契
+                         // ---------------------------------------------------
+                         // 1. 检查信号生存状态
+                         bool is_active = CheckSignalStatus(j, SL_price, true); // true=做多
+
+                         // 斐波那契绘图 (无需过滤历史，历史也要画)
+                         // 传入 true (做多) 和 全局前缀
+                         if (sq.grade >= GRADE_A && is_active)
+                         {
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], true, g_object_prefix);
+                         }
+                    }
+                }
+                // =========================================================
+
+                // 设置 Buffer
+                if (Is_EA_Mode)
+                {
+                    if (abs_lowindex != -1) BullishTargetBuffer[j] = Low[abs_lowindex];
+                    // BullishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    // 核心修改：计算编码值
+                    double grade_val = GetGradeWeight(sq.grade);
+                    BullishSignalBuffer[j] = 3.0 + grade_val; // 例如 3.4
+                }
+                else
+                {
+                    BullishSignalBuffer[j] = Low[j] - 30 * Point();
+                }
+
+                // 旧版报警 (互斥)
+                // if (!Enable_V3_Logic && Is_EA_Mode == false) 
+                // {
+                //     // Alert("Old Signal...");
+                // }
+
+                return; 
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        SignalQuality sq;
+        sq.grade = GRADE_NONE;
+
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
+        if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+
+        // =========================================================
+        // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
+        // =========================================================
+        if (Enable_V3_Logic)
+        {
+            // 1. 调用内核评分 (传入 K_Geo_Index)
+            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, true);
+            g_Stats.Add(sq.grade);
+            // [日志] 做多详情
+            if (Test_Print_Detail)
+            {
+                Print("Pass: [BUY] Time:", TimeToString(Time[K_Geo_Index]), " Grade:", sq.description);
+            }
+
+            // 2. 执行高级动作
+            if (sq.grade >= GRADE_D)
+            {
+                 // 🛡️ [报警过滤器]
+                 bool is_live_signal = (K_Geo_Index <= 1); 
+                 bool is_new_time    = (iTime(Symbol(), Period(), K_Geo_Index) > g_LastAlertTime);
+
+                 if (sq.grade >= Min_Alert_Grade && is_live_signal && is_new_time) 
+                 {
+                     SendRichAlert(Symbol(), Period(), "Bullish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
+                     g_LastAlertTime = iTime(Symbol(), Period(), K_Geo_Index);
+                 }
+
+                 bool is_active = CheckSignalStatus(K_Geo_Index, SL_price, true); // true=做多
+                 // 斐波那契绘图
+                 if (sq.grade >= GRADE_A && is_active)
+                 {
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], true, g_object_prefix);
+                 }
+            }
+        }
+        // =========================================================
+
+        if (Is_EA_Mode)
+        {
+            if (abs_lowindex != -1) BullishTargetBuffer[K_Geo_Index] = Low[abs_lowindex];
+            // BullishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            double grade_val = GetGradeWeight(sq.grade);
+            BullishSignalBuffer[K_Geo_Index] = 2.0 + grade_val;
+        }
+        else
+        {
+            BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point();
+        }
+
+        return;
+    }
+    
+    return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckBearishSignalConfirmationV3 (做空方向高级增强版)
+//| ------------------------------------------------------------------
+//| 核心逻辑：镜像 Bullish 版本，处理 P2 向下突破和 DB 向下突破
+//| 集成了 v3 评分系统、斐波那契投影、以及历史报警过滤器
+//+------------------------------------------------------------------+
+void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_highindex)
+{
+    // *** 1. 数据准备 (Data Prep) ***
+    double P1_price = Open[target_index]; // 锚点开盘价
+    double P2_price = Close[P2_index];    // 左侧支撑价 (做空时 P2 应为支撑)
+    
+    // 安全检查：如果没有找到绝对高点，使用锚点最高价作为止损兜底
+    double SL_price = (abs_highindex != -1) ? High[abs_highindex] : High[target_index]; 
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 向下突破 (K_P2)
+    // 逻辑：P2(支撑) 通常应低于 P1，结构才顺畅 (此处保留原逻辑的结构判断)
+    if (P2_price < P1_price) 
+    {
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            
+            // [确认点] P2 向下突破 (Close < P2)
+            if (Close[j] < P2_price) 
+            {
+                SignalQuality sq;
+                sq.grade = GRADE_NONE; // 默认初始化
+
+                // 绘制基础线条 (原逻辑: false 代表 Bearish)
+                DrawP2Baseline(P2_index, j, false); 
+                if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, j, false);
+
+                // =========================================================
+                // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
+                // =========================================================
+                if (Enable_V3_Logic)
+                {
+                    // 1. 调用内核评分 (注意最后参数 false 代表 Bearish)
+                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, false);
+                    g_Stats.Add(sq.grade);
+                    if (Test_Print_Detail)
+                    {
+                        Print("Pass: [SELL] Time:", TimeToString(Time[j]), " Grade:", sq.description);
+                    }
+
+                    // 2. 执行高级动作 (仅处理非垃圾信号)
+                    if (sq.grade >= GRADE_D)
+                    {
+                         // -----------------------------------------------------------
+                         // 🛡️ [报警过滤器] 只报实盘新信号 (Index 0或1)，且不重复
+                         // -----------------------------------------------------------
+                         bool is_live_signal = (j <= 1); 
+                         bool is_new_time    = (iTime(Symbol(), Period(), j) > g_LastAlertTime);
+
+                         if (sq.grade >= Min_Alert_Grade && is_live_signal && is_new_time) 
+                         {
+                             // 发送做空战报
+                             SendRichAlert(Symbol(), Period(), "Bearish(P2-Break)", Close[j], SL_price, sq);
+                             // 更新全局时间锁
+                             g_LastAlertTime = iTime(Symbol(), Period(), j);
+                         }
+
+                         // ---------------------------------------------------
+                         // 🎨 [绘图控制] 智能斐波那契
+                         // ---------------------------------------------------
+                         // 1. 检查信号生存状态 (注意：is_bullish = false)
+                         bool is_active = CheckSignalStatus(j, SL_price, false);
+
+                         // 斐波那契绘图 (无需过滤历史，历史也要画)
+                         // 传入 false (做空) 和 全局前缀
+                         if (sq.grade >= GRADE_A && is_active)
+                         {
+                             DrawFiboGradeZones(Symbol(), j, SL_price, Close[j], false, g_object_prefix);
+                         }
+                    }
+                }
+                // =========================================================
+
+                // 设置 Buffer (原 EA 逻辑保持兼容)
+                if (Is_EA_Mode)
+                {
+                    if (abs_highindex != -1) BearishTargetBuffer[j] = High[abs_highindex];
+                    // BearishSignalBuffer[j] = 3.0; // 3.0 = P2 Break
+                    double grade_val = GetGradeWeight(sq.grade);
+                    BearishSignalBuffer[j] = 3.0 + grade_val; 
+                }
+                else
+                {
+                    BearishSignalBuffer[j] = High[j] + 30 * Point(); // 箭头在K线上方
+                }
+
+                // 旧版报警 (互斥处理)
+                // if (!Enable_V3_Logic && Is_EA_Mode == false) 
+                // {
+                //     // Alert("Old Bearish Signal...");
+                // }
+
+                return; // 找到最高优信号，退出
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 向下突破 (K_DB)
+    // 如果代码执行到这里，说明没有 P2 突破，但协调者确认有 P1 突破 (K_Geo_Index)
+    
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        SignalQuality sq;
+        sq.grade = GRADE_NONE;
+
+        // 绘制基础线条
+        DrawP2Baseline(P2_index, K_Geo_Index, false);
+        if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, K_Geo_Index, false);
+
+        // =========================================================
+        // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
+        // =========================================================
+        if (Enable_V3_Logic)
+        {
+            // 1. 调用内核评分 (传入 K_Geo_Index)
+            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, false);
+            g_Stats.Add(sq.grade);
+            if (Test_Print_Detail)
+            {
+                Print("Pass: [SELL] Time:", TimeToString(Time[K_Geo_Index]), " Grade:", sq.description);
+            }
+
+            // 2. 执行高级动作
+            if (sq.grade >= GRADE_D)
+            {
+                 // 🛡️ [报警过滤器]
+                 bool is_live_signal = (K_Geo_Index <= 1); 
+                 bool is_new_time    = (iTime(Symbol(), Period(), K_Geo_Index) > g_LastAlertTime);
+
+                 if (sq.grade >= Min_Alert_Grade && is_live_signal && is_new_time) 
+                 {
+                     SendRichAlert(Symbol(), Period(), "Bearish(DB-Break)", Close[K_Geo_Index], SL_price, sq);
+                     g_LastAlertTime = iTime(Symbol(), Period(), K_Geo_Index);
+                 }
+
+                 bool is_active = CheckSignalStatus(K_Geo_Index, SL_price, false);
+                 // 斐波那契绘图
+                 if (sq.grade >= GRADE_A && is_active)
+                 {
+                     DrawFiboGradeZones(Symbol(), K_Geo_Index, SL_price, Close[K_Geo_Index], false, g_object_prefix);
+                 }
+            }
+        }
+        // =========================================================
+
+        if (Is_EA_Mode)
+        {
+            if (abs_highindex != -1) BearishTargetBuffer[K_Geo_Index] = High[abs_highindex];
+            // BearishSignalBuffer[K_Geo_Index] = 2.0; // 2.0 = DB Break
+            double grade_val = GetGradeWeight(sq.grade);
+            BearishSignalBuffer[K_Geo_Index] = 2.0 + grade_val;
+        }
+        else
+        {
+            BearishSignalBuffer[K_Geo_Index] = High[K_Geo_Index] + 20 * Point();
+        }
+
+        return;
+    }
+    
+    return;
+}
+
+//+------------------------------------------------------------------+
+//| CheckSignalStatus
+//| 功能: 检查历史信号是否依然有效 (Active)
+//| 返回: true=有效(应绘制), false=无效(已止损或已止盈，应隐藏)
+//+------------------------------------------------------------------+
+bool CheckSignalStatus(int signal_index, double sl_price, bool is_bullish)
+{
+    // 1. 如果是当前最新信号 (0 或 1)，永远视为有效
+    if (signal_index <= 1) return true;
+
+    // 2. 如果用户不想看任何历史信号，直接返回 false
+    if (!Show_History_Fibo) return false;
+
+    // 3. 如果用户选择显示历史，但不隐藏失效的，那就都显示
+    if (!Hide_Invalid_Fibo) return true;
+
+    // 4. --- 智能判断逻辑 (Trader's Eye) ---
+    // 遍历从信号发生后(signal_index - 1) 到 当前(0) 的所有K线
+    // 注意：MT4索引越小越新
+    
+    // 设定“完美止盈”的标准：斐波那契 4.236 (动能耗尽点)
+    // 估算 range
+    double entry_price = (is_bullish ? High[signal_index] : Low[signal_index]); // 估算
+    double range = MathAbs(entry_price - sl_price);
+    
+    for (int k = signal_index - 1; k >= 0; k--)
+    {
+        if (is_bullish)
+        {
+            // A. 检查止损 (失效)
+            if (Low[k] <= sl_price) return false; // 价格跌破 SL，信号死亡
+
+            // B. 检查止盈 (完成) -> 斐波 4.236
+            double tp_final = sl_price + range * 4.236;
+            if (High[k] >= tp_final) return false; // 价格到达终点，信号使命结束
+        }
+        else // 做空
+        {
+            // A. 检查止损
+            if (High[k] >= sl_price) return false; // 价格涨破 SL
+
+            // B. 检查止盈
+            double tp_final = sl_price - range * 4.236;
+            if (Low[k] <= tp_final) return false;
+        }
+    }
+
+    // 如果没死也没毕业，那就是“依然在战斗中” (Active)
+    return true;
+}
+
+// ==========================================================================
+// 2. 核心计算引擎 (Calculation Engine)
+// ==========================================================================
+
+// 计算空间因子 (ATR Helper)
+double Calculate_Space_Factor(string sym, int period, double p1, double p2, int shift) {
+   double atr = iATR(sym, period, 14, shift);
+   if(atr <= 0) return 0;
+   return MathAbs(p2 - p1) / atr;
+}
+
+// 综合评分系统 (The Brain)
+SignalQuality EvaluateSignal(
+   string sym, int period, 
+   int anchor_idx, int breakout_idx, 
+   double p1, double p2, double sl, 
+   bool is_bullish
+) {
+   SignalQuality sq;
+   sq.grade = GRADE_NONE;
+   
+   // --- A. 基础计算 ---
+   double atr = iATR(sym, period, 14, breakout_idx);
+   if(atr==0) atr = Point;
+   
+   double close_price = iClose(sym, period, breakout_idx);
+   int n_geo = MathAbs(anchor_idx - breakout_idx);
+   
+   sq.is_IB = (n_geo <= 2);
+   sq.is_DB = (n_geo > 2);
+   
+   // --- B. 结构与CB判定 ---
+   if (is_bullish) {
+      if (p2 < p1) { sq.grade = GRADE_F; sq.description = "结构破坏(P2<P1)"; return sq; }
+      sq.is_CB = (close_price > p2);
+   } else {
+      if (p2 > p1) { sq.grade = GRADE_F; sq.description = "结构破坏(P2>P1)"; return sq; }
+      sq.is_CB = (close_price < p2);
+   }
+
+   // --- C. 空间与盈亏比 ---
+   sq.space_factor = Calculate_Space_Factor(sym, period, p1, p2, breakout_idx);
+   double risk = MathAbs(p1 - sl);
+   double reward = MathAbs(p2 - p1);
+   sq.rr_ratio = (risk > 0) ? (reward / risk) : 0;
+   
+   // --- D. 斐波那契目标计算 (针对 Grade A/S) ---
+   double range = MathAbs(close_price - sl);
+   if (is_bullish) sq.target_fib_1618 = sl + range * 1.618;
+   else            sq.target_fib_1618 = sl - range * 1.618;
+
+   // --- E. 最终定级逻辑 ---
+   if (sq.is_CB) {
+      // 突破了P2，且空间不是极其微小
+      if (sq.is_DB) { sq.grade = GRADE_S; sq.description = "S级:主导突破(DB+CB)"; }
+      else          { sq.grade = GRADE_A; sq.description = "A级:爆发突破(IB+CB)"; }
+   } 
+   else {
+      // 没过P2，看空间
+      if (sq.space_factor > 1.5) {
+         if (sq.is_DB) { sq.grade = GRADE_B; sq.description = "B级:区间主导(DB)"; }
+         else          { sq.grade = GRADE_C; sq.description = "C级:区间激进(IB)"; }
+      } else {
+         sq.grade = GRADE_D; sq.description = "D级:空间不足";
+      }
+   }
+   
+   return sq;
+}
+
+// ==========================================================================
+// 3. 可视化与提醒 (Visuals & Alerts)
+// ==========================================================================
+
+// 发送富文本提醒
+void SendRichAlert(string sym, int period, string type, double price, double sl, SignalQuality &sq) {
+   if (Is_EA_Mode)
+   {
+      return;
+   }
+   
+   if (sq.grade <= GRADE_D) return; // 过滤低质量
+   
+   string msg = StringFormat(
+      "%s M%d [%s] | %s\n现价: %.5f | SL: %.5f\n因子: %.1f | R:R: %.1f\n",
+      sym, period, type, sq.description, price, sl, sq.space_factor, sq.rr_ratio
+   );
+   
+   if(sq.grade >= GRADE_A) msg += StringFormat(">> 目标: %.5f (Fib 1.618)", sq.target_fib_1618);
+   
+   Alert(msg);
+   SendNotification(msg);
+}
+
+/*
+// 绘制斐波那契矩形 (仅供 Grade A/S 使用)
+void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bullish) {
+   string name = "KT_Fib_" + IntegerToString(idx);
+   double range = MathAbs(close - sl);
+   datetime t1 = iTime(sym, 0, idx);
+   datetime t2 = t1 + PeriodSeconds(0) * 30; // 延伸30根
+   
+   double level1, level2;
+   if (bullish) {
+      level1 = sl + range * 1.618;
+      level2 = sl + range * 1.88;
+   } else {
+      level1 = sl - range * 1.618;
+      level2 = sl - range * 1.88;
+   }
+   
+   ObjectCreate(0, name, OBJ_RECTANGLE, 0, t1, level1, t2, level2);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, (bullish ? clrLightGreen : clrLightPink));
+   ObjectSetInteger(0, name, OBJPROP_FILL, true);
+   ObjectSetInteger(0, name, OBJPROP_BACK, true);
+}
+*/
+
+//+------------------------------------------------------------------+
+//| DrawFiboGradeZones (最终完整版)
+//| ------------------------------------------------------------------
+//| 改进点：
+//| 1. 接收外部 prefix，统一对象管理
+//| 2. 使用 iTime 时间戳替代 K线索引，防止对象随行情漂移
+//| 3. 具备存在性检查 (ObjectFind)
+//+------------------------------------------------------------------+
+void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bullish, string prefix)
+{
+   if (Is_EA_Mode)
+   {
+      return;
+   }
+   
+   // 1. 基础计算
+   double range = MathAbs(close - sl);
+   
+   // [关键改进] 获取该 K 线的精确时间作为唯一身份 ID
+   // 使用 long 类型转换确保时间戳数字的完整性
+   datetime bar_time = iTime(sym, 0, idx);
+   string time_str = IntegerToString((long)bar_time);
+
+   // 计算矩形的时间宽度 (默认向右延伸 30 根 K 线)
+   datetime t2 = bar_time + PeriodSeconds(0) * 30; 
+   
+   // 定义斐波那契倍数 (TP1, TP2, TP3)
+   double fib_levels[] = {1.618, 1.88,  2.618, 2.88,  4.236, 4.88};
+   color  zone_colors[] = {clrLightGreen, clrSkyBlue, clrGold};
+   
+   // 如果是做空，调整颜色
+   if (!bullish) {
+       zone_colors[0] = clrLightPink; 
+       zone_colors[1] = clrLightCoral; 
+       zone_colors[2] = clrOrangeRed; 
+   }
+
+   // 循环绘制 3 个目标区域
+   for(int k=0; k<3; k++)
+   {
+       // --- A. 构建基于时间的唯一对象名 ---
+       // 格式: [前缀]Fib_[时间戳]_TP[k]
+       // 例如: KTarget_v3_A1_Fib_167889200_TP1
+       string obj_name = prefix + "Fib_" + time_str + "_TP" + IntegerToString(k+1);
+       
+       // --- B. 存在性检查与创建 ---
+       if(ObjectFind(0, obj_name) < 0) 
+       {
+           ObjectCreate(0, obj_name, OBJ_RECTANGLE, 0, 0, 0, 0, 0);
+           // 静态属性仅设置一次
+           ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);     // 脚本列表中隐藏
+           ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);// 不可选中
+           ObjectSetInteger(0, obj_name, OBJPROP_BACK, true);       // 背景显示
+           ObjectSetInteger(0, obj_name, OBJPROP_FILL, true);       // 开启填充
+       }
+
+       // --- C. 动态属性更新 (坐标/颜色) ---
+       double level_start, level_end;
+       if (bullish) {
+           level_start = sl + range * fib_levels[k*2];
+           level_end   = sl + range * fib_levels[k*2+1];
+       } else {
+           level_start = sl - range * fib_levels[k*2];
+           level_end   = sl - range * fib_levels[k*2+1];
+       }
+
+       // 即使对象已存在，也更新坐标 (防止参数调整后位置不对)
+       ObjectSetInteger(0, obj_name, OBJPROP_TIME1, bar_time);
+       ObjectSetDouble (0, obj_name, OBJPROP_PRICE1, level_start);
+       ObjectSetInteger(0, obj_name, OBJPROP_TIME2, t2);
+       ObjectSetDouble (0, obj_name, OBJPROP_PRICE2, level_end);
+       ObjectSetInteger(0, obj_name, OBJPROP_COLOR, zone_colors[k]);
+   }
+}
+
+// 将枚举等级转换为协议小数
+double GetGradeWeight(ENUM_SIGNAL_GRADE grade)
+{
+   switch(grade)
+   {
+      case GRADE_S: return 0.5;
+      case GRADE_A: return 0.4;
+      case GRADE_B: return 0.3;
+      case GRADE_C: return 0.2;
+      case GRADE_D: return 0.1;
+      default:      return 0.0;
+   }
+}
