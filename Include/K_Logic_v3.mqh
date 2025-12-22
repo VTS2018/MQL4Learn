@@ -8,6 +8,7 @@
 // 1. 数据结构定义 (Data Structures)
 // ==========================================================================
 
+/*
 enum ENUM_SIGNAL_GRADE {
    GRADE_NONE = 0,
    GRADE_S    = 5, // DB + CB + 空间大
@@ -28,6 +29,7 @@ struct SignalQuality {
    double rr_ratio;        // 盈亏比
    double target_fib_1618; // 斐波目标1
 };
+*/
 
 // ==========================================================================
 // 2. 核心计算引擎 (Calculation Engine)

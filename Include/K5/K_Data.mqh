@@ -113,19 +113,18 @@ struct FilteredSignal
     int      type;               // 交易类型 (OP_BUY 或 OP_SELL)
 };
 
-/*
 //+------------------------------------------------------------------+
 //| 1. 定义信号等级枚举 (清晰的阶级划分)
 //+------------------------------------------------------------------+
 enum ENUM_SIGNAL_GRADE
 {
-   GRADE_NONE = 0,      // 无信号
-   GRADE_S    = 5,      // 完美级 (DB + CB + 空间大) - 重仓
-   GRADE_A    = 4,      // 优秀级 (IB + CB + 空间大) - 标准仓
-   GRADE_B    = 3,      // 良好级 (DB only + 空间大) - 以 P2 为目标
-   GRADE_C    = 2,      // 普通级 (IB only + 空间大) - 激进短线
-   GRADE_D    = 1,      // 鸡肋级 (空间太小，建议过滤)
-   GRADE_F    = -1      // 垃圾级 (结构破环，如 P2 < P1)
+    GRADE_NONE = 0, // 无信号
+    GRADE_S = 5,    // 完美级 (DB + CB + 空间大) - 重仓
+    GRADE_A = 4,    // 优秀级 (IB + CB + 空间大) - 标准仓
+    GRADE_B = 3,    // 良好级 (DB only + 空间大) - 以 P2 为目标
+    GRADE_C = 2,    // 普通级 (IB only + 空间大) - 激进短线
+    GRADE_D = 1,    // 鸡肋级 (空间太小，建议过滤)
+    GRADE_F = -1    // 垃圾级 (结构破环，如 P2 < P1)
 };
 
 //+------------------------------------------------------------------+
@@ -133,14 +132,15 @@ enum ENUM_SIGNAL_GRADE
 //+------------------------------------------------------------------+
 struct SignalQuality
 {
-   ENUM_SIGNAL_GRADE grade;   // 最终评级 (S/A/B/C/D)
-   string description;        // 文字描述 (方便调试打印)
-   
-   bool is_IB;                // 是否为 Initial Break (快速)
-   bool is_DB;                // 是否为 Dominant Break (稳健)
-   bool is_CB;                // 是否突破了 P2 (强力)
-   
-   double space_factor;       // P2与P1的距离因子 (基于ATR)
-   double reward_risk_ratio;  // 预估盈亏比 (P2-P1) / (P1-StopLoss)
+    ENUM_SIGNAL_GRADE grade; // 最终评级 (S/A/B/C/D)
+    string description;      // 文字描述 (方便调试打印)
+
+    bool is_IB; // 是否为 Initial Break (快速)
+    bool is_DB; // 是否为 Dominant Break (稳健)
+    bool is_CB; // 是否突破了 P2 (强力)
+
+    double space_factor;      // P2与P1的距离因子 (基于ATR)
+    // double reward_risk_ratio; // 预估盈亏比 (P2-P1) / (P1-StopLoss)
+    double rr_ratio;          // 盈亏比
+    double target_fib_1618;   // 斐波目标1
 };
-*/
