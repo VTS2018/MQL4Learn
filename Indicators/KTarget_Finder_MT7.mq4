@@ -51,7 +51,6 @@
 #include <K5/K_Data.mqh>
 #include <K5/K_Utils.mqh>
 #include <K7/K_Logic.mqh>
-// #include <K_Logic_v3.mqh>
 #include <K5/K_Drawing_Funcs.mqh>
 
 #include <Config7/Config_Core.mqh>
@@ -329,6 +328,7 @@ int OnCalculate(const int rates_total,
     // 2. 判断是否是新 K 线触发
     else if (time[0] > last_bar_time) 
     {
+        g_Stats.Reset();
         trigger_type = "NEW BAR (收线触发)";
         if (!Is_EA_Mode)
         {
