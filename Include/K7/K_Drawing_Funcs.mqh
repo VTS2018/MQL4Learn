@@ -895,7 +895,7 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
 }
 
 //========================================================================
-// 16. DrawSignalInfoText: 在信号矩形下方/上方绘制描述文本 (涨+CB+点数)
+// DrawSignalInfoText: 在信号矩形下方/上方绘制描述文本 (涨+CB+点数)
 //========================================================================
 void DrawSignalInfoText(int target_index, int signal_index, string type_str, double sl_price, double confirm_price, bool is_bullish)
 {
@@ -945,4 +945,257 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
         ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, GetTimeframeFlag(_Period));
         ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
     }
+}
+
+//+------------------------------------------------------------------+
+//| 🌍 DrawMarketSessions: 绘制全球四大市场时段矩形
+//| ------------------------------------------------------------------
+//| 逻辑: 基于标准 GMT 时间定义时段，然后加上 Server_Offset 进行平移
+//+------------------------------------------------------------------+
+void DrawMarketSessions(int lookback_days, int gmt_offset)
+{
+   if (Is_EA_Mode) return;
+
+   // --- 1. 定义标准市场的 GMT 开始和结束时间 (24小时制) ---
+   // 悉尼: 21:00 - 06:00 GMT
+   // 东京: 00:00 - 09:00 GMT (亚盘核心)
+   // 伦敦: 08:00 - 17:00 GMT (欧盘核心)
+   // 纽约: 13:00 - 22:00 GMT (美盘核心)
+   
+   int Sess_Syd_Start = 21; int Sess_Syd_End = 6;
+   int Sess_Tok_Start = 0;  int Sess_Tok_End = 9;
+   int Sess_Lon_Start = 8;  int Sess_Lon_End = 17;
+   int Sess_NY_Start  = 13; int Sess_NY_End  = 22;
+
+   // 获取当前服务器时间的日初 (00:00)
+   datetime time_current = TimeCurrent();
+   datetime day_start = iTime(Symbol(), PERIOD_D1, 0); 
+
+   // 循环处理过去 N 天
+   for(int i = 0; i <= lookback_days; i++)
+   {
+      // 计算当天的基准时间 (从今天往回推 i 天)
+      datetime current_day_base = day_start - (i * PeriodSeconds(PERIOD_D1));
+      
+      // 绘制四大时段
+      DrawSingleSession(current_day_base, "Sydney",  Sess_Syd_Start, Sess_Syd_End, gmt_offset, Color_Sydney);
+      DrawSingleSession(current_day_base, "Asian",   Sess_Tok_Start, Sess_Tok_End, gmt_offset, Color_Tokyo);
+      DrawSingleSession(current_day_base, "London",  Sess_Lon_Start, Sess_Lon_End, gmt_offset, Color_London);
+      DrawSingleSession(current_day_base, "NewYork", Sess_NY_Start,  Sess_NY_End,  gmt_offset, Color_NewYork);
+   }
+}
+
+// 辅助函数：绘制单个时段的矩形
+void DrawSingleSession_V1(datetime day_base, string name, int start_h_gmt, int end_h_gmt, int offset, color bg_color)
+{
+   if(bg_color == clrNONE) return; // 如果颜色未设置，不绘制
+
+   // 1. 计算服务器时间的开始小时
+   int server_start_h = start_h_gmt + offset;
+   int server_end_h   = end_h_gmt + offset;
+   
+   // 2. 处理跨日情况 (例如加了时区后超过24点，或者悉尼本身跨日)
+   // 这里做一个简化的处理：计算具体的时间戳
+   
+   datetime t1 = day_base + server_start_h * 3600;
+   datetime t2 = day_base + server_end_h * 3600;
+   
+   // 如果原始定义是跨日的 (比如 21:00 到 06:00)，手动修正 t2 到第二天
+   if (start_h_gmt > end_h_gmt)
+   {
+       t2 += 24 * 3600;
+   }
+
+   // 3. 构建对象名称 (按天唯一)
+   string day_str = TimeToString(day_base, TIME_DATE);
+   string obj_name = g_object_prefix + "Sess_" + name + "_" + day_str;
+
+   // 4. 获取该时间段内的最高价和最低价 (用于确定矩形高度)
+   // 使用 iBarShift 找到对应的K线索引
+   int idx_start = iBarShift(NULL, 0, t1);
+   int idx_end   = iBarShift(NULL, 0, t2);
+   
+   if (idx_start == -1 || idx_end == -1) return; // 数据不存在
+   
+   // 查找范围内的高低点
+   int highest_idx = iHighest(NULL, 0, MODE_HIGH, idx_start - idx_end + 1, idx_end);
+   int lowest_idx  = iLowest(NULL, 0, MODE_LOW,  idx_start - idx_end + 1, idx_end);
+   
+   if (highest_idx == -1 || lowest_idx == -1) return;
+
+   double high_price = High[highest_idx];
+   double low_price  = Low[lowest_idx];
+   
+   // 稍微向外扩一点点，让图表不压抑
+   double padding = 20 * Point;
+
+   // 5. 绘制矩形
+   if(ObjectFind(0, obj_name) != -1) ObjectDelete(0, obj_name);
+   
+   ObjectCreate(0, obj_name, OBJ_RECTANGLE, 0, t1, high_price + padding, t2, low_price - padding);
+/*
+   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, bg_color);
+   ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
+   ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, obj_name, OBJPROP_BACK, true); // 背景显示，不遮挡K线
+   ObjectSetInteger(0, obj_name, OBJPROP_FILL, true); // 开启填充
+   ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false); // 不可选中
+*/
+
+   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, bg_color);
+   ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_DASH); // ✅ 修改为：虚线 (STYLE_DASH 或 STYLE_DOT)
+   ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, obj_name, OBJPROP_BACK, true); 
+   ObjectSetInteger(0, obj_name, OBJPROP_FILL, false); // ✅ 修改为：关闭填充 (透明背景，只显示框)
+   ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+
+   // 6. 添加文字标签 (可选，放在矩形左上角)
+   string txt_name = obj_name + "_TXT";
+   if(ObjectFind(0, txt_name) != -1) ObjectDelete(0, txt_name);
+   
+   ObjectCreate(0, txt_name, OBJ_TEXT, 0, t1, high_price + padding);
+   ObjectSetString(0, txt_name, OBJPROP_TEXT, " " + name);
+   ObjectSetInteger(0, txt_name, OBJPROP_FONTSIZE, 8);
+   ObjectSetInteger(0, txt_name, OBJPROP_COLOR, clrGray);
+   ObjectSetInteger(0, txt_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+   ObjectSetInteger(0, txt_name, OBJPROP_BACK, true);
+}
+
+// 辅助函数：绘制单个时段的虚线框 (强制无填充版)
+void DrawSingleSession_V2(datetime day_base, string name, int start_h_gmt, int end_h_gmt, int offset, color border_color)
+{
+   if(border_color == clrNONE) return; // 如果颜色未设置，不绘制
+
+   // 1. 计算服务器时间的开始小时
+   int server_start_h = start_h_gmt + offset;
+   int server_end_h   = end_h_gmt + offset;
+   
+   // 2. 处理跨日情况
+   datetime t1 = day_base + server_start_h * 3600;
+   datetime t2 = day_base + server_end_h * 3600;
+   
+   if (start_h_gmt > end_h_gmt)
+   {
+       t2 += 24 * 3600;
+   }
+
+   // 3. 构建对象名称 
+   // ⚠️ 注意：我们在名称中加入了 "_Line" 后缀，强制创建一个新对象，
+   // 这样可以避免旧的“有背景色”的矩形属性残留。
+   string day_str = TimeToString(day_base, TIME_DATE);
+   string obj_name = g_object_prefix + "Sess_" + name + "_" + day_str + "_Line";
+
+   // 4. 获取高低点
+   int idx_start = iBarShift(NULL, 0, t1);
+   int idx_end   = iBarShift(NULL, 0, t2);
+   
+   if (idx_start == -1 || idx_end == -1) return;
+   
+   int highest_idx = iHighest(NULL, 0, MODE_HIGH, idx_start - idx_end + 1, idx_end);
+   int lowest_idx  = iLowest(NULL, 0, MODE_LOW,  idx_start - idx_end + 1, idx_end);
+   
+   if (highest_idx == -1 || lowest_idx == -1) return;
+
+   double high_price = High[highest_idx];
+   double low_price  = Low[lowest_idx];
+   double padding = 20 * Point;
+
+   // 5. 绘制矩形 (强制属性重设)
+   if(ObjectFind(0, obj_name) != -1) ObjectDelete(0, obj_name);
+   
+   if(ObjectCreate(0, obj_name, OBJ_RECTANGLE, 0, t1, high_price + padding, t2, low_price - padding))
+   {
+       // --- 关键属性设置 ---
+       ObjectSetInteger(0, obj_name, OBJPROP_COLOR, border_color);   // 设置边框颜色
+       ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_DASH);     // 设置为虚线
+       ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);              // ⚠️ 宽度必须为 1，否则虚线不显示
+       
+       ObjectSetInteger(0, obj_name, OBJPROP_FILL, false);           // ⚠️ 关键：强制关闭背景填充 (False=0)
+       ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);            // 放在背景层 (不遮挡K线)
+       ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);     // 不可选中
+   }
+   
+   // 6. 添加文字标签 (保持不变)
+   string txt_name = obj_name + "_TXT";
+   if(ObjectFind(0, txt_name) != -1) ObjectDelete(0, txt_name);
+   
+   ObjectCreate(0, txt_name, OBJ_TEXT, 0, t1, high_price + padding);
+   ObjectSetString(0, txt_name, OBJPROP_TEXT, " " + name);
+   ObjectSetInteger(0, txt_name, OBJPROP_FONTSIZE, 8);
+   ObjectSetInteger(0, txt_name, OBJPROP_COLOR, border_color); // 文字颜色与边框一致
+   ObjectSetInteger(0, txt_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+   ObjectSetInteger(0, txt_name, OBJPROP_BACK, true);
+}
+
+//+------------------------------------------------------------------+
+//| 辅助函数：绘制单个时段的虚线框 (客户验证修正版)
+//| 修复方案: OBJPROP_FILL = false 且 OBJPROP_BACK = false
+//+------------------------------------------------------------------+
+void DrawSingleSession(datetime day_base, string name, int start_h_gmt, int end_h_gmt, int offset, color border_color)
+{
+   if(border_color == clrNONE) return; 
+
+   // 1. 计算服务器时间
+   int server_start_h = start_h_gmt + offset;
+   int server_end_h   = end_h_gmt + offset;
+   
+   datetime t1 = day_base + server_start_h * 3600;
+   datetime t2 = day_base + server_end_h * 3600;
+   
+   // 跨日处理
+   if (start_h_gmt > end_h_gmt)
+   {
+       t2 += 24 * 3600;
+   }
+
+   // 2. 构建对象名称 (保留 _Line 后缀以防缓存冲突，或者改回原名也可以)
+   string day_str = TimeToString(day_base, TIME_DATE);
+   string obj_name = g_object_prefix + "Sess_" + name + "_" + day_str + "_Box"; 
+
+   // 3. 获取高低点
+   int idx_start = iBarShift(NULL, 0, t1);
+   int idx_end   = iBarShift(NULL, 0, t2);
+   
+   if (idx_start == -1 || idx_end == -1) return;
+   
+   int highest_idx = iHighest(NULL, 0, MODE_HIGH, idx_start - idx_end + 1, idx_end);
+   int lowest_idx  = iLowest(NULL, 0, MODE_LOW,  idx_start - idx_end + 1, idx_end);
+   
+   if (highest_idx == -1 || lowest_idx == -1) return;
+
+   double high_price = High[highest_idx];
+   double low_price  = Low[lowest_idx];
+   double padding = 20 * Point;
+
+   // 4. 绘制矩形
+   if(ObjectFind(0, obj_name) != -1) ObjectDelete(0, obj_name);
+   
+   if(ObjectCreate(0, obj_name, OBJ_RECTANGLE, 0, t1, high_price + padding, t2, low_price - padding))
+   {
+       // --- 核心样式设置 ---
+       ObjectSetInteger(0, obj_name, OBJPROP_COLOR, border_color);   // 边框颜色
+       ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_DASH);     // 虚线样式
+       ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);              // 宽度必须为1才显示虚线
+       
+       // --- 您的关键修复 ---
+       ObjectSetInteger(0, obj_name, OBJPROP_FILL, false);           // 必须为 false (无填充)
+       ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);           // 必须为 false (前景显示，确保虚线清晰)
+       
+       ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);     // 不可选中
+   }
+   
+   // 5. 添加文字标签 (可选)
+   string txt_name = obj_name + "_TXT";
+   if(ObjectFind(0, txt_name) != -1) ObjectDelete(0, txt_name);
+   
+   if(ObjectCreate(0, txt_name, OBJ_TEXT, 0, t1, high_price + padding))
+   {
+       ObjectSetString(0, txt_name, OBJPROP_TEXT, " " + name);
+       ObjectSetInteger(0, txt_name, OBJPROP_FONTSIZE, 8);
+       ObjectSetInteger(0, txt_name, OBJPROP_COLOR, border_color); 
+       ObjectSetInteger(0, txt_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+       // 文字可以设为 Back = true 以免遮挡 K 线，或者设为 false 保持清晰，看您喜好
+       ObjectSetInteger(0, txt_name, OBJPROP_BACK, false); 
+       ObjectSetInteger(0, txt_name, OBJPROP_SELECTABLE, false);
+   }
 }
