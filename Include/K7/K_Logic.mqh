@@ -980,7 +980,13 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
 
                 // 绘制基础线条
                 DrawP2Baseline(P2_index, j, true);
-                if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                if (abs_lowindex != -1)
+                {
+                    DrawP1P2Rectangle(abs_lowindex, j, true);
+                    // 参数: 锚点索引, 信号索引, 类型字符串, 止损价, 确认收盘价, 方向
+                    DrawSignalInfoText(abs_lowindex, j, "CB", SL_price, Close[j], true);
+                }
 
                 // =========================================================
                 // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
@@ -1064,7 +1070,12 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         sq.grade = GRADE_NONE;
 
         DrawP2Baseline(P2_index, K_Geo_Index, true);
-        if (abs_lowindex != -1) DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+
+        if (abs_lowindex != -1)
+        {
+            DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+            DrawSignalInfoText(abs_lowindex, K_Geo_Index, "DB", SL_price, Close[K_Geo_Index], true);
+        }
 
         // =========================================================
         // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
@@ -1153,8 +1164,13 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 sq.grade = GRADE_NONE; // 默认初始化
 
                 // 绘制基础线条 (原逻辑: false 代表 Bearish)
-                DrawP2Baseline(P2_index, j, false); 
-                if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, j, false);
+                DrawP2Baseline(P2_index, j, false);
+
+                if (abs_highindex != -1)
+                {
+                    DrawP1P2Rectangle(abs_highindex, j, false);
+                    DrawSignalInfoText(abs_highindex, j, "CB", SL_price, Close[j], false);
+                }
 
                 // =========================================================
                 // 🔪 [手术切口 A] P2 强力突破 (CB) - V3 逻辑植入
@@ -1236,7 +1252,11 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
 
         // 绘制基础线条
         DrawP2Baseline(P2_index, K_Geo_Index, false);
-        if (abs_highindex != -1) DrawP1P2Rectangle(abs_highindex, K_Geo_Index, false);
+        if (abs_highindex != -1)
+        {
+            DrawP1P2Rectangle(abs_highindex, K_Geo_Index, false);
+            DrawSignalInfoText(abs_highindex, K_Geo_Index, "DB", SL_price, Close[K_Geo_Index], false);
+        }
 
         // =========================================================
         // 🔪 [手术切口 B] P1 结构突破 (DB) - V3 逻辑植入
@@ -1297,7 +1317,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
 //| 功能: 检查历史信号是否依然有效 (Active)
 //| 返回: true=有效(应绘制), false=无效(已止损或已止盈，应隐藏)
 //+------------------------------------------------------------------+
-bool CheckSignalStatus(int signal_index, double sl_price, bool is_bullish)
+bool CheckSignalStatus_V1(int signal_index, double sl_price, bool is_bullish)
 {
     // 1. 如果是当前最新信号 (0 或 1)，永远视为有效
     if (signal_index <= 1) return true;
@@ -1340,6 +1360,93 @@ bool CheckSignalStatus(int signal_index, double sl_price, bool is_bullish)
     }
 
     // 如果没死也没毕业，那就是“依然在战斗中” (Active)
+    return true;
+}
+
+//+------------------------------------------------------------------+
+//| CheckSignalStatus (最终版)
+//|
+//| 功能: 检查历史信号是否依然有效 (Active)
+//| 核心逻辑: 
+//|   1. 止损标准 (IB失效): 价格实体收盘价 击穿 P1 (锚点开盘价) 即死。
+//|   2. 止盈标准 (完结): 价格触及 4.236 扩展位 即完成使命。
+//|
+//| 参数:
+//|   signal_index : 信号确认K线的索引 (P2突破或DB突破的那根K线)
+//|   sl_price     : 必须传入 P1 (锚点开盘价) 作为止损基准
+//|   is_bullish   : 多空方向
+//+------------------------------------------------------------------+
+bool CheckSignalStatus(int signal_index, double sl_price, bool is_bullish)
+{
+    // ---------------------------------------------------
+    // 1. 基础可见性过滤
+    // ---------------------------------------------------
+    
+    // 规则 A: 永远保留最新的正在进行的信号 (索引 0 或 1)
+    // 这样保证实盘时信号不会突然闪烁消失
+    if (signal_index <= 1) return true;
+
+    // 规则 B: 如果用户彻底关闭历史显示，则所有旧信号都不画
+    if (!Show_History_Fibo) return false;
+
+    // 规则 C: 如果用户想看历史，且允许看失效的信号(复盘用)，则全部保留
+    // Hide_Invalid_Fibo = true (默认) -> 隐藏死掉的，只留活的
+    // Hide_Invalid_Fibo = false      -> 显示所有历史尸体
+    if (!Hide_Invalid_Fibo) return true;
+
+
+    // ---------------------------------------------------
+    // 2. 智能生存状态检查 (从信号产生那一刻一直查到现在)
+    // ---------------------------------------------------
+    
+    // 计算逻辑上的 "IB 区间动能幅度" (用于测算 TP)
+    // 注意：这里使用信号K线的收盘价 vs P1 来计算幅度，与斐波那契绘制保持一致
+    double entry_price = Close[signal_index]; 
+    double range = MathAbs(entry_price - sl_price);
+
+    // 遍历：从信号后一根K线 (signal_index - 1) 开始，一直查到当前K线 (0)
+    for (int k = signal_index - 1; k >= 0; k--)
+    {
+        if (is_bullish) // [做多信号检查]
+        {
+            // A. 检查止损 (IB失效标准)
+            // 逻辑：如果 K 线实体收盘价跌破 P1 (sl_price)，视为结构崩塌
+            if (Close[k] < sl_price) 
+            {
+                return false; // 信号已死 (Invalid)
+            }
+            
+            // (可选：如果您想要更严格的"引线触碰即死"，请解开下面这行)
+            // if (Low[k] <= sl_price) return false;
+
+            // B. 检查止盈 (完美毕业)
+            // 逻辑：如果最高价触及 4.236 目标位
+            double tp_final = sl_price + (range * 4.236);
+            if (High[k] >= tp_final) 
+            {
+                return false; // 信号已完成使命 (Completed)
+            }
+        }
+        else // [做空信号检查]
+        {
+            // A. 检查止损 (IB失效标准)
+            // 逻辑：如果 K 线实体收盘价涨破 P1 (sl_price)
+            if (Close[k] > sl_price) 
+            {
+                return false; // 信号已死 (Invalid)
+            }
+
+            // B. 检查止盈
+            double tp_final = sl_price - (range * 4.236);
+            if (Low[k] <= tp_final) 
+            {
+                return false; // 信号已完成使命 (Completed)
+            }
+        }
+    }
+
+    // 经历了九九八十一难（所有K线检查）都没死也没毕业，
+    // 说明这个信号依然 "Active" (活着且未达终点)。
     return true;
 }
 

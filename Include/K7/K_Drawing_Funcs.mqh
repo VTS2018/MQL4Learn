@@ -893,3 +893,56 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
        ObjectSetInteger(0, obj_name, OBJPROP_COLOR, zone_colors[k]);
    }
 }
+
+//========================================================================
+// 16. DrawSignalInfoText: 在信号矩形下方/上方绘制描述文本 (涨+CB+点数)
+//========================================================================
+void DrawSignalInfoText(int target_index, int signal_index, string type_str, double sl_price, double confirm_price, bool is_bullish)
+{
+    if (Is_EA_Mode) return;
+
+    // 1. 计算点数 (Points)
+    // 涨: 收盘 - 止损; 跌: 止损 - 收盘
+    double diff = is_bullish ? (confirm_price - sl_price) : (sl_price - confirm_price);
+    int points = (int)(diff / Point); 
+
+    // 2. 构建文本内容
+    // 格式: 涨CB(150) 或 跌DB(80)
+    string dir_str = is_bullish ? "涨" : "跌";
+    string text_content = dir_str + type_str + "(" + IntegerToString(points) + ")";
+
+    // 3. 构建对象名称 (必须唯一，关联到锚点)
+    string time_id = GetBarTimeID(target_index); // 使用锚点时间作为唯一标识
+    string name = g_object_prefix + "SigTxt_" + (is_bullish ? "B_" : "S_") + time_id;
+
+    // 4. 确定绘制坐标
+    datetime time = Time[signal_index]; // X轴：画在信号确认的那根K线上
+    double price = sl_price;            // Y轴：画在止损价格线上 (矩形的底/顶)
+
+    // 5. 创建或更新对象
+    if (ObjectFind(0, name) != -1) ObjectDelete(0, name);
+
+    if (ObjectCreate(0, name, OBJ_TEXT, 0, time, price))
+    {
+        ObjectSetString(0, name, OBJPROP_TEXT, text_content);
+        ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 9); // 字号
+        ObjectSetString(0, name, OBJPROP_FONT, "Arial");
+        ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrGreen : clrRed); // 涨绿跌红
+        
+        // 6. 设置锚点 (关键：让字刚好在矩形外面)
+        if (is_bullish)
+        {
+            // 看涨矩形在上方，字画在底下 -> 文本的"Top"锚定在价格线上
+            ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_TOP); 
+        }
+        else
+        {
+            // 看跌矩形在下方，字画在顶上 -> 文本的"Bottom"锚定在价格线上
+            ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_TOP);
+        }
+
+        // 设置周期可见性 (同矩形)
+        ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, GetTimeframeFlag(_Period));
+        ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    }
+}
