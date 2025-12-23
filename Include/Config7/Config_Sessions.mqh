@@ -9,7 +9,7 @@
 //| 🌍 [新增] 市场时段可视化 (Market Sessions)
 //+------------------------------------------------------------------+
 input string   __SESSION_SET__      = "=== 市场时段 (Sessions) ===";
-input bool     Show_Sessions        = true;  // [开关] 显示市场时段色块
+input bool     Show_Sessions        = false;  // [开关] 显示市场时段色块
 input int      Server_Time_Offset   = 3;     // [重要] 平台时区 (夏令时填3, 冬令时填2)
 input int      Session_Lookback     = 5;     // [范围] 显示过去几天的时段
 
