@@ -97,6 +97,8 @@ int OnInit()
 
     RunTest();
 
+    SaveParamsToChart();
+
     // 非EA模式下 才启用 定时器和相关的打印逻辑
     if (!Is_EA_Mode)
     {
@@ -752,4 +754,42 @@ void RunTest()
         Print(" 单元测试执行完毕。请查看【专家(Experts)】选项卡日志。");
     }
     // =================================================================
+}
+
+//+------------------------------------------------------------------+
+//| 🛡️ 参数同步模块：将当前参数保存到隐藏对象，供脚本读取
+//+------------------------------------------------------------------+
+void SaveParamsToChart()
+{
+   if(Is_EA_Mode) return; // EA后台模式不需要保存
+
+   string obj_name = "KTarget_Param_Store"; // 固定名称
+   
+   // 1. 如果对象不存在，创建它 (使用 OBJ_LABEL 作为数据容器)
+   if(ObjectFind(0, obj_name) == -1) {
+      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true); // 隐藏，不干扰视线
+      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, -100); // 移出屏幕外
+      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   }
+
+   // 2. 拼接核心参数 (顺序必须与 Config_Core.mqh 一致!)
+   // 格式: Smart_Tuning|Scan_Range|La_B|Lb_B|La_T|Lb_T|Max_Look|DB_Thres|LLHH|Model
+   string param_str = 
+      (string)Smart_Tuning_Enabled + "|" +
+      (string)Scan_Range + "|" +
+      (string)Lookahead_Bottom + "|" +
+      (string)Lookback_Bottom + "|" +
+      (string)Lookahead_Top + "|" +
+      (string)Lookback_Top + "|" +
+      (string)Max_Signal_Lookforward + "|" +
+      (string)DB_Threshold_Candles + "|" +
+      (string)Look_LLHH_Candles + "|" +
+      (string)Find_Target_Model;
+
+   // 3. 写入对象描述
+   ObjectSetString(0, obj_name, OBJPROP_TEXT, param_str);
+   
+   // 打印日志方便确认
+   Print(" 参数已同步至图表: ", param_str);
 }
