@@ -696,6 +696,7 @@ void CheckBearishSignalConfirmation_Default(int target_index, int P2_index, int 
     return;
 }
 
+/*
 //+------------------------------------------------------------------+
 //| CheckBullishSignalConfirmationV2 (高级增强版)
 //| ------------------------------------------------------------------
@@ -942,6 +943,7 @@ void CheckBearishSignalConfirmationV2(int target_index, int P2_index, int K_Geo_
     
     return;
 }
+*/
 
 //+------------------------------------------------------------------+
 //| CheckBullishSignalConfirmationV3 (做多方向最终完整版)
@@ -994,7 +996,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Enable_V3_Logic)
                 {
                     // 1. 调用内核评分
-                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, true);
+                    sq = EvaluateSignal(Symbol(), Period(), N_Geo, j, P1_price, P2_price, SL_price, true);
                     g_Stats.Add(sq.grade);
                     // [日志] 做多详情
                     if (Test_Print_Detail)
@@ -1083,7 +1085,7 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Enable_V3_Logic)
         {
             // 1. 调用内核评分 (传入 K_Geo_Index)
-            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, true);
+            sq = EvaluateSignal(Symbol(), Period(), N_Geo, K_Geo_Index, P1_price, P2_price, SL_price, true);
             g_Stats.Add(sq.grade);
             // [日志] 做多详情
             if (Test_Print_Detail)
@@ -1178,7 +1180,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
                 if (Enable_V3_Logic)
                 {
                     // 1. 调用内核评分 (注意最后参数 false 代表 Bearish)
-                    sq = EvaluateSignal(Symbol(), Period(), target_index, j, P1_price, P2_price, SL_price, false);
+                    sq = EvaluateSignal(Symbol(), Period(), N_Geo, j, P1_price, P2_price, SL_price, false);
                     g_Stats.Add(sq.grade);
                     if (Test_Print_Detail)
                     {
@@ -1264,7 +1266,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         if (Enable_V3_Logic)
         {
             // 1. 调用内核评分 (传入 K_Geo_Index)
-            sq = EvaluateSignal(Symbol(), Period(), target_index, K_Geo_Index, P1_price, P2_price, SL_price, false);
+            sq = EvaluateSignal(Symbol(), Period(), N_Geo, K_Geo_Index, P1_price, P2_price, SL_price, false);
             g_Stats.Add(sq.grade);
             if (Test_Print_Detail)
             {
@@ -1462,7 +1464,7 @@ double Calculate_Space_Factor(string sym, int period, double p1, double p2, int 
 }
 
 // 综合评分系统 (The Brain)
-SignalQuality EvaluateSignal(
+SignalQuality EvaluateSignal_Bug(
    string sym, int period, 
    int anchor_idx, int breakout_idx, 
    double p1, double p2, double sl, 
@@ -1517,6 +1519,130 @@ SignalQuality EvaluateSignal(
       }
    }
    
+   return sq;
+}
+
+// 综合评分系统 (The Brain)
+SignalQuality EvaluateSignal(
+   string sym, int period, 
+   int n_geo_input, int breakout_idx, 
+   double p1, double p2, double sl, 
+   bool is_bullish
+) {
+   SignalQuality sq;
+   sq.grade = GRADE_NONE;
+   
+   // --- A. 基础计算 ---
+   double atr = iATR(sym, period, 14, breakout_idx);
+   if(atr==0) atr = Point;
+   
+   double close_price = iClose(sym, period, breakout_idx);
+   int n_geo = n_geo_input;
+
+   // ✅ 修复：使用全局参数 DB_Threshold_Candles 进行动态判断
+   // 只有跨度达到或超过阈值 (例如 >= 3) 才算是 DB
+   sq.is_DB = (n_geo >= DB_Threshold_Candles);
+
+   // 否则就是 IB (快速爆发)
+   sq.is_IB = (n_geo < DB_Threshold_Candles);
+   
+   // --- B. 结构与CB判定 ---
+   if (is_bullish) {
+      if (p2 < p1) { sq.grade = GRADE_F; sq.description = "结构破坏(P2<P1)"; return sq; }
+      sq.is_CB = (close_price > p2);
+   } else {
+      if (p2 > p1) { sq.grade = GRADE_F; sq.description = "结构破坏(P2>P1)"; return sq; }
+      sq.is_CB = (close_price < p2);
+   }
+
+   // --- C. 空间与盈亏比 ---
+   sq.space_factor = Calculate_Space_Factor(sym, period, p1, p2, breakout_idx);
+   double risk = MathAbs(p1 - sl);
+   double reward = MathAbs(p2 - p1);
+   sq.rr_ratio = (risk > 0) ? (reward / risk) : 0;
+   
+   // --- D. 斐波那契目标计算 (针对 Grade A/S) ---
+   double range = MathAbs(close_price - sl);
+   if (is_bullish) sq.target_fib_1618 = sl + range * 1.618;
+   else            sq.target_fib_1618 = sl - range * 1.618;
+
+   /*
+   // --- E. 最终定级逻辑 ---
+   if (sq.is_CB) {
+      // 突破了P2，且空间不是极其微小
+      if (sq.is_DB) { sq.grade = GRADE_S; sq.description = "S级:主导突破(DB+CB)"; }
+      else          { sq.grade = GRADE_A; sq.description = "A级:爆发突破(IB+CB)"; }
+   } 
+   else {
+      // 没过P2，看空间
+      if (sq.space_factor > 1.5) {
+         if (sq.is_DB) { sq.grade = GRADE_B; sq.description = "B级:区间主导(DB)"; }
+         else          { sq.grade = GRADE_C; sq.description = "C级:区间激进(IB)"; }
+      } else {
+         sq.grade = GRADE_D; sq.description = "D级:空间不足";
+      }
+   }
+   */
+
+   // =================================================================
+   // --- E. 最终定级逻辑 (Refactored Logic) ---
+   // 核心思想：结构决定潜力，动作决定触发
+   // =================================================================
+   
+   // 🟢 分支一：如果是 DB 结构 (深幅酝酿)
+   if (sq.is_DB) 
+   {
+       // 既然结构已经满足 DB，我们看它发生了什么动作
+       if (sq.is_CB) 
+       {
+           // 动作：强势突破 P2
+           // 结论：结构深 + 动能足 = 完美 S 级
+           sq.grade = GRADE_S; 
+           sq.description = "S级:主导突破(DB+CB)"; 
+       }
+       else 
+       {
+           // 动作：未突破 P2 (但结构是 DB)
+           // 检查：空间够不够挂单？
+           if (sq.space_factor > 1.5) 
+           {
+               sq.grade = GRADE_B; 
+               sq.description = "B级:区间主导(DB)"; 
+           }
+           else 
+           {
+               sq.grade = GRADE_D; 
+               sq.description = "D级:空间不足"; 
+           }
+       }
+   }
+   // 🔵 分支二：如果是 IB 结构 (快速爆发)
+   else // is_IB
+   {
+       // 结构较短，看看动作
+       if (sq.is_CB) 
+       {
+           // 动作：强势突破 P2
+           // 结论：虽然时间短，但动能极强 = 优秀 A 级
+           sq.grade = GRADE_A; 
+           sq.description = "A级:爆发突破(IB+CB)"; 
+       }
+       else 
+       {
+           // 动作：未突破 P2 且结构短
+           // 结论：通常视为噪音，给 C 级 (或 D)
+           if (sq.space_factor > 1.5) 
+           {
+               sq.grade = GRADE_C; 
+               sq.description = "C级:区间激进(IB)"; 
+           }
+           else 
+           {
+               sq.grade = GRADE_D; 
+               sq.description = "D级:空间不足"; 
+           }
+       }
+   }
    return sq;
 }
 
