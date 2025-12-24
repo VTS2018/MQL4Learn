@@ -44,87 +44,24 @@
 #property indicator_chart_window // 绘制在主图表窗口
 #property indicator_buffers 4 // 两个锚点 + 两个最终信号
 #property indicator_plots   4 // 对应四个绘图
+#include <K5/K_Data.mqh>
 
+// 缓冲区 核心配置 非核心配置 附属配置  会话配置  测试配置 全局变量
+#include <Config7/Define_buffers.mqh>
+#include <Config7/Config_Core.mqh>
+#include <Config7/Config_Non_Core.mqh>
+#include <Config7/Config_Add.mqh>
+// 会话和测试是各自独立的
+#include <Config7/Config_Sessions.mqh>
+#include <Config7/Config_Test.mqh>
+#include <Config7/Config_Global_var.mqh>
 //+------------------------------------------------------------------+
 //| ✅ 配置 数据 工具函数
 //+------------------------------------------------------------------+
-#include <K5/K_Data.mqh>
 #include <K5/K_Utils.mqh>
 #include <K7/K_Logic.mqh>
 #include <K7/K_Drawing_Funcs.mqh>
-
-#include <Config7/Config_Core.mqh>
-//+------------------------------------------------------------------+
-//| ✅ 四个变量开始 将来可能会移除掉 调试控制
-//+------------------------------------------------------------------+
-// extern bool Debug_Print_Info_Once = true; // 是否仅在指标首次加载时打印调试信息 (如矩形范围等)
-// static bool initial_debug_prints_done = false; // 内部标志：是否已完成首次加载时的调试打印
-
-// extern bool Debug_LimitCalculations = true; // 限制运行次数 用于开发调试阶段
-// static int g_run_count = 0; // 记录 OnCalculate 的运行次数
-
-//+------------------------------------------------------------------+
-//| ✅ 专门研究 (OnCalculate)
-//+------------------------------------------------------------------+
-extern int Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
-
-static datetime last_bar_time = 0;   // 记录上次计算时的 K 线时间
-static datetime last_tick_time = 0;  // 记录上次 OnCalculate 触发的时间 (用于区分Tick)
-static int on_calculate_count = 0;   // OnCalculate 【触发次数计数】
-static bool is_initial_load = true;  // 标记是否为首次历史数据加载
-
-// 两个字符串变量用于 OnCalculate 和 OnTimer 之间的通信
-static string on_calc_output_segment = ""; // 存储 OnCalculate 的计算结果部分
-static string on_timer_output_segment = ""; // 存储 OnTimer 的输出结果部分
-
-//+------------------------------------------------------------------+
-//| ✅ 唯一对象名前缀
-//+------------------------------------------------------------------+
-string g_object_prefix = ""; // [V1.32 NEW] 
-
-//+------------------------------------------------------------------+
-//| ✅ 绘图控制开关
-//+------------------------------------------------------------------+
-extern bool Is_DrawFibonacciLines = true; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
-
-//+------------------------------------------------------------------+
-//| ✅ 静态变量：用于检查两次点击之间的间隔，
-//| 以模拟“双击” 将 LastClickTime 改为存储毫秒数 (unsigned long)
-//+------------------------------------------------------------------+
-// static datetime LastClickTime = 0;
-static ulong LastClickTime_ms = 0;
-const ulong DOUBLE_CLICK_TIMEOUT_MS = 500; // 500 毫秒内算作双击
-
-//+------------------------------------------------------------------+
-//| ✅ K_Logic v3.0 Parameters
-//+------------------------------------------------------------------+
-input string   __V3_Settings__   = "=== v3.0 智能增强 ===";
-input bool     Enable_V3_Logic   = true;         // 是否开启 v3 增强逻辑
-input ENUM_SIGNAL_GRADE Min_Alert_Grade = GRADE_B; // 报警最低门槛 (建议 B 或 A)
-
-datetime g_LastAlertTime = 0; // 记录上一次成功报警的K线时间
-
-//+------------------------------------------------------------------+
-//| ✅ [新增] 斐波那契绘图过滤器
-//+------------------------------------------------------------------+
-input bool Show_History_Fibo   = false;  // [开关] 是否显示历史信号的斐波投影 (False=只看当前最新)
-input bool Hide_Invalid_Fibo   = true;   // [智能] 是否隐藏已失效(止损)或已完成(止盈)的信号
-//+------------------------------------------------------------------+
-#include <Config7/Config_Sessions.mqh>
-//+------------------------------------------------------------------+
-//| ✅ [新增] 单元测试控制模块
-//+------------------------------------------------------------------+
-string   __TEST_SETTINGS__  = "=== 内核单元测试 ===";
-bool     Run_Self_Test      = false;      // [开关] 是否在加载时运行 EvaluateSignal 自检
-int      Test_History_Bars  = 1000;       // [范围] 测试扫描的历史K线数量
-bool     Test_Print_Detail  = true;      // [日志] 是否打印每一笔信号的详情
 #include <K7/K_Test.mqh>
-
-// 声明一个全局变量
-SignalStatReport g_Stats;
-//+------------------------------------------------------------------+
-
-#include <Config7/Define_buffers.mqh>
 
 //+------------------------------------------------------------------+
 //| 函数原型
@@ -134,10 +71,6 @@ SignalStatReport g_Stats;
 // bool CheckKTargetTopCondition(int i, int total_bars);
 // void DrawTargetBottom(int target_index);
 // void DrawTargetTop(int target_index);
-
-//| 流程协调者模式，传入所有几何参数，实现解耦
-// void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex);
-// void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex);
 
 //========================================================================
 // 1. OnInit: 指标初始化
@@ -527,58 +460,6 @@ void FindAndDrawTargetCandles(int total_bars)
             CheckBearishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
         }
     }
-}
-
-//========================================================================
-// DrawTargetBottom: 绘图函数，用向上箭头标记 K-Target Bottom (无变化)
-// BullishTargetBuffer[] 函数如果存储最低价格以后 本质上这两个函数就没用了
-//========================================================================
-void DrawTargetBottom(int target_index)
-{
-    if (Is_EA_Mode) return;
-    // 将箭头标记在 K-Target 的最低价之下
-    BullishTargetBuffer[target_index] = Low[target_index] - 10 * Point();
-
-    /*
-    // 2.0 修复看跌阴线锚点丢失的 问题 需要将锚点标注代码 放在这里
-    // --- DrawTargetBottom 的真正逻辑 其实转到了这里
-    if (Is_EA_Mode)
-    {
-        // 目标： 在 {EA}模式下，停止在锚点 {i} 处写入 {SL}价格，仅保留人工模式下的绘图价格赋值。
-        // 🚨 修正：移除 EA 模式下的 BullishTargetBuffer[i] 赋值 🚨
-        // 即EA模式下 不需要对看涨锚点和看跌锚点进行 缓冲区写入，只保留人工模式下的写入
-        // BullishTargetBuffer[i] = Low[AbsLowIndex];
-    }
-    else
-    {
-        BullishTargetBuffer[i] = Low[i] - 10 * Point();
-    }
-    // --- 结束 DrawTargetBottom
-    */
-}
-
-//========================================================================
-// DrawTargetTop: 绘图函数，用向下箭头标记 K-Target Top (无变化)
-//========================================================================
-void DrawTargetTop(int target_index)
-{
-    if (Is_EA_Mode) return;
-    // 将箭头标记在 K-Target 的最高价之上
-    BearishTargetBuffer[target_index] = High[target_index] + 10 * Point();
-    
-    /*
-    // 2.0 修复
-    // --- DrawTargetTop 的真正逻辑 其实转到了这里
-    if (Is_EA_Mode)
-    {
-        // BearishTargetBuffer[i] = High[AbsHighIndex];
-    }
-    else
-    {
-        BearishTargetBuffer[i] = High[i] + 10 * Point();
-    }
-    // --- 结束DrawTargetTop
-    */
 }
 
 void Init_Smart_Tuning()
