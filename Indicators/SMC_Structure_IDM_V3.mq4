@@ -14,6 +14,11 @@ input color    ColorCHOCH    = clrRed;  // CHoCH 颜色
 input color    ColorIDM      = clrOrange; // IDM 颜色
 input color    ColorStructure= clrGray; // 结构连线颜色
 
+// >>> [新增] 强结构点水平线颜色设置
+input color    ColorStrongLow = clrDeepSkyBlue; // 强低点水平线 (支撑)
+input color    ColorStrongHigh= clrMagenta;     // 强高点水平线 (阻力)
+// <<< [新增结束]
+
 //--- buffers
 double         HighBuffer[];
 double         LowBuffer[];
@@ -74,6 +79,23 @@ void DrawText(string name, int idx, double price, string text, color clr, int an
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    }
 }
+
+// >>> [新增] 专门画结构点水平射线的函数
+void DrawStructuralLine(string name, int idx, double price, color clr)
+{
+   if(idx < 0) return;
+   if(ObjectFind(0, name) < 0) {
+      // 使用 OBJ_TREND，但起点和终点价格一样，形成水平线
+      // Time[0] 代表延伸到当前，配合 RAY_RIGHT=true 形成无限延伸支撑位
+      ObjectCreate(0, name, OBJ_TREND, 0, Time[idx], price, Time[0], price); 
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, name, OBJPROP_WIDTH, 1); // 线宽
+      ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true); // 开启向右射线
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+   }
+}
+// <<< [新增结束]
 
 //+------------------------------------------------------------------+
 //| Custom indicator iteration function                              |
@@ -210,7 +232,30 @@ int OnCalculate(const int rates_total,
            DrawLine("SMC_BOS_Bull", fractalHighs_idx[1], fractalHighs_price[1], fractalHighs_idx[0], fractalHighs_price[1], ColorBOS);
            DrawText("SMC_BOS_Bull_Txt", fractalHighs_idx[0], fractalHighs_price[1], "BOS", ColorBOS, ANCHOR_LEFT_LOWER);
        }
-       
+
+           // >>> [新增] 寻找干掉高点的低点 (Strong Low) 并画水平线 >>>
+           int startIdx = fractalHighs_idx[1]; // 旧高点
+           int endIdx = fractalHighs_idx[0];   // 新高点
+           int strongLowIdx = -1;
+           double minPrice = 999999;
+           
+           // 在两个高点之间找最低点
+           for(int m=0; m<lCount; m++) {
+               int currIdx = fractalLows_idx[m];
+               if(currIdx < startIdx && currIdx > endIdx) {
+                   if(fractalLows_price[m] < minPrice) {
+                       minPrice = fractalLows_price[m];
+                       strongLowIdx = currIdx;
+                   }
+               }
+           }
+           
+           if(strongLowIdx != -1) {
+               // 你的要求：画一条水平趋势线，不用圆点
+               DrawStructuralLine("SMC_StrongLow_Line", strongLowIdx, minPrice, ColorStrongLow);
+           }
+           // <<< [新增结束]
+
        // Bullish CHoCH: 价格向上突破了最近的“强高点”
        // 如果现在的收盘价 > 最近的高点，且最近的走势看起来像是刚结束下跌
        if(close[1] > fractalHighs_price[0]) {
@@ -229,7 +274,30 @@ int OnCalculate(const int rates_total,
            DrawLine("SMC_BOS_Bear", fractalLows_idx[1], fractalLows_price[1], fractalLows_idx[0], fractalLows_price[1], ColorBOS);
            DrawText("SMC_BOS_Bear_Txt", fractalLows_idx[0], fractalLows_price[1], "BOS", ColorBOS, ANCHOR_LEFT_UPPER);
        }
-       
+
+           // >>> [新增] 寻找干掉低点的高点 (Strong High) 并画水平线 >>>
+           int startIdx = fractalLows_idx[1]; // 旧低点
+           int endIdx = fractalLows_idx[0];   // 新低点
+           int strongHighIdx = -1;
+           double maxPrice = 0;
+           
+           // 在两个低点之间找最高点
+           for(int m=0; m<hCount; m++) {
+               int currIdx = fractalHighs_idx[m];
+               if(currIdx < startIdx && currIdx > endIdx) {
+                   if(fractalHighs_price[m] > maxPrice) {
+                       maxPrice = fractalHighs_price[m];
+                       strongHighIdx = currIdx;
+                   }
+               }
+           }
+           
+           if(strongHighIdx != -1) {
+               // 你的要求：画一条水平趋势线，不用圆点
+               DrawStructuralLine("SMC_StrongHigh_Line", strongHighIdx, maxPrice, ColorStrongHigh);
+           }
+           // <<< [新增结束]
+
        // Bearish CHoCH: 价格向下跌破了最近的“强低点”
        if(close[1] < fractalLows_price[0]) {
            DrawLine("SMC_CHoCH_Bear", fractalLows_idx[0], fractalLows_price[0], 0, fractalLows_price[0], ColorCHOCH);
