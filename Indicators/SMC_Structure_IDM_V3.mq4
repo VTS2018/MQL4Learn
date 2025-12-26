@@ -213,7 +213,7 @@ int OnCalculate(const int rates_total,
        
        // Bullish CHoCH: 价格向上突破了最近的“强高点”
        // 如果现在的收盘价 > 最近的高点，且最近的走势看起来像是刚结束下跌
-       if(close[0] > fractalHighs_price[0]) {
+       if(close[1] > fractalHighs_price[0]) {
            // 这是一个潜在的趋势反转向上
            DrawLine("SMC_CHoCH_Bull", fractalHighs_idx[0], fractalHighs_price[0], 0, fractalHighs_price[0], ColorCHOCH);
            DrawText("SMC_CHoCH_Bull_Txt", 0, fractalHighs_price[0], "CHoCH", ColorCHOCH, ANCHOR_LEFT_LOWER);
@@ -231,7 +231,7 @@ int OnCalculate(const int rates_total,
        }
        
        // Bearish CHoCH: 价格向下跌破了最近的“强低点”
-       if(close[0] < fractalLows_price[0]) {
+       if(close[1] < fractalLows_price[0]) {
            DrawLine("SMC_CHoCH_Bear", fractalLows_idx[0], fractalLows_price[0], 0, fractalLows_price[0], ColorCHOCH);
            DrawText("SMC_CHoCH_Bear_Txt", 0, fractalLows_price[0], "CHoCH", ColorCHOCH, ANCHOR_LEFT_UPPER);
        }
