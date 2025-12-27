@@ -1314,6 +1314,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
     return;
 }
 
+/*
 //+------------------------------------------------------------------+
 //| CheckSignalStatus
 //| 功能: 检查历史信号是否依然有效 (Active)
@@ -1364,6 +1365,7 @@ bool CheckSignalStatus_V1(int signal_index, double sl_price, bool is_bullish)
     // 如果没死也没毕业，那就是“依然在战斗中” (Active)
     return true;
 }
+*/
 
 //+------------------------------------------------------------------+
 //| CheckSignalStatus (最终版)
@@ -1463,6 +1465,7 @@ double Calculate_Space_Factor(string sym, int period, double p1, double p2, int 
    return MathAbs(p2 - p1) / atr;
 }
 
+/*
 // 综合评分系统 (The Brain)
 SignalQuality EvaluateSignal_Bug(
    string sym, int period, 
@@ -1521,6 +1524,7 @@ SignalQuality EvaluateSignal_Bug(
    
    return sq;
 }
+*/
 
 // 综合评分系统 (The Brain)
 SignalQuality EvaluateSignal(
@@ -1659,9 +1663,12 @@ void SendRichAlert(string sym, int period, string type, double price, double sl,
    
    if (sq.grade <= GRADE_D) return; // 过滤低质量
    
+   string per_str = GetTimeframeName(period);
+
+   // 把 M%d 修改为 %s
    string msg = StringFormat(
-      "%s M%d [%s] | %s\n现价: %.5f | SL: %.5f\n因子: %.1f | R:R: %.1f\n",
-      sym, period, type, sq.description, price, sl, sq.space_factor, sq.rr_ratio
+      "%s %s [%s] | %s\n现价: %.5f | SL: %.5f\n因子: %.1f | R:R: %.1f\n",
+      sym, per_str, type, sq.description, price, sl, sq.space_factor, sq.rr_ratio
    );
    
    if(sq.grade >= GRADE_A) msg += StringFormat(">> 目标: %.5f (Fib 1.618)", sq.target_fib_1618);
