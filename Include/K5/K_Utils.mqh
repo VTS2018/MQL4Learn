@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 
 //========================================================================
-// 14. ShortenObjectName: 辅助函数，移除对象名中的指定字符串以缩短名称 (修正版)
+// ShortenObjectName: 辅助函数，移除对象名中的指定字符串以缩短名称 (修正版)
 //========================================================================
 /**
  * 从对象名称中移除 "arget_Finder" 字符串以缩短名称。
@@ -54,6 +54,7 @@ string ShortenObjectNameBot(string original_name)
  * * @param bar_index 要获取时间的 K 线索引 (0 为当前 K线)
  * @return (string) 格式化后的唯一时间标识符，例如 "2025_11_24_06_00_00"
  */
+/*
 string GetBarTimeID_v1(int bar_index)
 {
     datetime target_time;
@@ -99,6 +100,7 @@ string GetBarTimeID_v1(int bar_index)
         
     return time_id_str;
 }
+*/
 
 //========================================================================
 // 18. ParseRectangleName: 解析矩形名称，提取 K 线时间 (V3.00)
@@ -109,6 +111,7 @@ string GetBarTimeID_v1(int bar_index)
  * @param info 引用传递的结构体，用于存储解析结果
  * @return (bool) 成功解析返回 true，否则返回 false
  */
+/*
 bool ParseRectangleName_v1(const string rect_name, ParsedRectInfo &info)
 {
     // 1. 检查类型并确定字符串起始位置
@@ -163,9 +166,10 @@ bool ParseRectangleName_v1(const string rect_name, ParsedRectInfo &info)
     
     return true;
 }
+*/
 
 //+------------------------------------------------------------------+
-//| 辅助函数，将 _Period 的分钟数转换为 MT4 期望的位标志
+//| 辅助函数，将 _Period 的分钟数转换为 MT4 期望的位标志 9个默认周期
 //+------------------------------------------------------------------+
 int GetTimeframeFlag(int timeframe_period)
 {
