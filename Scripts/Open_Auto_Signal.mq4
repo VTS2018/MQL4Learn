@@ -79,15 +79,43 @@ void OnStart()
    // 3. 准备开仓数据
    double entry_price, sl_price, tp_price;
    color arrow_color;
+
+   double p1_from_indicator = 0; // 用于接收指标传来的精确止损
    
    if (op_type == OP_BUY)
    {
       entry_price = Ask;
       arrow_color = clrBlue;
+
+      // ✅ [修改点 1]：尝试以 EA 模式向指标索要 P1 价格 (Buffer 0)
+      // 注意：这里的参数顺序必须与指标输入参数完全一致！
+      // 假设 Is_EA_Mode 是第一个参数，传 true
+      // 如果您有其他参数，必须在这里补齐
+      p1_from_indicator = iCustom(NULL, 0, IND_NAME, true, true, 0, signal_bar);
+
       // 自动止损：读取信号K线的最低价
-      if (Manual_SL_Price > 0) sl_price = Manual_SL_Price;
-      else                     sl_price = iLow(NULL, 0, signal_bar);
-      
+      if (Manual_SL_Price > 0)
+      {
+         sl_price = Manual_SL_Price;
+      }
+      else
+      {
+         // sl_price = iLow(NULL, 0, signal_bar);
+
+         // ✅ [修改点 2]：智能判断
+         if (p1_from_indicator != 0 && p1_from_indicator != EMPTY_VALUE)
+         {
+            sl_price = p1_from_indicator; // 拿到完美的 P1 结构止损！
+            Print(" 成功获取结构性止损 P1: ", sl_price);
+         }
+         else
+         {
+            // 兜底方案：万一读不到，就用 K 线最低价 (虽然不完美，但能保命)
+            sl_price = iLow(NULL, 0, signal_bar);
+            Print(" 警告：未获取到 P1，降级使用 K 线最低价: ", sl_price);
+         }
+      }
+
       if (sl_price >= entry_price) { Alert(" 错误：多单止损必须低于现价"); return; }
       tp_price = entry_price + (entry_price - sl_price) * RewardRatio;
    }
@@ -95,10 +123,29 @@ void OnStart()
    {
       entry_price = Bid;
       arrow_color = clrRed;
+      p1_from_indicator = iCustom(NULL, 0, IND_NAME, true, true, 1, signal_bar);
+
       // 自动止损：读取信号K线的最高价
-      if (Manual_SL_Price > 0) sl_price = Manual_SL_Price;
-      else                     sl_price = iHigh(NULL, 0, signal_bar);
-      
+      if (Manual_SL_Price > 0)
+      {
+         sl_price = Manual_SL_Price;
+      }
+      else
+      {
+         // sl_price = iHigh(NULL, 0, signal_bar);
+         // ✅ [修改点 2]：智能判断
+         if (p1_from_indicator != 0 && p1_from_indicator != EMPTY_VALUE)
+         {
+            sl_price = p1_from_indicator; // 拿到完美的 P1 结构止损！
+            Print(" 成功获取结构性止损 P1: ", sl_price);
+         }
+         else
+         {
+            sl_price = iHigh(NULL, 0, signal_bar);
+            Print(" 警告：未获取到 P1，降级使用 K 线最高价: ", sl_price);
+         }
+      }
+
       if (sl_price <= entry_price) { Alert(" 错误：空单止损必须高于现价"); return; }
       tp_price = entry_price - (sl_price - entry_price) * RewardRatio;
    }
@@ -128,8 +175,8 @@ int ScanForLatestSignal(int range, int &out_type)
    for (int i = 1; i <= range; i++)
    {
       // 读取指标值 (使用默认参数)
-      double buy_sig  = iCustom(NULL, 0, IND_NAME, 2, i);
-      double sell_sig = iCustom(NULL, 0, IND_NAME, 3, i);
+      double buy_sig  = iCustom(NULL, 0, IND_NAME, true, true, 2, i);
+      double sell_sig = iCustom(NULL, 0, IND_NAME, true, true, 3, i);
       
       // 检查是否有值 (非 0 且 非 EMPTY_VALUE)
       bool is_buy  = (buy_sig != 0 && buy_sig != EMPTY_VALUE);
@@ -159,7 +206,7 @@ int ScanForSpecificSignal(int range, int mode) // mode 0=Buy, 1=Sell
    // 往历史方向上扫描
    for (int i = 1; i <= range; i++)
    {
-      double sig = iCustom(NULL, 0, IND_NAME, buffer_idx, i);
+      double sig = iCustom(NULL, 0, IND_NAME, true, true, buffer_idx, i);
       if (sig != 0 && sig != EMPTY_VALUE) return i;
    }
    return -1;
