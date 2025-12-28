@@ -1688,3 +1688,319 @@ double GetGradeWeight(ENUM_SIGNAL_GRADE grade)
       default:      return 0.0;
    }
 }
+
+//+------------------------------------------------------------------+
+//| 🛡️ 参数同步模块：将当前参数保存到隐藏对象，供脚本读取
+//+------------------------------------------------------------------+
+void SaveParamsToChart()
+{
+   if(Is_EA_Mode) return; // EA后台模式不需要保存
+
+   string obj_name = "KTarget_Param_Store"; // 固定名称
+   
+   // 1. 如果对象不存在，创建它 (使用 OBJ_LABEL 作为数据容器)
+   if(ObjectFind(0, obj_name) == -1) {
+      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true); // 隐藏，不干扰视线
+      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, -100); // 移出屏幕外
+      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   }
+
+   // 2. 拼接核心参数 (顺序必须与 Config_Core.mqh 一致!)
+   // 格式: Smart_Tuning|Scan_Range|La_B|Lb_B|La_T|Lb_T|Max_Look|DB_Thres|LLHH|Model
+   string param_str = 
+      (string)Smart_Tuning_Enabled + "|" +
+      (string)Scan_Range + "|" +
+      (string)Lookahead_Bottom + "|" +
+      (string)Lookback_Bottom + "|" +
+      (string)Lookahead_Top + "|" +
+      (string)Lookback_Top + "|" +
+      (string)Max_Signal_Lookforward + "|" +
+      (string)DB_Threshold_Candles + "|" +
+      (string)Look_LLHH_Candles + "|" +
+      (string)Find_Target_Model;
+
+   // 3. 写入对象描述
+   ObjectSetString(0, obj_name, OBJPROP_TEXT, param_str);
+   
+   // 打印日志方便确认
+   Print("---->参数已同步至图表: ", param_str);
+}
+
+void Init_Smart_Tuning()
+{
+    //+------------------------------------------------------------------+
+    // 🚨 检查是否启用智能调优 🚨
+    if (Smart_Tuning_Enabled)
+    {
+        // 1. 获取周期调优后的参数集
+        TuningParameters tuned_params = GetTunedParameters();
+
+        // 2. 将全局外部变量的值覆盖为调优后的值
+        // 这样，主逻辑中所有对这些变量的引用都将自动使用新值。
+        Scan_Range = tuned_params.Scan_Range;
+        Lookahead_Bottom = tuned_params.Lookahead_Bottom;
+        Lookback_Bottom = tuned_params.Lookback_Bottom;
+        Lookahead_Top = tuned_params.Lookahead_Top;
+        Lookback_Top = tuned_params.Lookback_Top;
+        Max_Signal_Lookforward = tuned_params.Max_Signal_Lookforward;
+        Look_LLHH_Candles = tuned_params.Look_LLHH_Candles;
+
+        // 可选：打印日志确认
+        // Print("INFO: Smart Tuning Enabled. Parameters adjusted for Period ", GetTimeframeName(_Period));
+    }
+    //+------------------------------------------------------------------+
+}
+
+void Init_Object_prefix()
+{
+    // long cid = ChartID();
+    // Print("-->[KTarget_Finder5.mq4:152]: cid: ", cid);
+
+    // 1. 获取 ChartID 的绝对值 (long 类型)
+    long full_chart_id = MathAbs(ChartID());
+    // Print("-->[KTarget_Finder5.mq4:156]: full_chart_id: ", full_chart_id);
+
+    // 2. 强制截断 ChartID 到 32 位 int。
+    // 仅保留 ID 的低位部分，使其长度大幅缩短，但仍具有高度唯一性。
+    // int short_chart_id = (int)full_chart_id;
+    int short_chart_id = (int)(full_chart_id % 1000000);
+    // Print("-->[KTarget_Finder5.mq4:161]: short_chart_id: ", MathAbs(short_chart_id));
+
+    // [V1.32 NEW] 生成唯一的对象名前缀
+    g_object_prefix = ShortenObjectName(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
+    // Print("-->[KTarget_Finder5.mq4:165]: g_object_prefix: ", g_object_prefix);
+}
+
+void Init_Buffer()
+{
+    //+------------------------------------------------------------------+
+    // 缓冲区映射设置 (无变化)
+    SetIndexBuffer(0, BullishTargetBuffer);
+    SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, 1, clrBlue);
+    SetIndexArrow(0, ARROW_CODE_UP);
+
+    SetIndexBuffer(1, BearishTargetBuffer);
+    SetIndexStyle(1, DRAW_ARROW, STYLE_SOLID, 1, clrRed);
+    SetIndexArrow(1, ARROW_CODE_DOWN);
+
+    SetIndexBuffer(2, BullishSignalBuffer);
+    SetIndexStyle(2, DRAW_ARROW, STYLE_SOLID, 1, clrLimeGreen);
+    SetIndexArrow(2, ARROW_CODE_SIGNAL_UP);
+
+    SetIndexBuffer(3, BearishSignalBuffer);
+    SetIndexStyle(3, DRAW_ARROW, STYLE_SOLID, 1, clrDarkViolet);
+    SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
+
+    // 初始化所有缓冲区数据为 0.0
+    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
+    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
+    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
+}
+
+void DeInit_DelObject()
+{
+    // ------------------- 1.0 清理对象的迭代代码 -------------------
+    // 清理所有以 "IBDB_Line_" 为前缀的趋势线对象 (P1基准线)
+    // ObjectsDeleteAll(0, "IBDB_Line_");
+    // [V1.22 NEW] 清理所有以 "IBDB_P2_Line_" 为前缀的趋势线对象 (P2基准线)
+    // ObjectsDeleteAll(0, "IBDB_P2_Line_");
+
+    if (!Is_EA_Mode)
+    {
+        /* 1.0
+        // 使用唯一的 g_object_prefix 进行清理
+        for (int i = ObjectsTotal() - 1; i >= 0; i--)
+        {
+            string object_name = ObjectName(i);
+            // 检查对象名称是否包含我们独有的前缀
+            if (StringFind(object_name, g_object_prefix) != -1)
+            {
+                ObjectDelete(0, object_name);
+            }
+        }
+        */
+
+        // 2.0 遍历图表上的所有对象，从后向前扫描
+        for (int i = ObjectsTotal() - 1; i >= 0; i--)
+        {
+            string obj_name = ObjectName(i);
+
+            // 1. 第一层筛选：必须是本指标创建的对象 (匹配前缀)
+            if (StringFind(obj_name, g_object_prefix) != -1)
+            {
+                // 2. 第二层筛选：检查是否为【斐波那契相关对象】(白名单)
+                // 根据名称特征：包含 "_Fibo_" 或 "_FiboHL_" 的都属于斐波组件
+                bool is_fibo_line = (StringFind(obj_name, "_Fibo_") != -1);
+                bool is_fibo_zone = (StringFind(obj_name, "_FiboHL_") != -1);
+
+                // 3. 核心保护逻辑：如果是斐波对象，【跳过删除】，直接进入下一次循环
+                if (is_fibo_line || is_fibo_zone)
+                {
+                    continue; // 🚨 关键语句：保留对象，不执行下面的删除
+                }
+
+                // 4. 只有非斐波对象 (如信号箭头、临时连线等) 才会被删除
+                ObjectDelete(0, obj_name);
+            }
+        }
+
+        // ------------------- 0.0 下面的代码保持不变 -------------------
+        ChartRedraw();
+        Print("---->[KTarget_Finder_MT7.mq4:1067]: OnDeinit 指标卸载 ");
+    }
+}
+
+void HandleObjectClick(string sparam)
+{
+    // sparam 包含了被点击对象的名称。
+    string object_name = sparam;
+    ParsedRectInfo info;
+
+    // 这是您的目标：用户点击了图表对象
+    // Print("    *** 侦测到对象点击事件 (CHARTEVENT_OBJECT_CLICK) ***");
+    // Print("    被点击对象名称 (sparam): ", sparam);
+
+    // 检查是否点击了我们创建的趋势线
+    // if (sparam == g_trendline_name)
+    // {
+    //     Print("    >>> 成功点击了我们的可交互趋势线！ <<<");
+    //     // 此时您可以执行 DrawP1P2Fibonacci() 等自定义操作
+    // }
+
+    // --- 3. 模拟双击检查 ---
+    /* 这种方式没有通过
+    datetime current_time = TimeCurrent();
+    Print("-->[KTarget_Finder5.mq4:308]: current_time: ", current_time);
+
+    Print("-->[KTarget_Finder5.mq4:313]: LastClickTime: ", LastClickTime);
+
+    long time_diff_ms = (current_time - LastClickTime) * 1000; // 转换为毫秒
+    Print("-->[KTarget_Finder5.mq4:311]: time_diff_ms: ", time_diff_ms);
+    */
+
+    // --- 2. 检查是否点击了我们的矩形对象 ---
+    // 矩形对象的名称应该以我们定义的 "Rect_B_" 或 "Rect_S_" 开头
+    if (StringFind(object_name, "Rect_B_", 0) != -1 || StringFind(object_name, "Rect_S_", 0) != -1)
+    {
+        // 1. 获取当前系统启动以来的毫秒数
+        ulong current_time_ms = GetTickCount();
+        // Print("===>[KTarget_Finder5.mq4:320]: current_time_ms: ", current_time_ms);
+        // Print("===>[KTarget_Finder5.mq4:321]: LastClickTime_ms: ", LastClickTime_ms);
+
+        // 2. 计算毫秒差（直接相减就是毫秒数）
+        // 注意：GetTickCount() 返回值可能循环，但对于 500ms 的短期差值是可靠的。
+        ulong time_diff_ms = current_time_ms - LastClickTime_ms;
+        // Print("===>[KTarget_Finder5.mq4:326]: time_diff_ms: ", time_diff_ms);
+
+        if (time_diff_ms > 0 && time_diff_ms < DOUBLE_CLICK_TIMEOUT_MS)
+        {
+            Print(">>> DEBUG: Detected Double Click on Rectangle: ", sparam);
+
+            // 1. 检查是否点击了我们的矩形，并解析名称
+            if (ParseRectangleName(object_name, info))
+            {
+                // 2. 🚨 核心步骤：将绝对时间转换为当前 K 线索引 🚨
+
+                // iBarShift 查找给定时间对应的 K 线索引。
+                // false 参数表示精确匹配 K 线开盘时间。
+                int current_P1_index = iBarShift(NULL, 0, info.P1_time, false);
+                int current_P2_index = iBarShift(NULL, 0, info.P2_time, false);
+
+                // 检查索引是否有效 (通常 >= 0)
+                if (current_P1_index >= 0 && current_P2_index >= 0)
+                {
+                    Print("成功解析并转换时间到索引：P1索引=", current_P1_index, ", P2索引=", current_P2_index);
+
+                    // 3. 调用 DrawP1P2Fibonacci 函数绘制斐波那契线
+                    DrawP1P2Fibonacci(current_P1_index, current_P2_index, info.is_bullish);
+
+                    // 绘制斐波高亮的反转区域
+                    DrawFiboHighlightRectangles(current_P1_index, current_P2_index, info.is_bullish);
+
+                    // 确保 Fibo 立即显示
+                    // ChartRedraw(0);
+                }
+                else
+                {
+                    Print("错误: 无法找到匹配的 K 线索引，数据可能已过期或被移除。");
+                }
+            }
+
+            // 强制重绘，以确保 Fibo 立即显示
+            // ChartRedraw(0);
+
+            // 重置 LastClickTime，避免三次点击被识别为双击 -- 第一次编写的时候 使用 LastClickTime 没有成功 所以注销了
+            // LastClickTime = 0;
+
+            LastClickTime_ms = 0;
+        }
+        else
+        {
+            // 记录第一次点击时间
+            // LastClickTime = current_time;
+
+            // 记录第一次点击时间 (必须大于 0，避免系统启动时记录 0)
+            LastClickTime_ms = current_time_ms;
+        }
+    }
+}
+
+void HandleObjectDelete(string sparam)
+{
+    string deleted_name = sparam;
+    // Print("--->[KTarget_Finder5.mq4:595]: deleted_name: ", deleted_name);
+
+    // 1. 过滤：检查被删除的对象是否为我们指标绘制的 '主' 斐波那契线
+    // 条件：a) 必须包含指标前缀 g_object_prefix
+    //       b) 必须包含 "_Fibo_" (斐波那契主线的标记)
+    //       c) 必须不包含 "_FiboHL_" (排除高亮矩形本身)
+    if (StringFind(deleted_name, g_object_prefix) != -1 &&
+        StringFind(deleted_name, "_Fibo_") != -1 &&
+        StringFind(deleted_name, "_FiboHL_") == -1)
+    {
+        // 2. 提取唯一的锚点 ID 部分: [B/S]_[LongTimeID]
+
+        // 查找 "_Fibo_" 在名称中的起始位置
+        int start_pos = StringFind(deleted_name, "_Fibo_");
+
+        if (start_pos != -1)
+        {
+            // 查找 "_Fibo_" 后面的下划线的位置，即 Fibo_ 后面的下划线
+            int id_start = StringFind(deleted_name, "_", start_pos + 5);
+
+            if (id_start != -1)
+            {
+                // 提取唯一的锚点 ID，例如 "B_2025_11_20_04_00_00"
+                // 从下划线后一位开始截取到字符串末尾
+                string unique_anchor_id = StringSubstr(deleted_name, id_start + 1);
+                // Print("--->[KTarget_Finder5.mq4:627]: unique_anchor_id: ", unique_anchor_id);
+
+                // 3. 遍历图表对象并删除所有包含此 ID 的关联子对象
+                int total_objects = ObjectsTotal(0, 0);
+                string obj_name;
+
+                for (int i = total_objects - 1; i >= 0; i--)
+                {
+                    obj_name = ObjectName(0, i);
+                    // Print("--->[KTarget_Finder5.mq4:636]: obj_name: ", obj_name);
+
+                    // 检查条件：
+                    // a) 必须是 FiboHL 相关的对象 (Rect_FiboHL_...)
+                    // b) 必须包含被删除主线对象的唯一锚点 ID (unique_anchor_id)
+
+                    if (StringFind(obj_name, "_FiboHL_") != -1 &&
+                        StringFind(obj_name, unique_anchor_id) != -1)
+                    {
+                        // Print("--->[KTarget_Finder5.mq4:646]: obj_name: ", obj_name);
+                        // 找到了关联的矩形或文本 (因为文本名称是矩形名称 + _TXT)
+                        ObjectDelete(0, obj_name);
+                    }
+                }
+
+                Print("INFO: Fibo主线手动删除，自动清理相关对象: ", deleted_name);
+            }
+        }
+    }
+}
