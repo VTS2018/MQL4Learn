@@ -80,7 +80,7 @@ void OnStart()
    double entry_price, sl_price, tp_price;
    color arrow_color;
 
-   double p1_from_indicator = 0; // 用于接收指标传来的精确止损
+   double p1_from_indicator = 0.0; // 用于接收指标传来的精确止损
    
    if (op_type == OP_BUY)
    {
