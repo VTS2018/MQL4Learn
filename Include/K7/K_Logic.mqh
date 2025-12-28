@@ -516,8 +516,7 @@ TuningParameters GetTunedParameters()
 void CheckBullishSignalConfirmation_Default(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    // ClearSignalRectangle_v2(abs_lowindex, true); 
-    // ***************************************************************
+    // ClearSignalRectangle_v2(abs_lowindex, true);
 
     // K_Geo_Index 必须有效，否则协调者已经跳过了。
     // P2_price 必须有效，否则协调者已经跳过了。
@@ -616,9 +615,8 @@ void CheckBullishSignalConfirmation_Default(int target_index, int P2_index, int 
 void CheckBearishSignalConfirmation_Default(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_hightindex)
 {
     // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
-    // ClearSignalRectangle_v2(abs_hightindex, false); 
-    // ***************************************************************
-    
+    // ClearSignalRectangle_v2(abs_hightindex, false);
+
     double P1_price = Open[target_index];
     double P2_price = Close[P2_index];
 
