@@ -16,7 +16,7 @@ enum ENUM_TRADE_DIR     { DIR_AUTO, DIR_BUY, DIR_SELL };
 //+------------------------------------------------------------------+
 input string         __TRADE_SET__    = "--- 智能交易指令 ---";
 input ENUM_TRADE_DIR Trade_Direction  = DIR_AUTO;    
-input int            Scan_Range_Bar   = 20;          // 脚本扫描最近多少根K线寻找信号
+input int            Scan_Range_Bar   = 30;          // 脚本扫描最近多少根K线寻找信号
 input int            SL_Lookback      = 50;          // 止损回溯范围
 input double         Manual_SL_Price  = 0.0;         
 
