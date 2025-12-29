@@ -224,13 +224,14 @@ int OnCalculate(const int rates_total,
         Print("=================================================");
     }
     // 2. 判断是否是新 K 线触发
-    else if (time[0] > last_bar_time) 
+    else if (time[0] > last_bar_time)
     {
         g_Stats.Reset();
+
         trigger_type = "NEW BAR (收线触发)";
         if (!Is_EA_Mode)
         {
-            Print("--->[KTarget_Finder5.mq4:332]: trigger_type: ", trigger_type);
+            Print("--->[234]: trigger_type: ", trigger_type);
         }
 
         // 清除缓冲区中的所有旧标记
