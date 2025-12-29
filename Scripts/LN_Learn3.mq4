@@ -1,0 +1,72 @@
+//+------------------------------------------------------------------+
+//|                                                   Helloworld.mq4 |
+//|                                  Copyright 2025, MetaQuotes Ltd. |
+//|                                             https://www.mql5.com |
+//+------------------------------------------------------------------+
+#property copyright "Copyright 2025, MetaQuotes Ltd." // 版权信息
+#property link      "https://www.mql5.com"           // 链接信息
+#property version   "1.00"                           // 版本号
+#property strict                                     // 启用严格编译模式 (推荐)
+
+// --- 时区常量定义 (以秒为单位) ---
+// 北京时间 (UTC+8): +8 小时 * 3600 秒/小时
+#define BEIJING_OFFSET (8 * 3600)
+// 华盛顿哥伦比亚特区 (UTC-5/EST): -5 小时 * 3600 秒/小时
+// 注意：MQL4 脚本不自动处理夏令时 (DST)，此处使用标准的 UTC-5 作为示例。
+#define WASHINGTON_OFFSET (-5 * 3600)
+// 伦敦时间 (UTC+0/GMT): +0 小时 * 3600 秒/小时 (MT4时间本身就是GMT)
+#define LONDON_OFFSET (0 * 3600) 
+
+// --- MQL 脚本的入口函数 ---
+//+------------------------------------------------------------------+
+//| Script program start function                                    |
+//+------------------------------------------------------------------+
+void OnStart()
+  {
+//--- 1. 基础信息输出到日志 (Print) ---
+    Print("==================== MQL4 脚本运行 ====================");
+    Print("Hello World! - 这是脚本的 Print() 输出。");
+    Print("当前货币对: ", Symbol(), "，时间周期: ", Period());
+    Print("=================================================");
+
+//--- 2. 获取目标 K 线时间 ---
+    // 价格数组索引 1 代表最近一根已收盘的 K 线。
+    datetime last_close_time = Time[1]; // MT4 K线时间始终为 GMT/UTC
+    double last_close_price = Close[1];
+    
+    Print("最近一根 K 线的收盘价: ", last_close_price);
+    
+//--- 3. 执行时区转换 ---
+    // a. GMT/UTC 时间 (MQL4 原始时间)
+    string gmt_str = TimeToString(last_close_time, TIME_DATE|TIME_SECONDS);
+    
+    // b. 北京时间 (UTC+8)
+    datetime beijing_time = last_close_time + BEIJING_OFFSET;
+    string beijing_str = TimeToString(beijing_time, TIME_DATE|TIME_SECONDS);
+    
+    // c. 华盛顿时间 (UTC-5)
+    datetime washington_time = last_close_time + WASHINGTON_OFFSET;
+    string washington_str = TimeToString(washington_time, TIME_DATE|TIME_SECONDS);
+    
+    // d. 伦敦时间 (UTC+0)
+    datetime london_time = last_close_time + LONDON_OFFSET;
+    string london_str = TimeToString(london_time, TIME_DATE|TIME_SECONDS);
+    
+//--- 4. 构建图表左上角的输出文本 ---
+    string output_text = 
+        "=== Helloworld 脚本信息 ===\n" +
+        "货币对: " + Symbol() + " | 周期: " + Period() + "\n" +
+        "当前 Bid 价格: " + Bid + "\n" +
+        "---------------------------\n" +
+        "K线收盘时间对比:\n" +
+        "原始 MT4/GMT (UTC+0):  " + gmt_str + "\n" +
+        "北京时间 (UTC+8):      " + beijing_str + "\n" +
+        "华盛顿时间 (UTC-5):    " + washington_str + "\n" +
+        "伦敦时间 (UTC+0/GMT):  " + london_str;
+
+//--- 5. 使用 Comment() 将信息输出到图表左上角 ---
+    Comment(output_text);
+    
+    // 注意：脚本运行完毕后，程序自动结束。
+  }
+//+------------------------------------------------------------------+
