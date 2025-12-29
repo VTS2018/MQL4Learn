@@ -7,6 +7,7 @@
 #property link      "https://www.mql5.com"
 #property version   "1.00"
 #property strict
+#property indicator_chart_window // [修改1] 添加指标窗口属性
 
 input int MaSlwPeriod   = 100;   //慢速均线周期
 
@@ -62,12 +63,27 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {   
-   ObjectsDeleteAll(0, 0, OBJ_LABEL);
+   // ObjectsDeleteAll(0, 0, OBJ_LABEL);
+   // [修改2] 只删除本指标创建的特定对象，防止误删图表上其他文字
+   ObjectDelete(0, "lblMaBig");
+   ObjectDelete(0, "lblMaSmall");
+   ObjectDelete(0, "lblAuthor");
+   ObjectDelete(0, "lblConclusion");
+   ObjectDelete(0, "lblAdvice");
 }
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
-void OnTick()
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
 {
    // 趋势感知
    // 4H慢均线
@@ -111,5 +127,5 @@ void OnTick()
    // 显示操作建议
    ObjectSetString(0,"lblAdvice",OBJPROP_TEXT,advice);
    ObjectSetInteger(0,"lblAdvice",OBJPROP_XDISTANCE,16*StringLen(advice) + 16); 
-   
+   return(rates_total); // 必须返回，供下一次计算参考
 }
