@@ -3,16 +3,14 @@
 //|                        Copyright 2017, MetaQuotes Software Corp. |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2019, 环球外汇网友交流群@Aother,448036253@qq.com"
+#property copyright "Copyright 2019"
 #property link      "https://www.mql5.com"
 #property version   "1.00"
 #property strict
 #property indicator_chart_window // [修改1] 添加指标窗口属性
-
+// 基于 H4 双均线的趋势看板
 input int MaSlwPeriod   = 100;   //慢速均线周期
-
 input int MaFstPeriod = 60;      //快速均线周期
-
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -28,7 +26,7 @@ int OnInit()
    //设置内容
    ObjectSetString(0,"lblMaBig",OBJPROP_TEXT,"4H慢均线");
    ObjectSetString(0,"lblMaSmall",OBJPROP_TEXT,"4H快均线");
-   ObjectSetString(0,"lblAuthor",OBJPROP_TEXT,"作者：环球外汇网@Aother");
+   ObjectSetString(0,"lblAuthor",OBJPROP_TEXT,"作者：K-target");
    ObjectSetString(0,"lblConclusion",OBJPROP_TEXT,"趋势感知");
    ObjectSetString(0,"lblAdvice",OBJPROP_TEXT,"操作建议：无");
    //设置颜色
@@ -90,11 +88,13 @@ int OnCalculate(const int rates_total,
    double maSlw = iMA(_Symbol,PERIOD_H4,MaSlwPeriod,1,MODE_SMA,PRICE_CLOSE,0);
    // 4H快均线
    double maFst = iMA(_Symbol,PERIOD_H4,MaFstPeriod,1,MODE_SMA,PRICE_CLOSE,0);
+
    // 当前K柱价格
    MqlTick  lastTick;
    SymbolInfoTick(_Symbol,lastTick);
    // 取买价和卖价的均值(各自点差的一半)
    double price = (lastTick.bid + lastTick.ask)/2;
+
    string strTMP;
    // 精度减少1位，精确到一个点
    strTMP = "4H慢均线：%." + IntegerToString((int)SymbolInfoInteger(_Symbol,SYMBOL_DIGITS)-1) + "f";
@@ -102,6 +102,10 @@ int OnCalculate(const int rates_total,
    strTMP = "4H快均线：%." + IntegerToString((int)SymbolInfoInteger(_Symbol,SYMBOL_DIGITS)-1) + "f";
    ObjectSetString(0,"lblMaSmall",OBJPROP_TEXT,StringFormat(strTMP,maFst));     
    
+   // 趋势定义：
+   // 强多：价格 > 慢线 且 价格 > 快线 且 快线 > 慢线。
+   // 强空：价格 < 慢线 且 价格 < 快线 且 快线 < 慢线。
+
    // 操作建议
    string advice = "";
    // 强势多头，打死坚决不做空，K价下探触及均线时支撑概率较大
@@ -127,5 +131,6 @@ int OnCalculate(const int rates_total,
    // 显示操作建议
    ObjectSetString(0,"lblAdvice",OBJPROP_TEXT,advice);
    ObjectSetInteger(0,"lblAdvice",OBJPROP_XDISTANCE,16*StringLen(advice) + 16); 
+
    return(rates_total); // 必须返回，供下一次计算参考
 }

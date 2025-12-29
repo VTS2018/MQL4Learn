@@ -83,6 +83,12 @@ int OnInit() {
    return(INIT_SUCCEEDED);
 }
 
+void OnDeinit(const int reason) {
+   // 删除所有以 "PA_" 开头的对象
+   ObjectsDeleteAll(0, "PA_");
+   // Comment("");
+}
+
 //+------------------------------------------------------------------+
 //| 主计算循环
 //+------------------------------------------------------------------+
@@ -92,11 +98,42 @@ int OnCalculate(const int rates_total, const int prev_calculated,
                 const long &tick_volume[], const long &volume[], const int &spread[]) {
    
    int limit = rates_total - prev_calculated;
+
+   /*
    Print("--->[KT_PA_Signal_System.mq4:95]: limit: ", limit);
 
    if(limit > 1000) limit = 1000; // 首次加载只算最近1000根
    if(limit <= 0) return(rates_total);
    Print("--->[KT_PA_Signal_System.mq4:99]: limit: ", limit);
+   */
+
+   // --- [修复逻辑] 动态安全边界计算 ---
+   
+   // 1. 定义我们需要回溯的最大K线数量
+   // Fakey需要+2，KeyLevel需要+InpKeyLevelPeriod，我们多预留几根作为缓冲
+   int max_lookback_needed = InpKeyLevelPeriod + 5; 
+   
+   // 2. 计算允许的最大索引值 (总数 - 回溯需求 - 1)
+   // 举例：总数500，回溯25，那么最大能计算到的索引是 474 (474+25 < 500)
+   int max_safe_limit = rates_total - max_lookback_needed - 1;
+   
+   // 3. 安全性修正：如果图表数据太少(比回溯需求还少)，直接不计算
+   if(max_safe_limit < 1) return(rates_total); 
+
+   // 4. 施加限制：
+   // 情况A: 首次加载(limit很大)，限制在 max_safe_limit 内
+   if(limit > max_safe_limit) limit = max_safe_limit;
+   
+   // 情况B: 正常限制(不要算太多太久远的数据，省资源)
+   if(limit > 1000) limit = 1000; 
+   
+   // 情况C: 实时更新(limit可能很小)，但也必须确保不越界(虽然通常不会，但为了严谨)
+   // (一般实时更新时 limit=1, max_safe_limit 肯定是几千，所以不会触发)
+   
+   // 5. 基础检查
+   if(limit <= 0) return(rates_total);
+
+   // --- [修复结束] ---   
 
    // --- 循环检测每一根K线 ---
    for(int i = limit; i >= 1; i--) { // i=1 表示上一根收盘的K线（确认信号）
@@ -115,15 +152,21 @@ int OnCalculate(const int rates_total, const int prev_calculated,
       if(signal.type == SIG_NONE) continue;
 
       // 2. 关键位过滤 (Filter Layer - 功能3)
-      if(InpFilterKeyLevel) {
-         if(!IsKeyLevel(i, signal.dir, high, low)) continue; // 如果不在关键位，过滤掉
-      }
+      // if(InpFilterKeyLevel) {
+      //    if(!IsKeyLevel(i, signal.dir, high, low)) continue; // 如果不在关键位，过滤掉
+      // }
 
       // 3. 执行层 (Action Layer)
       // 3.1 画图 (功能1)
       if(signal.dir == 1) BufferBuy[i] = low[i] - 10 * Point;
       if(signal.dir == -1) BufferSell[i] = high[i] + 10 * Point;
       
+      // >>> [新增] 3.2 画详细标签 (Object 画文字) <<<
+      // 传入 i (索引), signal (信号详情), time[i] (时间), 以及箭头的位置
+      double drawPrice = (signal.dir == 1) ? low[i] : high[i];
+      CreateSignalObj(i, signal, time[i], drawPrice);
+      // >>> [结束] <<<
+
       // 3.2 报警 (功能2) - 仅针对刚收盘的K线(i=1)报警一次
       if(i == 1 && time[0] != lastAlertTime) {
          SendAlert(signal);
@@ -196,6 +239,9 @@ bool CheckPinBar(int i, const double &open[], const double &close[], const doubl
 bool CheckFakey(int i, const double &high[], const double &low[], const double &close[], const double &open[], PA_Signal &out) {
    // 需要至少3根K线：i+2(母线), i+1(子线/孕线), i(假突破线)
    
+   // [修复] 检查数组长度，防止 i+2 越界
+   if(i >= ArraySize(high) - 2) return false;
+
    // 第一步：i+1 必须是 Inside Bar
    if(high[i+1] < high[i+2] && low[i+1] > low[i+2]) {
       
@@ -222,6 +268,9 @@ bool CheckFakey(int i, const double &high[], const double &low[], const double &
 bool IsKeyLevel(int i, int dir, const double &high[], const double &low[]) {
    // 这是一个简易的支撑阻力判断逻辑
    // 真正的高级用法应该调用ZigZag指标或分形指标
+   
+   // [修复] 检查数组长度，防止 i+InpKeyLevelPeriod 越界
+   if(i + InpKeyLevelPeriod >= ArraySize(high)) return false;
    
    // 逻辑：如果是做多信号，要求当前低点接近过去N根K线的最低点（支撑位）
    if(dir == 1) {
@@ -261,4 +310,71 @@ void SendAlert(PA_Signal &sig) {
    
    Alert(msg);
    // SendNotification(msg); // 如果配置了手机推送，取消注释
+}
+
+//+------------------------------------------------------------------+
+//| 辅助功能：在图表上创建文本标签对象                                   |
+//+------------------------------------------------------------------+
+void CreateSignalObj(int i, const PA_Signal &sig, datetime time, double price) {
+   // 1. 定义对象名称 (必须唯一，包含时间和类型)
+   string name = "PA_" + TimeToString(time) + "_" + IntegerToString(sig.type);
+   
+   // 2. 根据信号类型设定 文字 和 颜色
+   string text = "";
+   color  clr  = clrGray;
+   
+   switch(sig.type) {
+      case SIG_INSIDE_BAR: 
+         text = "IB";      // Inside Bar 简称
+         clr  = clrBlue;   // 孕线用蓝色
+         break;
+      case SIG_ENGULFING:  
+         text = "Eng";     // Engulfing 简称
+         clr  = clrRed;    // 吞没用红色 (或根据方向区分)
+         break;
+      case SIG_PINBAR:     
+         text = "Pin";     // Pin Bar 简称
+         clr  = clrGold;   // Pin Bar 用金色
+         break;
+      case SIG_FAKEY:      
+         text = "Fky";     // Fakey 简称
+         clr  = clrMagenta;// Fakey 用洋红色
+         break;
+      default: return;
+   }
+   
+   // 3. 创建对象 (使用 OBJ_TEXT 纯文字，或者 OBJ_ARROW 带图标)
+   // 这里演示用文字标签，清晰明了
+   if(ObjectFind(0, name) < 0) {
+      ObjectCreate(0, name, OBJ_TEXT, 0, time, price);
+      ObjectSetString(0, name, OBJPROP_TEXT, text);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, 10); // 字体大小
+      ObjectSetString(0, name, OBJPROP_FONT, "Arial Bold");
+      
+      // 4. 设置位置锚点
+      // if(sig.dir == 1) { // 做多信号，文字在K线下方
+      //    ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_TOP);
+      //    // 稍微再往下偏移一点，避免挡住K线
+      //    ObjectSetDouble(0, name, OBJPROP_PRICE, price - 20 * Point); 
+      // } else { // 做空信号，文字在K线上方
+      //    ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_BOTTOM);
+      //    ObjectSetDouble(0, name, OBJPROP_PRICE, price + 20 * Point);
+      // }
+
+      // --- 核心修改：位置与锚点 (实现正中间对齐) ---
+      if(sig.dir == 1) { 
+         // [做多信号]：文字显示在 K线最低价 下方
+         // 设置锚点为 ANCHOR_UPPER (上中)，意味着文字的“顶部中心”对齐坐标点
+         ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_UPPER);
+         ObjectSetDouble(0, name, OBJPROP_PRICE, price - 20 * Point); // 向下偏移一点距离
+      } 
+      else { 
+         // [做空信号]：文字显示在 K线最高价 上方
+         // 设置锚点为 ANCHOR_LOWER (下中)，意味着文字的“底部中心”对齐坐标点
+         ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LOWER);
+         ObjectSetDouble(0, name, OBJPROP_PRICE, price + 20 * Point); // 向上偏移一点距离
+      }
+
+   }
 }
