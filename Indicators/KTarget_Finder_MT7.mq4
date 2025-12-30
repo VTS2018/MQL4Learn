@@ -154,45 +154,6 @@ int OnCalculate(const int rates_total,
                 const long& volume[],    
                 const int& spread[])     
 {
-
-    /** 如果将来调试代码，就将这里的注释去掉，让代码进入到Tick的执行模式 并开启上面的四个变量
-    if (Debug_LimitCalculations)
-    {
-        if (g_run_count >= 3)
-        {
-            // 如果达到限制，阻止进一步计算，直接返回
-            return (rates_total);
-        }
-        g_run_count++; // 每次运行时增加计数
-        // 打印提示信息到日志，便于调试确认
-        Print("DEBUG LIMIT: OnCalculate Run #", g_run_count, " of 3");
-    }
-
-    // 检查是否有 K 线存在
-    if(rates_total < 1) return(0); 
-
-    // 清除缓冲区中的所有旧标记
-    ArrayInitialize(BullishTargetBuffer, EMPTY_VALUE);
-    ArrayInitialize(BearishTargetBuffer, EMPTY_VALUE);
-    ArrayInitialize(BullishSignalBuffer, EMPTY_VALUE);
-    ArrayInitialize(BearishSignalBuffer, EMPTY_VALUE);
-    
-    // 寻找并绘制所有符合条件的 K-Target 及突破信号
-    FindAndDrawTargetCandles(rates_total);
-
-    // [V1.25 NEW] 在第一次完整计算完成后，设置标志位，确保后续的 tick 不再触发调试打印。
-    if (rates_total > prev_calculated) // 检查是否有新数据
-    {
-         if (!initial_debug_prints_done)
-         {
-              initial_debug_prints_done = true;
-         }
-    }
-    
-    // 返回 rates_total 用于下一次调用
-    return(rates_total);
-    */
-
     // ----------------- NEW 切换到真实环境 可以区分Tick触发类型的执行-----------------
 
     // --- 逻辑判断与计数 ---
@@ -367,7 +328,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             break;
     }
 }
-//+------------------------------------------------------------------+
 
 //========================================================================
 // FindAndDrawTargetCandles: 寻找 K-Target 的核心逻辑 (双向) (无变化)
@@ -398,6 +358,8 @@ void FindAndDrawTargetCandles(int total_bars)
             // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
             int K_Geo_Index = FindFirstP1BreakoutIndex(i, true);
             if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+            // 如果返回 0，说明是当前K线正在破，还没收盘，为了不重绘，暂时忽略
+            if (K_Geo_Index == 0) continue;
 
             // 计算突破距离 N_Geo
             int N_Geo = i - K_Geo_Index;
@@ -442,6 +404,7 @@ void FindAndDrawTargetCandles(int total_bars)
             // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
             int K_Geo_Index = FindFirstP1BreakoutIndex(i, false);
             if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+            if (K_Geo_Index == 0) continue;
 
             // 计算突破距离 N_Geo
             int N_Geo = i - K_Geo_Index;
