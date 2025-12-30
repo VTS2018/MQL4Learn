@@ -12,6 +12,13 @@ input color ColorHLine = clrRed;        // 水平线颜色
 input color ColorRay   = clrDeepSkyBlue;// 射线(趋势水平线)颜色
 input int   LineWidth  = 2;             // 线条宽度
 
+//--- [新增] 周期专属颜色设置 (针对浅色背景 229,230,250 优化)
+input color Color_H1   = clrBlue;         // H1 周期颜色
+input color Color_H4   = clrDarkOrange;   // H4 周期颜色
+input color Color_D1   = clrRed;          // D1 周期颜色
+input color Color_W1   = clrDarkGreen;    // W1 周期颜色
+input color Color_MN1  = clrDarkViolet;   // MN1 周期颜色
+
 //--- 内部变量
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
 string btnName1 = "Btn_Draw_HLine";
@@ -28,7 +35,7 @@ int OnInit()
    // 创建UI按钮
    CreateButton(btnName1, "画水平线 (H)", 100, 20, 80, 25, clrGray, clrWhite);
    CreateButton(btnName2, "画射线 (R)",   190, 20, 80, 25, clrGray, clrWhite);
-   
+
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    return(INIT_SUCCEEDED);
   }
@@ -135,12 +142,30 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // -------------------------------------------------------------
             // 执行画图
             // -------------------------------------------------------------
-            string objName = "Draw_" + IntegerToString(GetTickCount());
-            
+            string tfStr = GetPeriodName(Period());
+            string objName = "Draw_" + tfStr + "_" + IntegerToString(GetTickCount());
+            // string objName = "Draw_" + IntegerToString(GetTickCount());
+
+            // --- [新增] 自动匹配周期颜色 ---
+            color finalColor;
+            int p = Period();
+
+            if      (p == PERIOD_H1)  finalColor = Color_H1;
+            else if (p == PERIOD_H4)  finalColor = Color_H4;
+            else if (p == PERIOD_D1)  finalColor = Color_D1;
+            else if (p == PERIOD_W1)  finalColor = Color_W1;
+            else if (p == PERIOD_MN1) finalColor = Color_MN1;
+            else
+            {
+               // 如果不是特定周期，使用默认设置 (区分水平线和射线)
+               finalColor = (drawingState == 1) ? ColorHLine : ColorRay;
+            }
+            // ------------------------------
+
             if(drawingState == 1) // 画水平线
               {
                ObjectCreate(0, objName, OBJ_HLINE, 0, 0, finalPrice);
-               ObjectSetInteger(0, objName, OBJPROP_COLOR, ColorHLine);
+               ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
               }
@@ -148,7 +173,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
               {
                datetime time1 = iTime(NULL, 0, barIndex);
                ObjectCreate(0, objName, OBJ_TREND, 0, time1, finalPrice, Time[0], finalPrice);
-               ObjectSetInteger(0, objName, OBJPROP_COLOR, ColorRay);
+               ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, true);
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
@@ -192,3 +217,23 @@ void CreateButton(string name, string text, int x, int y, int w, int h, color bg
       ObjectSetInteger(0, name, OBJPROP_ZORDER, 10);
      }
   }
+
+//+------------------------------------------------------------------+
+//| [新增] 辅助函数：获取周期短名称
+//+------------------------------------------------------------------+
+string GetPeriodName(int p)
+{
+   switch(p)
+   {
+      case PERIOD_M1:  return "M1";
+      case PERIOD_M5:  return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_M30: return "M30";
+      case PERIOD_H1:  return "H1";
+      case PERIOD_H4:  return "H4";
+      case PERIOD_D1:  return "D1";
+      case PERIOD_W1:  return "W1";
+      case PERIOD_MN1: return "MN";
+   }
+   return "Unknown";
+}
