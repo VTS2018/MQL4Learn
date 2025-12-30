@@ -238,12 +238,15 @@ int OnCalculate(const int rates_total,
     }
 
     // ---------------------------------------------------------
-    // 🌍 [新增] 绘制市场时段模块
+    // [新增] 绘制市场时段模块
     // ---------------------------------------------------------
-    // 仅在历史加载或新K线时绘制，避免每个Tick都重绘，节省资源
-    if (Show_Sessions && (prev_calculated == 0 || time[0] > last_bar_time))
+    if (Period() <= PERIOD_H1)
     {
-        DrawMarketSessions(Session_Lookback, Server_Time_Offset);
+        // 仅在历史加载或新K线时绘制，避免每个Tick都重绘，节省资源
+        if (Show_Sessions && (prev_calculated == 0 || time[0] > last_bar_time))
+        {
+            DrawMarketSessions(Session_Lookback, Server_Time_Offset);
+        }
     }
 
     return(rates_total);

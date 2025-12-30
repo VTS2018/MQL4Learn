@@ -970,7 +970,11 @@ void CheckBullishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
         {
             if (j < 0) break;
-            
+            // >>>>>>>>> 【新增补丁】 <<<<<<<<<
+            // 强制跳过当前正在跳动的 K 线 (Index 0)，只看已收盘的 (Index >= 1)
+            if (j == 0) continue;
+            // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
             // [确认点] P2 突破
             if (Close[j] > P2_price)
             {
@@ -1156,6 +1160,7 @@ void CheckBearishSignalConfirmation(int target_index, int P2_index, int K_Geo_In
         for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
         {
             if (j < 0) break;
+            if (j == 0) continue;
             
             // [确认点] P2 向下突破 (Close < P2)
             if (Close[j] < P2_price) 
