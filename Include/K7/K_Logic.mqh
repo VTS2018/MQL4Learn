@@ -1701,10 +1701,28 @@ void SaveParamsToChart()
    // 1. 如果对象不存在，创建它 (使用 OBJ_LABEL 作为数据容器)
    if(ObjectFind(0, obj_name) == -1) {
       ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true); // 隐藏，不干扰视线
-      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, -100); // 移出屏幕外
-      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      // ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true); // 隐藏，不干扰视线
+      // ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, -100); // 移出屏幕外
+      // ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    }
+
+   // --- 核心修改：调整位置属性 (顶部居中) ---
+
+   // 2. 设置锚点为顶部中心 (关键：这会让文字以 X 坐标为中心向两边分布)
+   ObjectSetInteger(0, obj_name, OBJPROP_ANCHOR, ANCHOR_TOP);
+
+   // 3. 设置角部为左上角 (作为坐标计算的基准)
+   ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+
+   // 4. 动态计算 X 坐标：获取图表当前像素宽度，除以 2 得到中心点
+   int chart_width = (int)ChartGetInteger(0, CHART_WIDTH_IN_PIXELS);
+   ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, chart_width / 2);
+
+   // 5. 设置 Y 坐标：距离图表最顶部 20 像素，避免紧贴边缘
+   ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, 10);
+
+   // 6. 取消隐藏 (原代码设置为 true 且移出屏幕，现在改为可见)
+   ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
 
    // 2. 拼接核心参数 (顺序必须与 Config_Core.mqh 一致!)
    // 格式: Smart_Tuning|Scan_Range|La_B|Lb_B|La_T|Lb_T|Max_Look|DB_Thres|LLHH|Model
