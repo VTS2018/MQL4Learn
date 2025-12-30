@@ -180,7 +180,7 @@ int OnCalculate(const int rates_total,
         FindAndDrawTargetCandles(rates_total);
 
         Print("=================================================");
-        Print(">>> KTarget 历史信号全量统计完成 <<<");
+        Print(">>> KTarget 历史信号全量统计完成【prev_calculated】 <<<");
         Print(g_Stats.ToString());
         Print("=================================================");
     }
@@ -203,6 +203,11 @@ int OnCalculate(const int rates_total,
 
         // 寻找并绘制所有符合条件的 K-Target 及突破信号
         FindAndDrawTargetCandles(rates_total);
+
+        Print("=================================================");
+        Print(">>> KTarget 历史信号全量统计完成【NEW BAR (收线触发)】 <<<");
+        Print(g_Stats.ToString());
+        Print("=================================================");
     }
     // 3. 判断是否是 Tick 触发
     else if (current_time > last_tick_time && rates_total == prev_calculated)
@@ -213,7 +218,7 @@ int OnCalculate(const int rates_total,
     {
         trigger_type = "Tick Update (Same Time)";
     }
-        
+
     // 4. 更新全局静态变量
     last_bar_time = time[0];
     last_tick_time = current_time;
