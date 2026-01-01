@@ -330,13 +330,28 @@ void OnTick()
    // ==========================================================================
 
    // 🚨 新版核心扫描逻辑：循环“有效信号列表 X” 🚨
-   for (int i = 0; i < total_valid_signals; i++)
-   {
+   // for (int i = 0; i < total_valid_signals; i++)
+   // {
       // 注意这里 上面的代码 会将最新且有效的信号 即K[1] 排在列表的 第一个元素
       // signal_item 就是当前最新的有效信号，full_data 则是信号的 另一个信息载体
 
       // A. 从列表中提取关键信息
-      FilteredSignal signal_item = sorted_valid_signals[i];
+      // FilteredSignal signal_item = sorted_valid_signals[i];
+
+      // 这里我移除了for循环只执行第一个信号
+      // 1. 直接提取列表中排在第一位（最新）的信号
+      // (注意：前面的代码已经保证了 total_valid_signals > 0，所以这里取 [0] 是安全的)
+      FilteredSignal signal_item = sorted_valid_signals[0];
+
+      // 2. 🚨【核心修改】严格过滤条件：必须是 K[1] 🚨
+      // 如果列表里最新的信号是 K[2]、K[3] 等历史信号，说明 K[1] 没有信号，直接由 return 结束本次 OnTick
+      if (signal_item.shift != 1)
+      {
+         // 调试打印 (可选)
+         // Print("--- 最新信号位于 K[", signal_item.shift, "]，不是 K[1]，本轮忽略 ---");
+         return;
+      }
+
       int current_shift = signal_item.shift;
       Print("===>[366]: 循环遍历过滤后的信号列表 查看是否包含K[1] 最新信号 current_shift: ", current_shift, " 信号时间: ", signal_item.signal_time, " 信号类型: ", (signal_item.type == OP_BUY ? "BUY 信号" : "SELL 信号"));
 
@@ -364,7 +379,7 @@ void OnTick()
          // 🚨 4.1 新增：利润空间检查 (Reward/Risk Check) 🚨
          // 位置对了，还要看有没有肉吃（盈亏比）
          // ==========================================================================
-         
+         /*
          bool is_space_sufficient = false;
          
          // 准备计算参数
@@ -391,9 +406,16 @@ void OnTick()
          if (!is_space_sufficient)
          {
              Print(" [RiskControl] 信号 K[", current_shift, "] 被拒绝：盈亏比空间不足 (Reward/Risk < 阈值)。");
-             continue; // 🚨 跳过当前信号，继续循环检查下一个（如果有的话），或者直接退出循环
+             // continue; // 🚨 跳过当前信号，继续循环检查下一个（如果有的话），或者直接退出循环
+             return;// 如果使用for循环 注销 return
          }
-         
+         */
+
+         if (ValidateSignalSpace(signal_item.type, current_shift, full_data, clean_bulls, clean_bears) == false)
+         {
+             return; // 空间不足，直接退出本次 OnTick
+         }
+
          // ==========================================================================
          // 🚨 新增：反向距离震荡过滤
          if (CheckHedgeDistance(signal_item.type) == false)
@@ -423,7 +445,7 @@ void OnTick()
 
          return;
       }
-   }
+   // }
 
    //+------------------------------------------------------------------+
 }
@@ -683,4 +705,41 @@ void Init_Prefix()
    int short_chart_id = (int)(full_chart_id % 1000000);
    g_object_prefix = ShortenObjectNameBot(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
    Print("--->[196]: g_object_prefix: ", g_object_prefix);
+}
+
+//+------------------------------------------------------------------+
+//| ValidateSignalSpace
+//| 功能：封装利润空间检查逻辑 (盈亏比检查)
+//| 返回：true = 空间充足，允许交易; false = 空间不足，禁止交易
+//+------------------------------------------------------------------+
+bool ValidateSignalSpace(int type, int shift, const KBarSignal &data, FilteredSignal &bulls[], FilteredSignal &bears[])
+{
+   bool is_space_sufficient = false;
+   
+   // 准备计算参数
+   double check_entry = Close[shift]; // 粗略估算的入场价 (K线收盘价)
+   double check_sl    = 0.0;
+
+   // --- 分类检查 ---
+   if (type == OP_SELL)
+   {
+       check_sl = data.BearishStopLossPrice;
+       // 检查做空空间：传入【看涨列表 clean_bulls】作为下方的支撑障碍物
+       is_space_sufficient = CheckProfitSpace(OP_SELL, check_entry, check_sl, bulls);
+   }
+   else if (type == OP_BUY)
+   {
+       check_sl = data.BullishStopLossPrice;
+       // 检查做多空间：传入【看跌列表 clean_bears】作为上方的阻力障碍物
+       is_space_sufficient = CheckProfitSpace(OP_BUY, check_entry, check_sl, bears);
+   }
+   
+   // --- 决策与日志 ---
+   if (!is_space_sufficient)
+   {
+       Print(" [RiskControl] 信号 K[", shift, "] 被拒绝：盈亏比空间不足 (Reward/Risk < 阈值)。");
+       return false;
+   }
+   
+   return true; // 通过检查
 }

@@ -179,7 +179,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
       }
    }
 
-
+/* 暂时关闭 区间回踩的检查 让逻辑检查尽可能的减少
    // =================================================================
    // 逻辑 B: 同向区间回踩检查 (Zone Retest)
    // 场景：当前是看跌 -> 检查是否回踩了最近一个历史【看跌】信号的内部风险区
@@ -266,6 +266,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
          break;
       }
    }
+*/
 
    // 如果都不满足
    return 0;

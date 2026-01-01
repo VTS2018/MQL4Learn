@@ -74,7 +74,7 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
             int current_size = ArraySize(bullish_list);
             ArrayResize(bullish_list, current_size + 1);
 
-            Print("BullishReferencePrice--DoubleToString：",DoubleToString(data.BullishReferencePrice), " Int:", IntegerToString((int)data.BullishReferencePrice));
+            // Print("BullishReferencePrice--DoubleToString：",DoubleToString(data.BullishReferencePrice), " Int:", IntegerToString((int)data.BullishReferencePrice));
             bullish_list[current_size].shift = shift;
             bullish_list[current_size].signal_time = data.OpenTime;
             bullish_list[current_size].confirmation_close = Close[shift];
@@ -96,7 +96,7 @@ void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_l
             int current_size = ArraySize(bearish_list);
             ArrayResize(bearish_list, current_size + 1);
 
-            Print("BearishReferencePrice--DoubleToString：",DoubleToString(data.BearishReferencePrice), " Int:", IntegerToString((int)data.BearishReferencePrice));
+            // Print("BearishReferencePrice--DoubleToString：",DoubleToString(data.BearishReferencePrice), " Int:", IntegerToString((int)data.BearishReferencePrice));
             bearish_list[current_size].shift = shift;
             bearish_list[current_size].signal_time = data.OpenTime;
             bearish_list[current_size].confirmation_close = Close[shift];

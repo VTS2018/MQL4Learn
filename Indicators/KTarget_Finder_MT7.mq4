@@ -204,10 +204,10 @@ int OnCalculate(const int rates_total,
         // 寻找并绘制所有符合条件的 K-Target 及突破信号
         FindAndDrawTargetCandles(rates_total);
 
-        Print("=================================================");
-        Print(">>> KTarget 历史信号全量统计完成【NEW BAR (收线触发)】 <<<");
-        Print(g_Stats.ToString());
-        Print("=================================================");
+        // Print("=================================================");
+        // Print(">>> KTarget 历史信号全量统计完成【NEW BAR (收线触发)】 <<<");
+        // Print(g_Stats.ToString());
+        // Print("=================================================");
     }
     // 3. 判断是否是 Tick 触发
     else if (current_time > last_tick_time && rates_total == prev_calculated)

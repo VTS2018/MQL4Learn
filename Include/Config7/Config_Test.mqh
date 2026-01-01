@@ -11,4 +11,4 @@
 string   __TEST_SETTINGS__  = "=== 内核单元测试 ===";
 bool     Run_Self_Test      = false;      // [开关] 是否在加载时运行 EvaluateSignal 自检
 int      Test_History_Bars  = 1000;       // [范围] 测试扫描的历史K线数量
-bool     Test_Print_Detail  = true;      // [日志] 是否打印每一笔信号的详情
+bool     Test_Print_Detail  = false;      // [日志] 是否打印每一笔信号的详情
