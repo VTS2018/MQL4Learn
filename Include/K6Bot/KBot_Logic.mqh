@@ -27,8 +27,8 @@ double GetIndicatorSignal(int buffer_index, int shift)
        Indi_Max_Signal_Look,
        Indi_DB_Threshold,
        Indi_LLHH_Candles,
-       Indi_Timer_Interval_Seconds,
-       Indi_DrawFibonacci, // 即使不画线，为了函数签名匹配也要传
+       // Indi_Timer_Interval_Seconds,
+       // Indi_DrawFibonacci, // 即使不画线，为了函数签名匹配也要传
        // ... (在这里添加您指标所需的其他关键参数) ...
 
        // --- 缓冲区和 K 线位移 ---
