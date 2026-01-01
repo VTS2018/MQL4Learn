@@ -178,7 +178,7 @@ int CheckSignalContext(int current_shift, int current_type, FilteredSignal &hist
          }
       }
    }
-   
+
 
    // =================================================================
    // 逻辑 B: 同向区间回踩检查 (Zone Retest)

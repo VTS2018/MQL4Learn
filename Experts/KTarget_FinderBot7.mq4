@@ -8,81 +8,25 @@
 #property version "1.00"
 #property strict
 
+//+------------------------------------------------------------------+
+//| ✅ 全局常量与变量
+//+------------------------------------------------------------------+
 #define OP_NONE -1
+#define BTN_CLEANUP_NAME "Btn_CleanShadowData" // 按钮的对象名称
 
 #include <K5/K_Data.mqh>
+
 #include <K5/K_Utils.mqh>
 #include <K6Bot/KBot_Utils.mqh>
 #include <K6Bot/KBot_Logic.mqh>
 #include <K5Bot/KBot_Test.mqh>
 #include <K5Bot/KBot_Draw.mqh>
 
-//+------------------------------------------------------------------+
-//| ✅ --- Bot Core Settings ---
-//+------------------------------------------------------------------+
-input string EA_Version_Tag = "V6";     // 版本信息标签，用于订单注释追踪
-input bool   EA_Master_Switch       = true;     // 核心总开关：设置为 false 时，EA 不执行任何操作
-input bool   EA_Trading_Enabled     = true;    // 设置为 true 时，EA 才执行开仓和平仓操作
-//+------------------------------------------------------------------+
-
-// --- 信号质量评级定义 (与指标保持一致) ---
-enum ENUM_SIGNAL_GRADE {
-   GRADE_S = 5, // 完美信号 (0.5)
-   GRADE_A = 4, // 优秀信号 (0.4)
-   GRADE_B = 3, // 良好信号 (0.3)
-   GRADE_C = 2, //及格信号 (0.2)
-   GRADE_D = 1, // 勉强信号 (0.1)
-   GRADE_F = 0  // 垃圾信号 (0.0)
-};
-
-// --- 策略参数新增 ---
-input ENUM_SIGNAL_GRADE Min_Trade_Grade = GRADE_B; // [过滤器] 最低交易评级：低于此等级不交易
-
-#include <KBot_UI_Panel.mqh> // [新增] 引入 UI 库
-
-// [新增] 定义人工确认模式枚举
-enum ENUM_EXECUTION_MODE {
-   MODE_AUTO_TRADE,      // 全自动模式
-   MODE_MANUAL_CONFIRM   // 人工审核模式
-};
-
-// [新增] 交易请求暂存结构体
-struct PendingTradeRequest {
-   bool     is_active;        // 是否有待处理请求
-   int      type;             // OP_BUY / OP_SELL
-   double   lots;             // 手数
-   double   entry_price;      // 理论入场价
-   double   sl_price;         // 止损
-   double   tp_price;         // 止盈
-   string   comment;          // 注释
-   string   grade_str;        // 评级文本
-   datetime expire_time;      // 超时时间
-};
-
-// [新增] 全局变量
-PendingTradeRequest g_PendingRequest;
-
-// --- 交易执行模式设置 ---
-input ENUM_EXECUTION_MODE Execution_Mode = MODE_MANUAL_CONFIRM; // 交易模式
-input int Confirm_Timeout_Seconds = 300; // 人工确认超时(秒)
-
-//====================================================================
-//| ✅ 策略参数设置 (Strategy Inputs)
-//====================================================================
-input string   __STRATEGY_SETTINGS__ = "--- Strategy Settings ---";
-input int      MagicNumber    = 88888;       // 魔术数字 (EA的身份证)
-
+// 核心配置1
+#include <ConfigBot7/Config_Core.mqh>
 #include <ConfigBot6/Config_CalcPosition.mqh>
-
 #include <ConfigBot7/Config_Indicator.mqh>
-
-//====================================================================
-//| ✅ 全局变量
-//====================================================================
-datetime g_last_bar_time = 0; // 用于新K线检测
-
-input int Indi_LastScan_Range = 300; // 扫描最近多少根 K 线 (Bot 1.0 逻辑)
-input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=P2
+#include <ConfigBot7/Config_Global_var.mqh>
 
 // 下面这些还没有实现
 // input int Trade_Start_Hour = 8; // 开始交易小时 (例如 8)
@@ -92,44 +36,8 @@ input int Min_Signal_Quality = 2; // 最低信号质量要求: 1=IB, 2=P1-DB, 3=
 // input double Daily_Target_Profit_Pips = 200.0; // 日盈利目标 (点数)
 // input int Daily_Max_Trades = 5;                // 日最大交易次数
 
-//+------------------------------------------------------------------+
-//| ✅ 严格过滤版本 只有紧跟信号成立后的 第一根K线 才允许交易
-//+------------------------------------------------------------------+
-extern bool Found_First_Qualified_Signal = false; // 追踪是否已找到第一个合格的信号
-
 #include <ConfigBot6/Config_Fibo.mqh>
-
-//+------------------------------------------------------------------+
-//| ✅ 调试/日志输出设置 (Debug/Logging)
-//+------------------------------------------------------------------+
-input string   __DEBUG_LOGGING__    = "--- Debug/Logging ---";
-input bool     Debug_Print_Valid_List = false; // 是否在日志中打印清洗合并后的有效信号列表 (sorted_valid_signals)
-// input int      Log_Level            = 1;      // 日志级别 (例如 0=关, 1=关键信息, 2=详细)
-
 #include <ConfigBot6/Config_Risk.mqh>
-
-//+------------------------------------------------------------------+
-//| ✅ 唯一对象名前缀
-//+------------------------------------------------------------------+
-string g_object_prefix = "";
-
-//+------------------------------------------------------------------+
-//| ✅ 输入参数: 空间检查模块需要的 最小盈亏比阈值 (建议 1.0 到 1.5)
-//+------------------------------------------------------------------+
-input double Min_Reward_Risk_Ratio = 1.0; // 空间检查模块需要的 最小盈亏比阈值 (建议 1.0 到 1.5) 
-
-//+------------------------------------------------------------------+
-//| ✅ 输入参数建议
-//| 在图表上实时显示当前周期下 品种的ATR数据
-//+------------------------------------------------------------------+
-input bool   Use_Hedge_Filter       = true;  // 开关：是否启用反向距离过滤
-input int    Hedge_ATR_Period       = 14;    // ATR 计算周期
-input double Min_Hedge_Dist_ATR     = 0.5;   // 最小距离系数 (建议 0.5 到 1.0)
-
-//+------------------------------------------------------------------+
-//| ✅ 全局常量与变量
-//+------------------------------------------------------------------+
-#define BTN_CLEANUP_NAME "Btn_CleanShadowData" // 按钮的对象名称
 
 //====================================================================
 // 函数声明
@@ -142,9 +50,11 @@ input double Min_Hedge_Dist_ATR     = 0.5;   // 最小距离系数 (建议 0.5 �
 #include <FunBot6/Lib_RiskControl.mqh>
 #include <FunBot6/Lib_OrderTrack.mqh>
 #include <FunBot6/Lib_CalcPosition.mqh>
+
 #include <FunBot6/KBot_Init_GetInfo.mqh>
 #include <FunBot6/KBot_Logic_Start.mqh>
 #include <FunBot6/KBot_Logic_Second.mqh>
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -159,7 +69,7 @@ int OnInit()
                           Indi_Smart_Tuning, Indi_Scan_Range, 
                           Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
                           Indi_Lookahead_Top, Indi_Lookback_Top,
-                          Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
+                          Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles,
                           2, 0); // 读取 Buffer 2, Index 0
    
    if(GetLastError() == 4802) // ERR_INDICATOR_CANNOT_LOAD
@@ -170,12 +80,8 @@ int OnInit()
 
    Print("KTarget_FinderBot 初始化成功。监控信号中...");
 
-   // 🚨 g_object_prefix 🚨
-   long full_chart_id = MathAbs(ChartID());
-   // int short_chart_id = (int)full_chart_id;
-   int short_chart_id = (int)(full_chart_id % 1000000);
-   g_object_prefix = ShortenObjectNameBot(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
-   Print("--->[196]: g_object_prefix: ", g_object_prefix);
+   // 🚨 初始化对象管理前缀 🚨
+   Init_Prefix();
 
    // 🚨 斐波那契参数初始化 🚨
    InitializeFiboLevels(Fibo_Zone_1, Fibo_Zone_2, Fibo_Zone_3, Fibo_Zone_4);
@@ -183,6 +89,7 @@ int OnInit()
    // 🚨 计算本机与服务器时间差值 🚨
    CalculateAndPrintTimeOffset();
 
+   // 🚨 查看当前品种的一些基础信息 🚨
    Init_GetInfo();
 
    // 🚨 创建右下角的清理按钮 🚨
@@ -413,6 +320,10 @@ void OnTick()
       Print("--- 没有找到历史信号数据 不交易!!! ---");
       return;
    }
+   // else
+   // {
+   //    return;
+   // }
 
    // ==========================================================================
    // 第二阶段：核心执行循环 (只针对精英信号进行决策)
@@ -432,55 +343,6 @@ void OnTick()
       // B. 重新获取完整的指标数据 (为了兼容 CheckSignalAndFilter)
       // 虽然 FilteredSignal 有部分数据，但 CheckSignalAndFilter 可能需要完整的 KBarSignal 结构
       KBarSignal full_data = GetIndicatorBarData(current_shift);
-
-      // =======================================================================
-      // 🧠 [新增] 共享大脑解码器 (Brain Decoder)
-      // =======================================================================
-      // 为了获取含评级的小数(如 3.4)，我们必须直接读取 Buffer，防止被底层截断
-      double raw_signal_value = 0.0;
-      int    signal_type_int  = 0;
-      int    signal_grade_int = 0;
-
-      // 1. 根据信号方向读取对应的指标缓冲区 (2=Buy, 3=Sell)
-      if (signal_item.type == OP_BUY)
-      {
-          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
-                                     Indi_Smart_Tuning, Indi_Scan_Range, 
-                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
-                                     Indi_Lookahead_Top, Indi_Lookback_Top,
-                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
-                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
-                                     // Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo, // 注意：Bot7如果还没加这两个新参数，就先去掉
-                                     2, current_shift); // Buffer 2
-      }
-      else if (signal_item.type == OP_SELL)
-      {
-          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
-                                     // ... 同上的参数 ...
-                                     Indi_Smart_Tuning, Indi_Scan_Range, 
-                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
-                                     Indi_Lookahead_Top, Indi_Lookback_Top,
-                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
-                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
-                                     // Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo,
-                                     3, current_shift); // Buffer 3
-      }
-
-      // 2. 解码 (例如 3.4 -> Type=3, Grade=4)
-      DecodeSignalQuality(raw_signal_value, signal_type_int, signal_grade_int);
-      ENUM_SIGNAL_GRADE current_grade = (ENUM_SIGNAL_GRADE)signal_grade_int;
-
-      // 3. 评级过滤 (Quality Gate)
-      if (current_grade < Min_Trade_Grade)
-      {
-          string grade_str = EnumToString(current_grade);
-          string limit_str = EnumToString(Min_Trade_Grade);
-          Print(" [Bot7过滤] 信号 K[", current_shift, "] 被拒绝。评级不足: ", grade_str, " < 门槛: ", limit_str);
-          continue; // 🚨 跳过当前信号，直接进入下一轮循环
-      }
-      
-      Print(" [Bot7通过] 发现优质信号! 评级: ", EnumToString(current_grade), " (Raw: ", DoubleToString(raw_signal_value, 1), ")");
-      // =======================================================================      
 
       // ----------------------------------------------------
       // 🚨 核心调用更新 🚨
@@ -552,8 +414,7 @@ void OnTick()
          if (trade_command != OP_NONE)
          {
             // D. 找到最新且通过所有检查的信号，执行交易
-            // CalculateTradeAndExecute_V2(full_data, trade_command);
-            CalculateAndConfirm_Trade(full_data, trade_command, current_grade);
+            CalculateTradeAndExecute(full_data, trade_command);
 
             // E. 立即退出！
             // 因为 sorted_valid_signals 是按时间排序的，第一个通过检查的肯定是最新的合规信号。
@@ -576,19 +437,6 @@ void OnTimer()
    CleanUpShadowLedger();
    Print(" [定时器] 3天周期已到，已自动执行影子数据清理。");
 }
-
-//+------------------------------------------------------------------+
-//| Tester function                                                  |
-//+------------------------------------------------------------------+
-// double OnTester()
-// {
-//   //---
-//   double ret = 0.0;
-//   //---
-
-//   //---
-//   return (ret);
-// }
 
 //+------------------------------------------------------------------+
 //| ChartEvent function                                              |
@@ -635,44 +483,6 @@ void OnChartEvent(const int id,
          }
 
       }
-
-      // 👇👇👇 [新增] 人工确认按钮响应 👇👇👇
-      
-      // 🟢 交易员点击 [确认开仓]
-      if (sparam == "KBot_UI_Btn_Confirm_Trade") 
-      {
-         if (g_PendingRequest.is_active)
-         {
-            // 1. 超时检查
-            if (TimeCurrent() > g_PendingRequest.expire_time)
-            {
-               Alert("请求已超时失效，无法执行！");
-               RemoveConfirmPanel();
-               g_PendingRequest.is_active = false;
-               return;
-            }
-            
-            // 2. 执行交易 (提取暂存的数据)
-            // 注意：theoretical_entry 这里我们用暂存的 entry_price 代替
-            ExecuteTrade(g_PendingRequest.type, g_PendingRequest.lots, 
-                         g_PendingRequest.entry_price, g_PendingRequest.sl_price, 
-                         g_PendingRequest.tp_price, g_PendingRequest.entry_price, g_PendingRequest.comment);
-                         
-            // 3. 清理现场
-            RemoveConfirmPanel();
-            g_PendingRequest.is_active = false;
-         }
-      }
-
-      // 🔴 交易员点击 [拒绝/忽略]
-      if (sparam == "KBot_UI_Btn_Reject_Trade")
-      {
-         Print(" 人工拒绝了交易信号。");
-         RemoveConfirmPanel();
-         g_PendingRequest.is_active = false;
-      }
-      // 👆👆👆 [新增结束] 👆👆👆
-
    }
 }
 
@@ -753,7 +563,7 @@ void ExecuteTrade(int type, double lots, double cl, double sl, double tp, double
 //| CalculateTradeAndExecute V2.0
 //| 功能：集成固定手数与以损定仓模式，执行交易
 //+------------------------------------------------------------------+
-void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
+void CalculateTradeAndExecute(const KBarSignal &data, int type)
 {
     // =================================================================
     // 1. 价格准备 (Entry & SL)
@@ -865,85 +675,12 @@ void CalculateTradeAndExecute_V2(const KBarSignal &data, int type)
 // 2. 斐波那契的 Reference Price 必须改为直接使用 Close[1] 来获取，如 CalculateTradeAndExecute 中所示。
 //+------------------------------------------------------------------+
 
-//+------------------------------------------------------------------+
-//| DecodeSignalQuality
-//| 功能: 解码指标传来的浮点数 (例如 3.4 -> Type=3, Grade=4)
-//| 输出: 引用传递 type 和 grade
-//+------------------------------------------------------------------+
-void DecodeSignalQuality(double raw_value, int &out_type, int &out_grade)
+void Init_Prefix()
 {
-   // 1. 提取整数部分作为信号类型 (3=P2, 2=DB)
-   out_type = (int)raw_value;
-   
-   // 2. 提取小数部分作为评级
-   // 算法: (3.4 - 3.0) * 10 = 0.4 * 10 = 4.0 -> Round -> 4
-   // 加上 0.001 防止浮点数精度误差 (如 0.399999)
-   double decimal_part = raw_value - out_type;
-   out_grade = (int)MathRound(decimal_part * 10);
-}
-
-//+------------------------------------------------------------------+
-//| CalculateAndConfirm_Trade
-//| 功能：替代 CalculateTradeAndExecute_V2，增加人工确认逻辑
-//+------------------------------------------------------------------+
-void CalculateAndConfirm_Trade(const KBarSignal &data, int type, ENUM_SIGNAL_GRADE grade)
-{
-    // 1. 基础价格准备 (复用 V2 逻辑)
-    double entry_price = Open[0]; 
-    double sl_price    = (type == OP_BUY) ? data.BullishStopLossPrice : data.BearishStopLossPrice;
-    
-    if (sl_price == 0) { Print("错误：止损价格无效 (0)，取消开仓。"); return; }
-
-    // 2. 计算止盈 (TP)
-    double risk_dist = MathAbs(entry_price - sl_price);
-    double tp_price  = (type == OP_BUY) ? (entry_price + risk_dist * RewardRatio) : (entry_price - risk_dist * RewardRatio);
-
-    // 3. 仓位计算 (调用现有风控逻辑)
-    double trade_lots = 0.0;
-    if (Position_Mode == POS_FIXED_LOT) trade_lots = NormalizeLots(FixedLot);
-    else if (Position_Mode == POS_RISK_BASED) trade_lots = GetPositionSize_V1(entry_price, sl_price, Risk_Mode, Risk_Value);
-
-    if (trade_lots <= 0) { Print("错误：计算手数无效。"); return; }
-
-    // 4. 生成注释
-    string signal_id = GenerateSignalID(data.OpenTime);
-    string risk_info = (Position_Mode == POS_FIXED_LOT) ? "FixLot" : ("Risk:" + DoubleToString(Risk_Value, 1));
-    string comment   = EA_Version_Tag + "|" + signal_id + "|" + risk_info;
-    
-    // 辅助参数
-    double theoretical_entry = Close[1]; 
-    double risk_money_est    = (Position_Mode == POS_RISK_BASED) ? Risk_Value : 0.0; // 仅用于显示
-
-    // ==============================================================
-    // 🚦 核心分流：全自动 vs 人工确认
-    // ==============================================================
-    if (Execution_Mode == MODE_AUTO_TRADE)
-    {
-        // 模式A: 全自动 - 直接开火 (调用原有的 ExecuteTrade)
-        ExecuteTrade(type, trade_lots, theoretical_entry, sl_price, tp_price, entry_price, comment);
-    }
-    else // MODE_MANUAL_CONFIRM
-    {
-        // 模式B: 人工模式 - 拦截并弹窗
-        
-        // 1. 检查是否已有等待中的请求 (防刷屏)
-        if (g_PendingRequest.is_active) return; 
-        
-        // 2. 填充全局请求结构体 (暂存数据)
-        g_PendingRequest.is_active = true;
-        g_PendingRequest.type = type;
-        g_PendingRequest.lots = trade_lots;
-        g_PendingRequest.entry_price = entry_price;
-        g_PendingRequest.sl_price = sl_price;
-        g_PendingRequest.tp_price = tp_price;
-        g_PendingRequest.comment = comment;
-        g_PendingRequest.grade_str = EnumToString(grade);
-        g_PendingRequest.expire_time = TimeCurrent() + Confirm_Timeout_Seconds;
-        
-        // 3. 🎨 绘制 UI 面板 (调用库函数)
-        CreateConfirmPanel(type, trade_lots, entry_price, sl_price, tp_price, g_PendingRequest.grade_str, risk_money_est);
-        
-        PlaySound("alert.wav"); // 声音提示
-        Print(" [人工审核] 信号已挂起，等待确认... 评级: ", g_PendingRequest.grade_str);
-    }
+   // 🚨 g_object_prefix 🚨
+   long full_chart_id = MathAbs(ChartID());
+   // int short_chart_id = (int)full_chart_id;
+   int short_chart_id = (int)(full_chart_id % 1000000);
+   g_object_prefix = ShortenObjectNameBot(WindowExpertName()) + StringFormat("_%d_", MathAbs(short_chart_id));
+   Print("--->[196]: g_object_prefix: ", g_object_prefix);
 }
