@@ -27,4 +27,4 @@ extern int Max_Signal_Lookforward = 20;    // 最大信号确认前瞻 K 线数�
 extern int DB_Threshold_Candles = 3;       // DB 突破的最小 K 线数量 (N >= 3 为 DB, N < 3 为 IB)
 extern int Look_LLHH_Candles = 3;          // 寻找绝对最低和最高价的K线范围查找数量(FindAbsoluteLowIndex)
 
-extern int Find_Target_Model = 1;          // 锚点查找方式
+extern int Find_Target_Model = 1;          // 锚点查找方式 1 是默认查找；2 是更加严格的查找
