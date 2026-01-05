@@ -187,8 +187,28 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectCreate(0, objName, OBJ_TREND, 0, time1, finalPrice, Time[0], finalPrice);
                ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
-               ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, true);
+               ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, false);
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
+               
+               // [新增功能] 在图表右侧价格轴显示射线价格标签
+               string priceLabelName = "PriceLabel_" + tfStr + "_" + IntegerToString(GetTickCount());
+               datetime currentTime = Time[0]; // 当前K线时间
+               ObjectCreate(0, priceLabelName, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, finalPrice);
+               ObjectSetInteger(0, priceLabelName, OBJPROP_COLOR, finalColor);
+               ObjectSetInteger(0, priceLabelName, OBJPROP_WIDTH, 1);
+               ObjectSetInteger(0, priceLabelName, OBJPROP_SELECTABLE, false); // 不可选中，避免干扰
+               ObjectSetInteger(0, priceLabelName, OBJPROP_HIDDEN, true); // 在对象列表中隐藏
+               
+               // [新增功能] 在磁吸的K线上绘制Check标记
+               bool isBullish = (close > open); // 判断阳线/阴线
+               double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
+               string markName = "Mark_" + tfStr + "_" + IntegerToString(GetTickCount());
+               
+               ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
+               ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
+               ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
+               ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
+               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, true);
               }
             
             ChartRedraw();
