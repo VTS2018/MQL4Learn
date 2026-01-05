@@ -100,6 +100,9 @@ int OnInit()
 
     SaveParamsToChart();
 
+    // [新增] 探测服务器时区
+    DetectServerTimeZone();
+
     // 非EA模式下 才启用 定时器和相关的打印逻辑
     if (!Is_EA_Mode)
     {

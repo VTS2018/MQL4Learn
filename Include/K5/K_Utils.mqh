@@ -360,3 +360,73 @@ bool ParseRectangleName(const string rect_name, ParsedRectInfo &info)
     
     return true;
 }
+
+//+------------------------------------------------------------------+
+//| 探测服务器时区函数 (GMT格式) - 优化版
+//+------------------------------------------------------------------+
+void DetectServerTimeZone()
+{
+    // 1. 获取服务器时间和GMT时间（尽量减少调用间隔）
+    datetime server_time = TimeCurrent();  // 服务器当前时间
+    datetime gmt_time = TimeGMT();         // 标准GMT时间
+    
+    // 2. 计算时区偏移（秒）
+    int offset_seconds = (int)(server_time - gmt_time);
+    
+    // 3. 四舍五入到最近的整小时（处理59分钟这种情况）
+    int offset_hours_raw = offset_seconds / 3600;
+    int remainder_seconds = offset_seconds % 3600;
+    
+    // 如果余数超过30分钟（1800秒），则向上取整
+    int offset_hours_rounded;
+    if (MathAbs(remainder_seconds) >= 1800) // 30分钟
+    {
+        offset_hours_rounded = (offset_seconds > 0) ? (offset_hours_raw + 1) : (offset_hours_raw - 1);
+    }
+    else
+    {
+        offset_hours_rounded = offset_hours_raw;
+    }
+    
+    // 4. 计算实际的小时和分钟（用于调试）
+    int offset_hours = offset_seconds / 3600;
+    int offset_minutes = (MathAbs(offset_seconds) % 3600) / 60;
+    int offset_secs = MathAbs(offset_seconds) % 60;
+    
+    // 5. 构建GMT格式字符串（使用四舍五入后的值）
+    string gmt_format;
+    if (offset_hours_rounded == 0)
+    {
+        gmt_format = "GMT+0 (格林威治标准时间)";
+    }
+    else if (offset_hours_rounded > 0)
+    {
+        gmt_format = "GMT+" + IntegerToString(offset_hours_rounded);
+    }
+    else
+    {
+        gmt_format = "GMT" + IntegerToString(offset_hours_rounded);
+    }
+    
+    // 6. 输出详细诊断信息
+    Print("========================================");
+    Print(">>> 服务器时区探测结果 <<<");
+    Print("========================================");
+    Print("服务器时间: ", TimeToString(server_time, TIME_DATE|TIME_SECONDS));
+    Print("GMT 时间:   ", TimeToString(gmt_time, TIME_DATE|TIME_SECONDS));
+    Print("原始偏移:   ", offset_seconds, " 秒 (", offset_hours, "h ", offset_minutes, "m ", offset_secs, "s)");
+    Print("四舍五入:   ", offset_hours_rounded, " 小时");
+    Print("GMT 格式:   ", gmt_format);
+    
+    // 7. 警告信息（如果偏移不是整小时）
+    if (MathAbs(remainder_seconds) > 300) // 超过5分钟误差
+    {
+        Print("   警告: 服务器时区不是标准整点偏移！");
+        Print("   可能原因: 1) 服务器时钟不准确  2) 函数调用时间差  3) 特殊时区");
+        Print("   建议: 手动验证服务器时区设置，或联系券商确认。");
+    }
+    Print("========================================");
+    
+    // 8. 在图表上显示（可选，注释掉避免干扰）
+    // Comment("服务器时区: ", gmt_format);
+}
