@@ -947,7 +947,7 @@ void DrawFiboGradeZones(string sym, int idx, double sl, double close, bool bulli
 }
 
 //========================================================================
-// DrawSignalInfoText: 在信号矩形下方/上方绘制描述文本 (涨+CB+点数)
+// DrawSignalInfoText: 在信号矩形下方/上方绘制描述文本 (涨+CB+点数+止损金额)
 //========================================================================
 void DrawSignalInfoText(int target_index, int signal_index, string type_str, double sl_price, double confirm_price, bool is_bullish)
 {
@@ -958,12 +958,23 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
     double diff = is_bullish ? (confirm_price - sl_price) : (sl_price - confirm_price);
     int points = (int)(diff / Point); 
 
-    // 2. 构建文本内容
-    // 格式: 涨CB(150) 或 跌DB(80)
-    string dir_str = is_bullish ? "涨" : "跌";
-    string text_content = dir_str + type_str + "(" + IntegerToString(points) + ")";
+    // 2. 计算标准手止损金额（美元）
+    // 公式: 止损金额 = 点数 × Point × 合约大小
+    double contract_size = MarketInfo(Symbol(), MODE_LOTSIZE); // 获取合约大小（标准手）
+    double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE);  // 获取每点价值
+    
+    // 止损金额 = 点数 × 每点价值
+    double loss_amount = points * tick_value;
+    
+    // 四舍五入到整数美元
+    int loss_usd = (int)MathRound(loss_amount);
 
-    // 3. 构建对象名称 (必须唯一，关联到锚点)
+    // 3. 构建文本内容
+    // 格式: 涨CB(150)-200$ 或 跌DB(80)-150$
+    string dir_str = is_bullish ? "涨" : "跌";
+    string text_content = dir_str + type_str + "(" + IntegerToString(points) + ")-" + IntegerToString(loss_usd) + "$";
+
+    // 4. 构建对象名称 (必须唯一，关联到锚点)
     string time_id = GetBarTimeID(target_index); // 使用锚点时间作为唯一标识
     string name = g_object_prefix + "SigTxt_" + (is_bullish ? "B_" : "S_") + time_id;
 
