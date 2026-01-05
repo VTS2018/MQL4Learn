@@ -33,8 +33,8 @@ uint lastBtnClickTime = 0;
 int OnInit()
   {
    // 创建UI按钮
-   CreateButton(btnName1, "画水平线 (H)", 100, 20, 80, 25, clrGray, clrWhite);
-   CreateButton(btnName2, "画射线 (R)",   190, 20, 80, 25, clrGray, clrWhite);
+   CreateButton(btnName1, "画水平线 (H)", 150, 20, 80, 25, clrGray, clrWhite);
+   CreateButton(btnName2, "画射线 (R)",   240, 20, 80, 25, clrGray, clrWhite);
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    return(INIT_SUCCEEDED);
