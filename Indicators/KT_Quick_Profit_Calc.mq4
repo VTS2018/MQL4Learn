@@ -11,7 +11,7 @@
 
 //--- 输入参数
 input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
-input color  InpLineColor   = clrGold; // 测距线颜色
+input color  InpLineColor   = clrBlack; // 测距线颜色
 input int    InpLineWidth   = 1;       // 测距线宽度
 input int    InpFontSize    = 10;      // 显示字体大小
 input color  InpTextColor   = clrWhite;// 字体颜色
@@ -107,6 +107,7 @@ void OnChartEvent(const int id,
                CreateLineObject();
                // 创建显示文本对象
                CreateLabelObjects();
+               ChartRedraw(0);
             }
             else
             {
