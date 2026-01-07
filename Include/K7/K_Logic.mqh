@@ -2028,3 +2028,41 @@ void HandleObjectDelete(string sparam)
         }
     }
 }
+
+//+------------------------------------------------------------------+
+//| 根据图表周期获取自适应 ATR 计算周期
+//+------------------------------------------------------------------+
+int GetAdaptiveATRPeriod(int period)
+{
+   switch(period)
+   {
+      case PERIOD_M1:  return 24; // M1 噪音大，使用更长周期平滑
+      case PERIOD_M5:  return 20;
+      case PERIOD_M15: return 14; // 标准周期
+      case PERIOD_M30: return 14;
+      case PERIOD_H1:  return 14;
+      case PERIOD_H4:  return 20; // H4 波动较大，稍微平滑
+      case PERIOD_D1:  return 20;
+      case PERIOD_W1:  return 10; // 周线反应需灵敏
+      default:         return 14;
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 根据图表周期获取自适应 ATR 止损倍数 (Multiplier)
+//+------------------------------------------------------------------+
+double GetAdaptiveATRMultiplier(int period)
+{
+   switch(period)
+   {
+      case PERIOD_M1:  return 3.0; // M1 噪音极大，且点差影响大，给予宽倍数
+      case PERIOD_M5:  return 2.5; // M5 仍属于高噪区
+      case PERIOD_M15: return 2.0; // 短线标准
+      case PERIOD_M30: return 1.8;
+      case PERIOD_H1:  return 1.5; // H1 是非常标准的趋势周期，1.5倍较常用
+      case PERIOD_H4:  return 1.2; // H4 波动值大，缩小倍数以优化盈亏比
+      case PERIOD_D1:  return 1.0; // 日线一倍ATR通常已足够涵盖噪音
+      case PERIOD_W1:  return 1.0;
+      default:         return 1.5;
+   }
+}

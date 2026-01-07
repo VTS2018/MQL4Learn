@@ -1262,3 +1262,62 @@ void DrawSingleSession(datetime day_base, string name, int start_h_gmt, int end_
        ObjectSetInteger(0, txt_name, OBJPROP_SELECTABLE, false);
    }
 }
+
+//+------------------------------------------------------------------+
+//| 在主图表显示当前 ATR 面板 (包含倍数与止损位)
+//+------------------------------------------------------------------+
+void UpdateATRDisplay()
+{
+   if(Is_EA_Mode) return; // EA 模式不显示
+
+   string obj_name = g_object_prefix + "ATR_Dashboard";
+   
+   // 1. 获取自适应参数
+   int atr_period = GetAdaptiveATRPeriod(_Period);      // 获取周期
+   double atr_mult = GetAdaptiveATRMultiplier(_Period); // 获取倍数 [NEW]
+   
+   // 2. 计算数值
+   // 使用 Close[0] 代表当前最新价格 (也可以用 Bid/Ask，但 Close[0] 在指标中更通用)
+   double current_price = Close[0]; 
+   double atr_value = iATR(_Symbol, _Period, atr_period, 0);
+   
+   // 计算止损距离 (ATR * 倍数)
+   double sl_distance = atr_value * atr_mult;
+   
+   // 计算具体的止损价格
+   double buy_sl_price = current_price - sl_distance; // 做多止损在下方
+   double sell_sl_price = current_price + sl_distance; // 做空止损在上方
+
+   // 3. 格式化显示文本
+   // -----------------------------------------------------
+   // ATR(14): 0.00250 | Mult: 1.5x
+   // SL Dist: 375 pts
+   // Buy SL: 1.08500
+   // Sell SL: 1.09250
+   // -----------------------------------------------------
+   string text = "";
+   text += StringFormat("ATR(%d): %.5f  |  Mult: %.1fx\n", atr_period, atr_value, atr_mult);
+   text += StringFormat("SL Space: %d pts\n", (int)(sl_distance / Point)); // 显示点数距离
+   text += "------------------\n";
+   text += StringFormat("Buy SL: %.5f\n", buy_sl_price);
+   text += StringFormat("Sell SL: %.5f", sell_sl_price);
+
+   // 4. 创建或更新标签对象
+   if(ObjectFind(0, obj_name) == -1)
+   {
+      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSetInteger(0, obj_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, 20); // 距右侧
+      ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, 50); // 距顶部
+      ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clrBlack); 
+      ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 9); // 字体稍微调小一点以容纳多行
+      ObjectSetString(0, obj_name, OBJPROP_FONT, "Consolas"); // 使用等宽字体对齐更好看
+      ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
+   }
+   
+   // 更新文本
+   ObjectSetString(0, obj_name, OBJPROP_TEXT, text);
+}

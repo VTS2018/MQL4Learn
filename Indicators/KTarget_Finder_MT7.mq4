@@ -256,6 +256,7 @@ int OnCalculate(const int rates_total,
             DrawMarketSessions(Session_Lookback, Server_Time_Offset);
         }
     }
+    UpdateATRDisplay();
 
     return(rates_total);
 
@@ -399,6 +400,136 @@ void FindAndDrawTargetCandles(int total_bars)
         
         // 2. 检查 K-Target Top (看跌) 锚定条件
         if (IsKTargetTop(i, total_bars))
+        {
+            // 1.0
+            DrawTargetTop(i); 
+            // 检查信号确认逻辑
+            //CheckBearishSignalConfirmation(i);
+
+            // --- V1.31 NEW: 流程协调 (看跌) ---
+
+            // 查找 P2 索引和价格
+            int P2_index = FindP2Index(i, false);
+            if (P2_index == -1) continue; // P2 查找失败，跳过该锚点
+            double P2_price = Close[P2_index];
+
+            // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
+            int K_Geo_Index = FindFirstP1BreakoutIndex(i, false);
+            if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+            if (K_Geo_Index == 0) continue;
+
+            // 计算突破距离 N_Geo
+            int N_Geo = i - K_Geo_Index;
+
+            // 绘制 P1 辅助线 (几何绘制职责)
+            DrawP1Baseline(i, K_Geo_Index, false, P2_price);
+            // --- END V1.31 NEW ---
+
+            // --- V1.35 NEW: 绝对高点阻力线 ---
+            int AbsHighIndex = FindAbsoluteLowIndex(i, Look_LLHH_Candles, Look_LLHH_Candles, false); // 查找绝对最高点
+            if (AbsHighIndex != -1)
+            {
+                // 绘制绝对高点阻力线，向右延伸 15 根 K 线
+                DrawAbsoluteSupportLine(AbsHighIndex, false, 15);
+            }
+            // --- END V1.35 NEW ---
+
+            // 调用信号标记器 (仅传入数据)
+            CheckBearishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsHighIndex);
+        }
+    }
+}
+
+//========================================================================
+// FindAndDrawTargetCandles: 寻找 K-Target 的核心逻辑 (双向) (老实人过滤机制 (The Honest Filter))
+//========================================================================
+void FindAndDrawTargetCandles_The_Honest(int total_bars)
+{
+    // 确定实际循环上限
+    int max_bars_to_scan = MathMin(total_bars, Scan_Range);
+    // int LookAhead_Confirm_Bars = 20; // 老实人模式：必须等右边走出20根确认
+    int LookAhead_Confirm_Bars = MathMax(Lookahead_Bottom, Lookahead_Top);
+
+    // 循环从第一根已收盘 K 线 (i=1) 开始
+    for (int i = 1; i < max_bars_to_scan; i++)
+    {
+        // -------------------------------------------------------------
+        // 【新增逻辑】老实人过滤机制 (The Honest Filter)
+        // -------------------------------------------------------------
+        
+        // 1. 如果当前的 i 小于我们需要的确认根数，说明“还没走完20根”，直接跳过
+        // 这就是“滞后”的体现：最新的 20 根 K 线内，绝不画信号
+        if (i < LookAhead_Confirm_Bars) 
+            continue; 
+
+        // 2. 强制检查右侧 (未来) 的 20 根 K 线
+        bool is_strict_lowest = true;
+        bool is_strict_highest = true;
+
+        for (int k = 1; k <= LookAhead_Confirm_Bars; k++)
+        {
+            // 向右看 (索引减小)：i-k
+            // 如果右边任何一根收盘价/最低价 比 i 还低，说明 i 根本不是底部
+            if (Low[i-k] <= Low[i]) 
+            {
+                is_strict_lowest = false;
+            }
+            // 如果右边任何一根收盘价/最高价 比 i 还高，说明 i 根本不是顶部
+            if (High[i-k] >= High[i])
+            {
+                is_strict_highest = false;
+            }
+        }
+        // -------------------------------------------------------------
+
+        // 1. 检查 K-Target Bottom (看涨) 锚定条件
+        if (is_strict_lowest && IsKTargetBottom(i, total_bars))
+        {
+            // 1.0
+            DrawTargetBottom(i); 
+            // 检查信号确认逻辑 (IB/DB 突破)
+            //CheckBullishSignalConfirmation(i);
+
+            // --- V1.31 NEW: 流程协调 (看涨) ---
+
+            // 查找 P2 索引和价格
+            int P2_index = FindP2Index(i, true);
+            if (P2_index == -1) continue; // P2 查找失败，跳过该锚点
+            double P2_price = Close[P2_index];
+
+            // 查找 P1 突破索引 K_Geo_Index (第一次 P1 突破点)
+            int K_Geo_Index = FindFirstP1BreakoutIndex(i, true);
+            if (K_Geo_Index == -1) continue; // P1 突破失败，跳过该锚点
+            // 如果返回 0，说明是当前K线正在破，还没收盘，为了不重绘，暂时忽略
+            if (K_Geo_Index == 0) continue;
+
+            // 计算突破距离 N_Geo
+            int N_Geo = i - K_Geo_Index;
+
+            // 绘制 P1 辅助线 (几何绘制职责)
+            DrawP1Baseline(i, K_Geo_Index, true, P2_price);
+            // --- END V1.31 NEW ---
+
+            // --- V1.35 NEW: 绝对低点支撑线 ---
+            int AbsLowIndex = FindAbsoluteLowIndex(i, Look_LLHH_Candles, Look_LLHH_Candles, true);
+            //Print("====>[KTarget_Finder4_FromGemini.mq4:298]: AbsLowIndex: ", AbsLowIndex);
+
+            // double lowprice = Low[AbsLowIndex];
+            //Print("====>[KTarget_Finder4_FromGemini.mq4:301]: lowprice: ", lowprice);
+            
+            if (AbsLowIndex != -1)
+            {
+                // 绘制绝对低点支撑线，向右延伸 15 根 K 线
+                DrawAbsoluteSupportLine(AbsLowIndex, true, 15);
+            }
+            // --- END V1.35 NEW ---
+
+            // 调用信号标记器 (仅传入数据)
+            CheckBullishSignalConfirmation(i, P2_index, K_Geo_Index, N_Geo, AbsLowIndex);
+        }
+        
+        // 2. 检查 K-Target Top (看跌) 锚定条件
+        if (is_strict_highest && IsKTargetTop(i, total_bars))
         {
             // 1.0
             DrawTargetTop(i); 
