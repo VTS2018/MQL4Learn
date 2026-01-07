@@ -1,21 +1,37 @@
 //+------------------------------------------------------------------+
 //|                                         KT_Quick_Profit_Calc.mq4 |
-//|                                Copyright 2023, Professional Dev. |
-//|                                            https://www.mql5.com |
+//|                                Copyright 2023, Lovell Cecil.     |
+//|                                            https://www.mql5.com  |
 //+------------------------------------------------------------------+
-#property copyright "Copyright 2023, Professional Dev."
-#property link      "https://www.mql5.com"
+#property copyright "Copyright 2023, Lovell Cecil."
+#property link      "https://www.mql5.com/zh/users/lovellcecil"
 #property version   "1.00"
 #property strict
 #property indicator_chart_window
 
+// >>> 新增这些描述 <<<
+#property description "KT Quick Profit Calc (快速盈亏测算工具)"
+#property description " "
+#property description "功能特点："
+#property description "1. 先点击MT4 十字光标。"
+#property description "2. 按住 Ctrl + 鼠标左键拖拽，即可进行测距。"
+#property description "3. 自动计算点数和对应的金额盈亏。"
+#property description "4. 完美支持黄金、外汇、原油等所有品种。"
+
 //--- 输入参数
-input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
-input color  InpLineColor   = clrBlack; // 测距线颜色
-input int    InpLineWidth   = 1;       // 测距线宽度
-input int    InpFontSize    = 10;      // 显示字体大小
-input color  InpTextColor   = clrWhite;// 字体颜色
-input color  InpBgColor     = clrBlack;// 提示框背景色
+// input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
+// input color  InpLineColor   = clrBlack; // 测距线颜色
+// input int    InpLineWidth   = 1;       // 测距线宽度
+// input int    InpFontSize    = 10;      // 显示字体大小
+// input color  InpTextColor   = clrWhite;// 字体颜色
+// input color  InpBgColor     = clrBlack;// 提示框背景色
+
+input double InpDefaultLots = 0.01;    // Calculation Lots (Default 0.01)
+input color  InpLineColor   = clrBlack; // Measurement Line Color
+input int    InpLineWidth   = 1;       // Line Width
+input int    InpFontSize    = 10;      // Font Size
+input color  InpTextColor   = clrWhite;// Text Color
+input color  InpBgColor     = clrBlack;// Background Color
 
 //--- 全局变量
 string LineObjName = "KT_Calc_Line";
