@@ -238,25 +238,44 @@ void UpdateCalculation(datetime end_time, double end_price, int x, int y)
    // 盈亏金额 = 点数 * 单点价值 * 手数
    double profit_money = points * tick_value * InpDefaultLots;
    
-   // 3. 格式化显示文本
-   string text = "";
-   text += "手数: " + DoubleToString(InpDefaultLots, 2) + "\n";
-   text += "点数: " + DoubleToString(points, 0) + " pts\n";
-   text += "盈亏: " + DoubleToString(profit_money, 2) + " " + AccountCurrency();
+   // 3. 格式化显示文本（每行独立）
+   string lines[];
+   ArrayResize(lines, 3);
+   lines[0] = "手数: " + DoubleToString(InpDefaultLots, 2);
+   lines[1] = "点数: " + DoubleToString(points, 0) + " pts";
+   lines[2] = "盈亏: " + DoubleToString(profit_money, 2) + " " + AccountCurrency();
    
    // 4. 更新文本标签位置 (跟随鼠标)
    // 我们稍微偏移一点坐标，避免挡住鼠标指针
    int offset_x = 15;
    int offset_y = 15;
+   int line_height = 20;  // 每行高度（像素）
    
    // 更新背景框位置
    ObjectSetInteger(0, RectObjName, OBJPROP_XDISTANCE, x + offset_x);
    ObjectSetInteger(0, RectObjName, OBJPROP_YDISTANCE, y + offset_y);
    
-   // 更新文字位置
-   ObjectSetString(0, TextObjName, OBJPROP_TEXT, text);
-   ObjectSetInteger(0, TextObjName, OBJPROP_XDISTANCE, x + offset_x + 5);
-   ObjectSetInteger(0, TextObjName, OBJPROP_YDISTANCE, y + offset_y + 5);
+   // 更新每行文字的位置和内容
+   for(int i = 0; i < ArraySize(lines); i++)
+   {
+      string line_obj_name = TextObjName + "_Line" + IntegerToString(i);
+      
+      if(ObjectFind(0, line_obj_name) == -1)
+      {
+         // 如果对象不存在，创建它
+         ObjectCreate(0, line_obj_name, OBJ_LABEL, 0, 0, 0);
+         ObjectSetInteger(0, line_obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+         ObjectSetInteger(0, line_obj_name, OBJPROP_COLOR, InpTextColor);
+         ObjectSetInteger(0, line_obj_name, OBJPROP_FONTSIZE, InpFontSize);
+         ObjectSetInteger(0, line_obj_name, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, line_obj_name, OBJPROP_HIDDEN, true);
+      }
+      
+      // 更新位置和文本
+      ObjectSetString(0, line_obj_name, OBJPROP_TEXT, lines[i]);
+      ObjectSetInteger(0, line_obj_name, OBJPROP_XDISTANCE, x + offset_x + 5);
+      ObjectSetInteger(0, line_obj_name, OBJPROP_YDISTANCE, y + offset_y + 5 + (i * line_height));
+   }
    
    ChartRedraw(0);
 }
@@ -287,8 +306,8 @@ void CreateLabelObjects()
    if(ObjectFind(0, RectObjName) < 0)
    {
       ObjectCreate(0, RectObjName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, RectObjName, OBJPROP_XSIZE, 300); // 宽
-      ObjectSetInteger(0, RectObjName, OBJPROP_YSIZE, 60);  // 高
+      ObjectSetInteger(0, RectObjName, OBJPROP_XSIZE, 200); // 宽
+      ObjectSetInteger(0, RectObjName, OBJPROP_YSIZE, 75);  // 高
       ObjectSetInteger(0, RectObjName, OBJPROP_BGCOLOR, InpBgColor);
       ObjectSetInteger(0, RectObjName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
       ObjectSetInteger(0, RectObjName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
@@ -297,16 +316,7 @@ void CreateLabelObjects()
       ObjectSetInteger(0, RectObjName, OBJPROP_HIDDEN, true);
    }
    
-   // 创建文字
-   if(ObjectFind(0, TextObjName) < 0)
-   {
-      ObjectCreate(0, TextObjName, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, TextObjName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(0, TextObjName, OBJPROP_COLOR, InpTextColor);
-      ObjectSetInteger(0, TextObjName, OBJPROP_FONTSIZE, InpFontSize);
-      ObjectSetInteger(0, TextObjName, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, TextObjName, OBJPROP_HIDDEN, true);
-   }
+   // 文本标签现在在 UpdateCalculation 中动态创建（支持多行显示）
 }
 
 //+------------------------------------------------------------------+
@@ -316,6 +326,12 @@ void DeleteObjects()
 {
    ObjectDelete(0, LineObjName);
    ObjectDelete(0, RectObjName);
-   ObjectDelete(0, TextObjName);
+   
+   // 删除所有文本行对象
+   for(int i = 0; i < 3; i++)
+   {
+      string line_obj_name = TextObjName + "_Line" + IntegerToString(i);
+      ObjectDelete(0, line_obj_name);
+   }
 }
 //+------------------------------------------------------------------+
