@@ -1407,8 +1407,8 @@ void UpdateCalculation(datetime end_time, double end_price, int x, int y)
    
    // 3. 格式化显示文本
    string text = "";
-   text += "手数: " + DoubleToString(InpDefaultLots, 2) + "\n";
-   text += "点数: " + DoubleToString(points, 0) + " pts\n";
+   text += "手数: " + DoubleToString(InpDefaultLots, 2) + "  ";
+   text += "点数: " + DoubleToString(points, 0) + " pts  ";
    text += "盈亏: " + DoubleToString(profit_money, 2) + " " + AccountCurrency();
    
    // 4. 更新文本标签位置 (跟随鼠标)
