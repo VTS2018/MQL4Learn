@@ -8,7 +8,7 @@
 //+------------------------------------------------------------------+
 //| ✅ [新增] 融合 KT_Quick_Profit_Calc 的配置选项
 //+------------------------------------------------------------------+
-string   __Quick_Profit_Calc__  = "=== Quick_Profit_Calc ===";
+input string   __Quick_Profit_Calc__  = "=== Quick_Profit_Calc ===";
 input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
 input color  InpLineColor   = clrBlack; // 测距线颜色
 input int    InpLineWidth   = 1;       // 测距线宽度

@@ -145,6 +145,8 @@ void OnDeinit(const int reason)
         Comment("");
     }
     DeInit_DelObject();
+    // 删除参数
+    ObjectDelete(0, "KTarget_Param_Store");
     // 清理图表上的对象
     DeleteProfit_CalcObjects();
 }
