@@ -1384,7 +1384,24 @@ void UpdateCalculation(datetime end_time, double end_price, int x, int y)
    
    // 获取当前品种 1手跳动1个Point的价值 (这是核心，自动适配所有品种)
    double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE);
-   
+   if (tick_value <= 0)
+   {
+      // 备用方案：使用合约大小和最小变动来计算
+      double contract_size = MarketInfo(Symbol(), MODE_LOTSIZE);      // 合约大小 (标准手)
+      double tick_size = MarketInfo(Symbol(), MODE_TICKSIZE);         // 最小价格变动
+
+      if(contract_size > 0 && tick_size > 0)
+      {
+         // tick_value = 合约大小 × (Point / TickSize)
+         // 这适用于大多数品种（外汇、黄金、原油等）
+         tick_value = contract_size * (Point / tick_size);
+      }
+      else
+      {
+         // 如果仍然无法获取，使用保底值 1.0（至少显示点数关系）
+         tick_value = 1.0;
+      }
+   }
    // 盈亏金额 = 点数 * 单点价值 * 手数
    double profit_money = points * tick_value * InpDefaultLots;
    
