@@ -55,6 +55,7 @@
 // 会话和测试是各自独立的
 #include <Config7/Config_Sessions.mqh>
 #include <Config7/Config_Test.mqh>
+#include <Config7/Config_Quick_Profit_Calc.mqh>
 #include <Config7/Config_Global_var.mqh>
 //+------------------------------------------------------------------+
 //| ✅ 配置 数据 工具函数
@@ -78,6 +79,9 @@
 //========================================================================
 int OnInit()
 {
+    // 开启鼠标移动事件检测
+    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
+
     // 🚨 关键修正：显式地启用图形对象删除事件监听 🚨
     // 只有设置这个，OnChartEvent 才能接收到 CHARTEVENT_OBJECT_DELETE 事件
     ChartSetInteger(0, CHART_EVENT_OBJECT_DELETE, true);
@@ -141,6 +145,8 @@ void OnDeinit(const int reason)
         Comment("");
     }
     DeInit_DelObject();
+    // 清理图表上的对象
+    DeleteProfit_CalcObjects();
 }
 
 //========================================================================
@@ -331,6 +337,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         case CHARTEVENT_OBJECT_DELETE:
         {
             HandleObjectDelete(sparam);
+            break;
+        }
+
+        case CHARTEVENT_MOUSE_MOVE:
+        {
+            HandleProfit_Calc(sparam, dparam, lparam);
             break;
         }
 

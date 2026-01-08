@@ -2066,3 +2066,74 @@ double GetAdaptiveATRMultiplier(int period)
       default:         return 1.5;
    }
 }
+
+void HandleProfit_Calc(string sparam, double dparam, long lparam)
+{
+   // 仅处理鼠标移动事件
+   // if(id == CHARTEVENT_MOUSE_MOVE)
+   // {
+      // 🚨 核心修正：正确解析鼠标状态和修饰键 🚨
+      // sparam 在 CHARTEVENT_MOUSE_MOVE 中是一个字符串，需要转换为整数
+      // 位标志含义：
+      // 1 = 左键按下
+      // 2 = 右键按下
+      // 4 = Shift 键按下
+      // 8 = Ctrl 键按下
+      // 16 = 中键按下
+      
+      int mouse_state = (int)StringToInteger(sparam);
+      int curr_x = (int)lparam;
+      int curr_y = (int)dparam;
+      
+      // 检测是否同时按下 Ctrl 键 + 鼠标左键
+      bool ctrl_pressed = (mouse_state & 8) != 0;   // Ctrl 键
+      bool left_pressed = (mouse_state & 1) != 0;   // 左键
+      
+      // 🚨 新增限制：必须同时按下 Ctrl + 左键才能启动计算功能 🚨
+      // 这样可以避免误触发，用户需要主动按 Ctrl 键才能使用
+      
+      // 状态 1: Ctrl + 鼠标左键同时按下 (开始或正在拖拽)
+      if(ctrl_pressed && left_pressed)
+      {
+         // 获取当前鼠标位置对应的价格和时间
+         double curr_price;
+         datetime curr_time;
+         int sub_window;
+         
+         if(ChartXYToTimePrice(0, curr_x, curr_y, sub_window, curr_time, curr_price))
+         {
+            // 如果之前没有在拖拽，说明是刚按下的第一刻 (记录起点)
+            if(!IsDragging)
+            {
+               IsDragging = true;
+               Start_X = curr_x;
+               Start_Y = curr_y;
+               Start_Price = curr_price;
+               Start_Time = curr_time;
+               
+               // 创建测距线对象
+               CreateLineObject();
+               // 创建显示文本对象
+               CreateLabelObjects();
+               ChartRedraw(0);
+            }
+            else
+            {
+               // 正在拖拽中，更新终点和数据
+               UpdateCalculation(curr_time, curr_price, curr_x, curr_y);
+            }
+         }
+      }
+      // 状态 0: Ctrl 键或左键松开
+      else
+      {
+         // 如果之前在拖拽，现在松开了，清理现场
+         if(IsDragging)
+         {
+            IsDragging = false;
+            DeleteProfit_CalcObjects();
+            ChartRedraw(0);
+         }
+      }
+   // }
+}
