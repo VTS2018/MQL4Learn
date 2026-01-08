@@ -1264,20 +1264,19 @@ void DrawSingleSession(datetime day_base, string name, int start_h_gmt, int end_
 }
 
 //+------------------------------------------------------------------+
-//| 在主图表显示当前 ATR 面板 (包含倍数与止损位)
+//| 在主图表显示当前 ATR 面板 (包含倍数与止损位) - 修正多行显示
 //+------------------------------------------------------------------+
 void UpdateATRDisplay()
 {
    if(Is_EA_Mode) return; // EA 模式不显示
 
-   string obj_name = g_object_prefix + "ATR_Dashboard";
+   string base_name = g_object_prefix + "ATR_Dashboard";
    
    // 1. 获取自适应参数
    int atr_period = GetAdaptiveATRPeriod(_Period);      // 获取周期
-   double atr_mult = GetAdaptiveATRMultiplier(_Period); // 获取倍数 [NEW]
+   double atr_mult = GetAdaptiveATRMultiplier(_Period); // 获取倍数
    
    // 2. 计算数值
-   // 使用 Close[0] 代表当前最新价格 (也可以用 Bid/Ask，但 Close[0] 在指标中更通用)
    double current_price = Close[0]; 
    double atr_value = iATR(_Symbol, _Period, atr_period, 0);
    
@@ -1285,39 +1284,45 @@ void UpdateATRDisplay()
    double sl_distance = atr_value * atr_mult;
    
    // 计算具体的止损价格
-   double buy_sl_price = current_price - sl_distance; // 做多止损在下方
+   double buy_sl_price = current_price - sl_distance;  // 做多止损在下方
    double sell_sl_price = current_price + sl_distance; // 做空止损在上方
 
-   // 3. 格式化显示文本
-   // -----------------------------------------------------
-   // ATR(14): 0.00250 | Mult: 1.5x
-   // SL Dist: 375 pts
-   // Buy SL: 1.08500
-   // Sell SL: 1.09250
-   // -----------------------------------------------------
-   string text = "";
-   text += StringFormat("ATR(%d): %.5f  |  Mult: %.1fx\n", atr_period, atr_value, atr_mult);
-   text += StringFormat("SL Space: %d pts\n", (int)(sl_distance / Point)); // 显示点数距离
-   text += "------------------\n";
-   text += StringFormat("Buy SL: %.5f\n", buy_sl_price);
-   text += StringFormat("Sell SL: %.5f", sell_sl_price);
-
-   // 4. 创建或更新标签对象
-   if(ObjectFind(0, obj_name) == -1)
-   {
-      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-      ObjectSetInteger(0, obj_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
-      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, 20); // 距右侧
-      ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, 50); // 距顶部
-      ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clrBlack); 
-      ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 9); // 字体稍微调小一点以容纳多行
-      ObjectSetString(0, obj_name, OBJPROP_FONT, "Consolas"); // 使用等宽字体对齐更好看
-      ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);
-      ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
-   }
+   // 3. 构建多行文本数组（每行独立）
+   string lines[];
+   ArrayResize(lines, 5);
    
-   // 更新文本
-   ObjectSetString(0, obj_name, OBJPROP_TEXT, text);
+   lines[0] = StringFormat("ATR(%d): %.5f  |  Mult: %.1fx", atr_period, atr_value, atr_mult);
+   lines[1] = StringFormat("SL Space: %d pts", (int)(sl_distance / Point));
+   lines[2] = "------------------";
+   lines[3] = StringFormat("Buy SL: %.5f", buy_sl_price);
+   lines[4] = StringFormat("Sell SL: %.5f", sell_sl_price);
+
+   // 4. 创建或更新多个 Label 对象（每行一个）
+   int line_height = 15; // 每行间距（像素）
+   int start_y = 50;     // 起始Y坐标
+   int start_x = 20;     // 距离右侧距离
+   
+   for(int i = 0; i < ArraySize(lines); i++)
+   {
+      string obj_name = base_name + "_Line" + IntegerToString(i);
+      
+      // 创建对象（如果不存在）
+      if(ObjectFind(0, obj_name) == -1)
+      {
+         ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+         ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+         ObjectSetInteger(0, obj_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+         ObjectSetInteger(0, obj_name, OBJPROP_COLOR, clrBlack);
+         ObjectSetInteger(0, obj_name, OBJPROP_FONTSIZE, 9);
+         ObjectSetString(0, obj_name, OBJPROP_FONT, "Consolas"); // 等宽字体
+         ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);
+         ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
+      }
+      
+      // 更新位置和文本
+      ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, start_x);
+      ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, start_y + (i * line_height));
+      ObjectSetString(0, obj_name, OBJPROP_TEXT, lines[i]);
+   }
 }
