@@ -1325,4 +1325,45 @@ void UpdateATRDisplay()
       ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, start_y + (i * line_height));
       ObjectSetString(0, obj_name, OBJPROP_TEXT, lines[i]);
    }
+   
+   // 5. 在当前K线上方和下方显示 Buy SL 和 Sell SL 价格标签
+   datetime current_time = Time[0]; // 当前K线的时间
+   
+   // 创建或更新 Buy SL 价格标签（做多止损，红色，显示在下方）
+   string buy_sl_name = base_name + "_BuySL_Label";
+   if(ObjectFind(0, buy_sl_name) == -1)
+   {
+      ObjectCreate(0, buy_sl_name, OBJ_ARROW_RIGHT_PRICE, 0, current_time, buy_sl_price);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_HIDDEN, false);
+   }
+   else
+   {
+      // 更新时间和价格
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_TIME, 0, current_time);
+      ObjectSetDouble(0, buy_sl_name, OBJPROP_PRICE, 0, buy_sl_price);
+   }
+   
+   // 创建或更新 Sell SL 价格标签（做空止损，蓝色，显示在上方）
+   string sell_sl_name = base_name + "_SellSL_Label";
+   if(ObjectFind(0, sell_sl_name) == -1)
+   {
+      ObjectCreate(0, sell_sl_name, OBJ_ARROW_RIGHT_PRICE, 0, current_time, sell_sl_price);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_COLOR, clrBlue);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_HIDDEN, false);
+   }
+   else
+   {
+      // 更新时间和价格
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_TIME, 0, current_time);
+      ObjectSetDouble(0, sell_sl_name, OBJPROP_PRICE, 0, sell_sl_price);
+   }
 }
