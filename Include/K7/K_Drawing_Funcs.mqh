@@ -1048,6 +1048,7 @@ void DrawMarketSessions(int lookback_days, int gmt_offset)
    }
 }
 
+/*
 // 辅助函数：绘制单个时段的矩形
 void DrawSingleSession_V1(datetime day_base, string name, int start_h_gmt, int end_h_gmt, int offset, color bg_color)
 {
@@ -1096,14 +1097,13 @@ void DrawSingleSession_V1(datetime day_base, string name, int start_h_gmt, int e
    if(ObjectFind(0, obj_name) != -1) ObjectDelete(0, obj_name);
    
    ObjectCreate(0, obj_name, OBJ_RECTANGLE, 0, t1, high_price + padding, t2, low_price - padding);
-/*
-   ObjectSetInteger(0, obj_name, OBJPROP_COLOR, bg_color);
-   ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
-   ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, obj_name, OBJPROP_BACK, true); // 背景显示，不遮挡K线
-   ObjectSetInteger(0, obj_name, OBJPROP_FILL, true); // 开启填充
-   ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false); // 不可选中
-*/
+
+   // ObjectSetInteger(0, obj_name, OBJPROP_COLOR, bg_color);
+   // ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_SOLID);
+   // ObjectSetInteger(0, obj_name, OBJPROP_WIDTH, 1);
+   // ObjectSetInteger(0, obj_name, OBJPROP_BACK, true); // 背景显示，不遮挡K线
+   // ObjectSetInteger(0, obj_name, OBJPROP_FILL, true); // 开启填充
+   // ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false); // 不可选中
 
    ObjectSetInteger(0, obj_name, OBJPROP_COLOR, bg_color);
    ObjectSetInteger(0, obj_name, OBJPROP_STYLE, STYLE_DASH); // ✅ 修改为：虚线 (STYLE_DASH 或 STYLE_DOT)
@@ -1123,7 +1123,9 @@ void DrawSingleSession_V1(datetime day_base, string name, int start_h_gmt, int e
    ObjectSetInteger(0, txt_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
    ObjectSetInteger(0, txt_name, OBJPROP_BACK, true);
 }
+*/
 
+/*
 // 辅助函数：绘制单个时段的虚线框 (强制无填充版)
 void DrawSingleSession_V2(datetime day_base, string name, int start_h_gmt, int end_h_gmt, int offset, color border_color)
 {
@@ -1189,6 +1191,7 @@ void DrawSingleSession_V2(datetime day_base, string name, int start_h_gmt, int e
    ObjectSetInteger(0, txt_name, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
    ObjectSetInteger(0, txt_name, OBJPROP_BACK, true);
 }
+*/
 
 //+------------------------------------------------------------------+
 //| 辅助函数：绘制单个时段的虚线框 (客户验证修正版)
@@ -1374,7 +1377,6 @@ void UpdateATRDisplay()
 void UpdateCalculation(datetime end_time, double end_price, int x, int y)
 {
    // 1. 更新线条位置
-   // ObjectSetDouble(0, LineObjName, OBJPROP_TIME, 1, end_time);
    ObjectSetInteger(0, LineObjName, OBJPROP_TIME, 1, end_time); // 正确：时间要用 SetInteger
    ObjectSetDouble(0, LineObjName, OBJPROP_PRICE, 1, end_price);
    
