@@ -227,7 +227,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             else if(drawingState == 2) // 画射线
               {
                datetime time1 = iTime(NULL, 0, barIndex);
-               ObjectCreate(0, objName, OBJ_TREND, 0, time1, finalPrice, Time[0], finalPrice);
+               // [修夏] 使用 iTime 获取当前K线时间
+               datetime currentTime = iTime(Symbol(), Period(), 0);
+               ObjectCreate(0, objName, OBJ_TREND, 0, time1, finalPrice, currentTime, finalPrice);
                ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, false);
@@ -236,7 +238,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                // [新增功能] 在图表右侧价格轴显示射线价格标签
                // [修改] 使用uniqueID建立关联
                string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
-               datetime currentTime = Time[0]; // 当前K线时间
                ObjectCreate(0, priceLabelName, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, finalPrice);
                ObjectSetInteger(0, priceLabelName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, priceLabelName, OBJPROP_WIDTH, 1);
@@ -437,7 +438,17 @@ void RebuildObjectPairs()
 void UpdateRayEndpoints()
 {
    int total = ObjectsTotal(0, 0, -1);
-   datetime currentTime = Time[0]; // 当前最新K线时间
+   
+   // [修复] 使用 iTime 代替 Time[0]，防止数组越界
+   datetime currentTime = iTime(Symbol(), Period(), 0);
+   
+   // [保护] 如果时间为0，说明数据未加载完成
+   if(currentTime == 0)
+   {
+      Print("跳过射线更新：数据未就绪");
+      return;
+   }
+   
    int updateCount = 0;
    
    for(int i = 0; i < total; i++)
