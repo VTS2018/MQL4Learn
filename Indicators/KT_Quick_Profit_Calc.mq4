@@ -49,13 +49,22 @@ OBJ_RECTANGLE_LABEL 和 OBJ_LABEL：我们使用这两种对象而不是 Comment
 */
 
 // >>> 新增这些描述 <<<
-#property description "KT Quick Profit Calc (快速盈亏测算工具)"
+#property description "KT Quick Profit Calc (Quick Profit and Loss Calculation Tool)"
 #property description " "
-#property description "功能特点："
-#property description "1. 先点击MT4 十字光标。"
-#property description "2. 按住 Ctrl + 鼠标左键拖拽，即可进行测距。"
-#property description "3. 自动计算点数和对应的金额盈亏。"
-#property description "4. 完美支持黄金、外汇、原油等所有品种。"
+#property description "Features:"
+#property description "1. First, click the MT4 crosshair cursor or use the shortcut Ctrl + F to switch to crosshair mode."
+#property description "2. Hold Ctrl + left mouse button and drag to measure distance."
+#property description "3. Automatically calculate points and corresponding profit and loss amounts."
+#property description "4. Perfectly supports gold, forex, crude oil, cryptocurrencies, and all other instruments."
+// >>> New descriptions end <<<
+
+// #property description "KT Quick Profit Calc (快速盈亏测算工具)"
+// #property description " "
+// #property description "功能特点："
+// #property description "1. 先点击MT4 十字光标。或使用快捷键 Ctrl + F 切换到十字光标模式。"
+// #property description "2. 按住 Ctrl + 鼠标左键拖拽，即可进行测距。"
+// #property description "3. 自动计算点数和对应的金额盈亏。"
+// #property description "4. 完美支持黄金、外汇、原油、加密货币等所有品种。"
 
 //--- 输入参数
 // input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
@@ -206,7 +215,6 @@ void OnChartEvent(const int id,
 void UpdateCalculation(datetime end_time, double end_price, int x, int y)
 {
    // 1. 更新线条位置
-   // ObjectSetDouble(0, LineObjName, OBJPROP_TIME, 1, end_time);
    ObjectSetInteger(0, LineObjName, OBJPROP_TIME, 1, end_time); // 正确：时间要用 SetInteger
    ObjectSetDouble(0, LineObjName, OBJPROP_PRICE, 1, end_price);
    
