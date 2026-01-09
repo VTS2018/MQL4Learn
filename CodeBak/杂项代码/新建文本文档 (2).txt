@@ -1,0 +1,66 @@
+void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+{
+    // 1. 清空数组，准备重新收集
+    ArrayResize(bullish_list, 0); 
+    ArrayResize(bearish_list, 0); 
+
+    // -----------------------------------------------------------
+    // 🚨 核心修正 1：获取现价基准 (使用当前 K 线的收盘价)
+    // Close[0] 代表当前正在形成的 K 线的收盘价（或最新的价格）
+    // -----------------------------------------------------------
+    double current_price = Close[0]; 
+    
+    // 2. 开始扫描：从 K[1] 往历史左侧扫描
+    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+    {
+        // A. 批量读取所有缓冲区数据 (假设 GetIndicatorBarData 可用)
+        KBarSignal data = GetIndicatorBarData(shift); 
+        
+        // -----------------------
+        // 检查看涨信号 (OP_BUY)
+        // -----------------------
+        if (data.BullishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BullishReferencePrice >= Min_Signal_Quality &&
+            data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+        {
+            // --------------------------------------------------------
+            // 🚨 核心修正 2：看涨信号价格区位过滤 (信号价必须低于现价)
+            // 我们使用信号的确认收盘价 (Close[shift]) 作为其“价格”的代表
+            // --------------------------------------------------------
+            if (Close[shift] < current_price) 
+            {
+                int current_size = ArraySize(bullish_list); 
+                ArrayResize(bullish_list, current_size + 1); 
+
+                bullish_list[current_size].shift = shift;
+                bullish_list[current_size].signal_time = data.OpenTime;
+                bullish_list[current_size].confirmation_close = Close[shift]; 
+                bullish_list[current_size].stop_loss = data.BullishStopLossPrice; 
+                bullish_list[current_size].type = OP_BUY;
+            }
+        }
+        
+        // -----------------------
+        // 检查看跌信号 (OP_SELL)
+        // -----------------------
+        if (data.BearishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BearishReferencePrice >= Min_Signal_Quality &&
+            data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+        {
+            // --------------------------------------------------------
+            // 🚨 核心修正 3：看跌信号价格区位过滤 (信号价必须高于现价)
+            // --------------------------------------------------------
+            if (Close[shift] > current_price)
+            {
+                int current_size = ArraySize(bearish_list); 
+                ArrayResize(bearish_list, current_size + 1); 
+
+                bearish_list[current_size].shift = shift;
+                bearish_list[current_size].signal_time = data.OpenTime;
+                bearish_list[current_size].confirmation_close = Close[shift]; 
+                bearish_list[current_size].stop_loss = data.BearishStopLossPrice; 
+                bearish_list[current_size].type = OP_SELL;
+            }
+        }
+    }
+}

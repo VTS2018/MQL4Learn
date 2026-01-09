@@ -1,0 +1,83 @@
+//+------------------------------------------------------------------+
+//| ManageOpenTrades_SimpleBE (1.5倍保本专用版)
+//| 策略：
+//| 1. 不进行追踪止损 (给足 1:2.5 的波动空间)
+//| 2. 仅当盈利达到 1.5倍 初始止损距离时，移动止损到开仓价 (BreakEven)
+//+------------------------------------------------------------------+
+void ManageOpenTrades_SimpleBE()
+{
+   // 如果总开关关闭，不管理
+   if (!EA_Master_Switch) return;
+
+   int total = OrdersTotal();
+   for (int i = 0; i < total; i++)
+   {
+      // 必须循环查找，防止漏单
+      if (OrderSelect(i, SELECT_BY_POS, MODE_TRADES) == false) continue;
+      
+      // 过滤：只管理本EA、本品种的订单
+      if (OrderSymbol() != Symbol() || OrderMagicNumber() != MagicNumber) continue;
+      
+      // ---------------------------------------------------
+      // 核心计算：计算初始风险距离 (Initial Risk)
+      // ---------------------------------------------------
+      double open_price = OrderOpenPrice();
+      double current_sl = OrderStopLoss();
+      
+      // 如果没有止损，为了安全起见，跳过 (防止除零或逻辑错误)
+      if (current_sl == 0) continue;
+      
+      // 检查是否已经保本了？
+      // 如果 Buy单 SL >= 开仓价，或者 Sell单 SL <= 开仓价，说明已经保本过了，直接跳过
+      // 使用 Point * 0.5 作为误差容忍
+      if (OrderType() == OP_BUY && current_sl >= open_price - Point * 0.5) continue;
+      if (OrderType() == OP_SELL && current_sl <= open_price + Point * 0.5) continue;
+
+      // 计算初始止损的距离 (Risk Distance)
+      // 注意：这里假设当前的 SL 还是初始 SL。因为我们只移动一次保本，所以逻辑成立。
+      double risk_dist = MathAbs(open_price - current_sl);
+      
+      // 设定保本触发线：1.5 倍风险
+      double trigger_dist = risk_dist * 1.5;
+
+      // ---------------------------------------------------
+      // 执行保本逻辑
+      // ---------------------------------------------------
+      if (OrderType() == OP_BUY)
+      {
+         double current_profit_dist = Bid - open_price;
+         
+         // 如果当前盈利距离 > 1.5倍风险距离
+         if (current_profit_dist > trigger_dist)
+         {
+            // 移动止损到开仓价 (微加 1个点防止手续费亏损，可选)
+            double new_sl = open_price; 
+            
+            if (OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrBlue))
+            {
+               Print("🛡️ [保本触发] 订单 #", OrderTicket(), 
+                     " 盈利达标 (1.5R: ", DoubleToString(current_profit_dist, 5), 
+                     ") -> SL 移动至开仓价。");
+            }
+         }
+      }
+      else if (OrderType() == OP_SELL)
+      {
+         double current_profit_dist = open_price - Ask;
+         
+         // 如果当前盈利距离 > 1.5倍风险距离
+         if (current_profit_dist > trigger_dist)
+         {
+            // 移动止损到开仓价
+            double new_sl = open_price;
+            
+            if (OrderModify(OrderTicket(), open_price, new_sl, OrderTakeProfit(), 0, clrRed))
+            {
+               Print("🛡️ [保本触发] 订单 #", OrderTicket(), 
+                     " 盈利达标 (1.5R: ", DoubleToString(current_profit_dist, 5), 
+                     ") -> SL 移动至开仓价。");
+            }
+         }
+      }
+   }
+}

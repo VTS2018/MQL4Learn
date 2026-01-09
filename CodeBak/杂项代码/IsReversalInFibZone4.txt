@@ -1,0 +1,121 @@
+//+------------------------------------------------------------------+
+//| L2c: 斐波那契反转区域过滤 (Context Filter)                       |
+//| 修正：检查多个自定义斐波那契区域是否被触碰 (High/Low)            |
+//+------------------------------------------------------------------+
+bool IsReversalInFibZone(int current_shift, int current_type)
+{
+    // --- 定义需要检查的斐波那契区域 ---
+    // 格式: {Level1, Level2}，可以根据需要自由添加/修改
+    double FiboLevels[][2] = {
+        {1.618, 2.000},
+        {2.618, 3.000},
+        {4.236, 5.000}
+        // 您可以添加更多区域，例如 {0.618, 0.786}
+    };
+    int zones_count = ArraySize(FiboLevels);
+
+    // 1. 确定我们要找的前一个信号类型
+    int search_type = (current_type == OP_SELL) ? OP_BUY : OP_SELL;
+
+    // 2. 向历史回溯扫描 (找到最近的一个反向有效信号作为斐波那契的锚点)
+    int max_history_scan = 100;
+    int found_prev_shift = -1;
+
+    KBarSignal prev_data; 
+    ZeroMemory(prev_data); 
+    
+    for (int i = current_shift + 1; i < current_shift + max_history_scan; i++)
+    {
+        KBarSignal temp_data = GetIndicatorBarData(i);
+        bool is_target_found = false;
+
+        if (search_type == OP_BUY)
+        {
+            if (temp_data.BullishReferencePrice != (double)EMPTY_VALUE && temp_data.BullishReferencePrice != 0.0)
+                is_target_found = true;
+        }
+        else
+        {
+            if (temp_data.BearishReferencePrice != (double)EMPTY_VALUE && temp_data.BearishReferencePrice != 0.0)
+                is_target_found = true;
+        }
+
+        if (is_target_found)
+        {
+            found_prev_shift = i;
+            prev_data = temp_data;
+            break; 
+        }
+    }
+    
+    if (found_prev_shift == -1)
+    {
+        return false;
+    }
+
+    // 3. 计算前一个信号的风险波幅 (Risk)
+    double prev_entry = Close[found_prev_shift];
+    double prev_sl = 0;
+    double risk = 0;
+    
+    if (search_type == OP_BUY)
+    {
+        prev_sl = prev_data.BullishStopLossPrice;
+        risk = prev_entry - prev_sl; 
+    }
+    else
+    {
+        prev_sl = prev_data.BearishStopLossPrice;
+        risk = prev_sl - prev_entry; 
+    }
+    
+    if (risk <= 0) return false;
+
+    // 4. 准备当前信号的价格数据和容差
+    double current_low  = Low[current_shift];
+    double current_high = High[current_shift]; 
+    double tolerance = risk * 0.1; // 10% 的风险距离作为容差
+
+    // 5. 🚨 核心逻辑：循环检查所有定义的斐波那契区域 🚨
+    for (int z = 0; z < zones_count; z++)
+    {
+        double level1 = FiboLevels[z][0];
+        double level2 = FiboLevels[z][1];
+        
+        double zone_low = 0;
+        double zone_high = 0;
+
+        // 计算该区域的绝对价格边界
+        if (search_type == OP_BUY) // 前一个是涨势 (向上延伸)
+        {
+            zone_low  = prev_entry + (risk * level1);
+            zone_high = prev_entry + (risk * level2);
+        }
+        else // 前一个是跌势 (向下延伸)
+        {
+            // 下跌时，数值越小越远 (prev_entry - risk * level)
+            zone_low  = prev_entry - (risk * level2);
+            zone_high = prev_entry - (risk * level1);
+        }
+        
+        // 6. 应用容差，计算实际检查区域
+        double check_zone_low  = zone_low - tolerance;
+        double check_zone_high = zone_high + tolerance;
+        
+        // 7. 触碰检查 (Touching Check)：K 线范围是否与目标区域有重叠
+        // 只要 K-bar Low <= Zone High AND K-bar High >= Zone Low，即为触碰。
+        if (current_low <= check_zone_high && current_high >= check_zone_low)
+        {
+            string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+            
+            Print(" L2c 斐波过滤通过 (触碰): 当前", type_str, "信号 @ K[", current_shift, "] 触碰前值 Fib [",
+                  DoubleToString(level1, 3), "-", DoubleToString(level2, 3), 
+                  "] 区域 (", DoubleToString(zone_low, _Digits), "-", DoubleToString(zone_high, _Digits), ")");
+            
+            return true; // 只要命中任意一个区域，即视为通过过滤
+        }
+    }
+    
+    // 循环结束后，如果没有命中任何区域
+    return false;
+}

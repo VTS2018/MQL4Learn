@@ -1,0 +1,71 @@
+//+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种_月日_时分)                 |
+//+------------------------------------------------------------------+
+/*
+string GenerateSignalID_V1(datetime signal_time)
+{
+   // 1. 获取时间元素
+   string month_day = TimeToString(signal_time, TIME_MONTH | TIME_DAY);
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 2. 清理分隔符
+   // 品种名: BTCUSD_1129_1027
+   string clean_symbol = StringReplace(_Symbol, "_", "");
+   string clean_month_day = StringReplace(month_day, ".", "");
+   string clean_hour_minute = StringReplace(hour_minute, ":", "");
+
+   // 3. 最终 ID 拼接
+   return clean_symbol + "_" + clean_month_day + "_" + clean_hour_minute;
+}
+*/
+
+//+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_月日_时分)             |
+//+------------------------------------------------------------------+
+/*
+string GenerateSignalID(datetime signal_time)
+{
+   // --- 定义辅助变量 (用于 StringReplace) ---
+   string find_underscore = "_" + "";
+   string find_dot = "." + "";
+   string find_colon = ":" + "";
+   string replace_empty = "" + "";
+
+   // 1. 获取品种前缀 (例如: BTCUSD -> BTC)
+   string symbol_prefix = _Symbol;
+   if (StringLen(_Symbol) >= 3)
+   {
+      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符
+   }
+   string clean_symbol_prefix = StringReplace(symbol_prefix, find_underscore, replace_empty);
+   clean_symbol_prefix = StringReplace(clean_symbol_prefix, find_dot, replace_empty);
+
+   // ----------------------------------------------------
+   // 2. 🚨 修正日期/时间获取逻辑 🚨
+   // ----------------------------------------------------
+
+   // 2.1 获取完整日期: "yyyy.mm.dd"
+   // 注意：使用 TIME_DATE (0) 确保输出标准格式
+   string full_date = TimeToString(signal_time, TIME_DATE);
+
+   // 2.2 截取月日部分: 从第 5 位开始，长度为 5 ("mm.dd")
+   // 格式： yyyy.mm.dd
+   // 索引： 0123456789
+   string month_day = StringSubstr(full_date, 5, 5); // 截取 "mm.dd"
+
+   // 2.3 获取时间: "hh:mi"
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 3. 清理日期时间分隔符
+   string temp_month_day = month_day;
+   string temp_hour_minute = hour_minute;
+
+   // 清理分隔符 (将 "11.29" 变为 "1129"，将 "10:27" 变为 "1027")
+   StringReplace(temp_month_day, find_dot, replace_empty);
+   StringReplace(temp_hour_minute, find_colon, replace_empty);
+
+   // 4. 最终 ID 拼接
+   // 格式: 品种前缀_月日_时分 (例如：XAU_1201_1517)
+   return clean_symbol_prefix + "_" + temp_month_day + "_" + temp_hour_minute;
+}
+*/

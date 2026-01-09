@@ -1,0 +1,156 @@
+// 修改成区域触碰 降低严格程度
+bool IsReversalInFibZone_V2(int current_shift, int current_type)
+{
+   // 1. 确定我们要找的前一个信号类型
+   // 如果当前是 SELL，我们要找之前的 BUY；反之亦然。
+   int search_type = (current_type == OP_SELL) ? OP_BUY : OP_SELL;
+
+   // 2. 向历史回溯扫描 (从当前信号的前一根 K 线开始)
+   // 我们限制回溯范围，比如最多往前找 100 根，太远就没有因果关系了
+   int max_history_scan = 100;
+   int found_prev_shift = -1;
+
+   KBarSignal prev_data; // 用于存储找到的历史信号数据
+   // 🚨 修正：初始化 prev_data 以解决 uninitialized variable 错误 🚨
+   ZeroMemory(prev_data);
+
+   for (int i = current_shift + 1; i < current_shift + max_history_scan; i++)
+   {
+      KBarSignal temp_data = GetIndicatorBarData(i);
+
+      // 检查是否有由于 search_type 指定的信号
+      bool is_target_found = false;
+
+      if (search_type == OP_BUY)
+      {
+         // 找看涨信号 (有质量代码，且有有效的 SL)
+         // if (temp_data.BullishReferencePrice > 0 && temp_data.BullishStopLossPrice > 0)
+         if (temp_data.BullishReferencePrice != (double)EMPTY_VALUE && temp_data.BullishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+      else
+      {
+         // 找看跌信号
+         // if (temp_data.BearishReferencePrice > 0 && temp_data.BearishStopLossPrice > 0)
+         if (temp_data.BearishReferencePrice != (double)EMPTY_VALUE && temp_data.BearishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+
+      if (is_target_found)
+      {
+         found_prev_shift = i;
+         prev_data = temp_data;
+         Print("---->[KTarget_FinderBot.mq4:1098]: shift= ", i, "--", prev_data.BullishStopLossPrice, "--", prev_data.BearishStopLossPrice, "--", prev_data.BullishReferencePrice, "--", prev_data.BearishReferencePrice);
+         break; // 找到了最近的一个反向信号，停止扫描
+      }
+   }
+   
+   // 如果没找到前一个反向信号，无法判断上下文，视策略而定 (这里默认返回 false 过滤掉，或者 true 放行)
+   if (found_prev_shift == -1)
+   {
+       // Print("未找到前置反向信号，无法计算斐波那契区域。");
+       return false; // 严格模式：没参考就不做
+   }
+
+   // 3. 计算前一个信号的风险波幅 (Risk)
+   double prev_entry = Close[found_prev_shift]; // 假设信号 K 收盘价为入场
+   double prev_sl = 0;
+   double risk = 0;
+
+   if (search_type == OP_BUY)
+   {
+      prev_sl = prev_data.BullishStopLossPrice;
+      risk = prev_entry - prev_sl; // 看涨：入场 - 止损
+   }
+   else
+   {
+      prev_sl = prev_data.BearishStopLossPrice;
+      risk = prev_sl - prev_entry; // 看跌：止损 - 入场
+   }
+   // 确保风险值有效
+   if (risk <= 0) return false;
+
+   // 4. 计算 2.618 - 3.00 区域
+   // 注意：扩展是沿着前一个趋势方向延伸的
+   double zone_low = 0;
+   double zone_high = 0;
+
+   if (search_type == OP_BUY)
+   {
+      // 前一个是涨势，目标位在上方
+      zone_low  = prev_entry + (risk * 2.618);
+      Print("--->[KTarget_FinderBot.mq4:1127]: zone_low: ", zone_low);
+      zone_high = prev_entry + (risk * 3.000);
+      Print("--->[KTarget_FinderBot.mq4:1129]: zone_high: ", zone_high);
+   }
+   else
+   {
+      // 前一个是跌势，目标位在下方
+      // 下跌时，数值越小越远，所以 3.0 是 zone_low (数值小)，2.618 是 zone_high
+      zone_low  = prev_entry - (risk * 3.000); 
+      zone_high = prev_entry - (risk * 2.618);
+   }
+   
+   /*
+   // 1.0 的检查非常的严格
+   // 5. 检查当前信号价格是否在区域内
+   double current_price = Close[current_shift]; // 当前信号 K 线的收盘价
+
+   // 添加一点容差 (例如 10% 的 Risk 距离)，这就是您说的“附近”
+   double tolerance = risk * 0.1;
+
+   bool in_zone = false;
+   if (current_price >= (zone_low - tolerance) && current_price <= (zone_high + tolerance))
+   {
+      in_zone = true;
+   }
+
+   if (in_zone)
+   {
+       string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+       Print(" L2c 斐波过滤通过: 当前", type_str, "信号 @ ", current_price, 
+             " 位于前值 Fib [2.618-3.0] 区域 (", DoubleToString(zone_low, _Digits), "-", DoubleToString(zone_high, _Digits), ")");
+       return true;
+   }
+   else
+   {
+       // Print("L2c 斐波过滤: 当前信号不在前值 Fib 衰竭区。");
+       return false;
+   }
+   */
+
+   // =========================================================================
+   // 🚨 5. 核心修正：检查当前信号 K 线是否触碰了区域 (High/Low) 🚨
+   // =========================================================================
+   double current_low = Low[current_shift];
+   double current_high = High[current_shift];
+   // 添加容差 (例如 10% 的 Risk 距离)，即您说的“附近”
+   double tolerance = risk * 0.1;
+
+   // 计算带容差的检查区域
+   double check_zone_low  = zone_low - tolerance;
+   double check_zone_high = zone_high + tolerance;
+   
+   bool is_touching = false;
+   
+   // K 线范围 [current_low, current_high] 是否与目标区域 [check_zone_low, check_zone_high] 有重叠
+   // 只要 K 线的最低点低于区域的最高点 AND K 线的最高点高于区域的最低点，即视为触碰。
+   if (current_low <= check_zone_high && current_high >= check_zone_low)
+   {
+      is_touching = true;
+   }
+   
+   if (is_touching)
+   {
+       string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+       
+       Print(" L2c 斐波过滤通过 (触碰): 当前", type_str, "信号 @ K[", current_shift, "] 触碰前值 Fib [2.618-3.0] 区域 (", 
+             DoubleToString(zone_low, _Digits), "-", DoubleToString(zone_high, _Digits), ")");
+       return true;
+   }
+   else
+   {
+       // Print("L2c 斐波过滤: 当前信号未触碰前值 Fib 衰竭区。");
+       return false;
+   }
+}

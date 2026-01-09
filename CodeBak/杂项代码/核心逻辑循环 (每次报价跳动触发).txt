@@ -1,0 +1,59 @@
+//+------------------------------------------------------------------+
+//| OnTick: 核心逻辑循环 (每次报价跳动触发)
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // --- 1. 新 K 线检测机制 (New Bar Check) ---
+    if(Time[0] == g_last_bar_time) return; 
+    g_last_bar_time = Time[0]; 
+
+    // --- 2. 🚨 交易管理政策：防止重复开仓 🚨
+    if (CountOpenTrades(MagicNumber) >= 1) 
+    {
+        return; 
+    }
+    
+    // --- 3. 批量获取信号数据 (集中 iCustom 调用) ---
+    // 🚨 只需要调用一次，获取 shift=1 (已收盘 K 线) 的所有数据 🚨
+    KBarSignal last_bar_data = GetIndicatorBarData(1); 
+
+    // --- 4. 执行交易逻辑 ---
+    
+    // 4.1 处理买入信号 (使用 ReferencePrice 判断信号存在)
+    if(last_bar_data.BullishReferencePrice != EMPTY_VALUE && last_bar_data.BullishReferencePrice != 0)
+    {
+        Print(">>> 侦测到看涨信号 @ ", Time[1], "。SL Price: ", last_bar_data.BullishStopLossPrice);
+        
+        // A. 止损价直接读取 Buffer 0 (绝对 SL 价)
+        double sl_price = last_bar_data.BullishStopLossPrice; 
+        
+        // B. 入场价：新 K 线的开盘价 (Close[1] == Open[0])
+        double entry_price = Open[0]; 
+        
+        // C. 计算止盈
+        double risk = entry_price - sl_price;
+        double tp_price = entry_price + (risk * RewardRatio);
+
+        // D. 执行开仓
+        ExecuteTrade(OP_BUY, FixedLot, sl_price, tp_price, entry_price, "K-Target Buy"); 
+    }
+
+    // 4.2 处理卖出信号 (使用 ReferencePrice 判断信号存在)
+    if(last_bar_data.BearishReferencePrice != EMPTY_VALUE && last_bar_data.BearishReferencePrice != 0)
+    {
+        Print(">>> 侦测到看跌信号 @ ", Time[1], "。SL Price: ", last_bar_data.BearishStopLossPrice);
+        
+        // A. 止损价直接读取 Buffer 1 (绝对 SL 价)
+        double sl_price = last_bar_data.BearishStopLossPrice;
+        
+        // B. 入场价：新 K 线的开盘价 (Close[1] == Open[0])
+        double entry_price = Open[0];
+        
+        // C. 计算止盈
+        double risk = sl_price - entry_price;
+        double tp_price = entry_price - (risk * RewardRatio);
+
+        // D. 执行开仓
+        ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, entry_price, "K-Target Sell");
+    }
+}

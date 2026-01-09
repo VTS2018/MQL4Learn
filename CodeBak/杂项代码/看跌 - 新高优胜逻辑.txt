@@ -1,0 +1,50 @@
+//+------------------------------------------------------------------+
+//| 信号弱势过滤 (看跌 - 新高优胜逻辑)                              |
+//| 逻辑：Newer.Close > Older.SL，则 Older 无效 (被涨破)。           |
+//+------------------------------------------------------------------+
+int FilterWeakBearishSignals(FilteredSignal &source_signals[], FilteredSignal &filtered_list[])
+{
+    ArrayResize(filtered_list, 0);
+    int total = ArraySize(source_signals);
+    
+    if (total == 0) return 0;
+
+    // 1. 保留最新信号
+    ArrayResize(filtered_list, 1);
+    filtered_list[0] = source_signals[0];
+
+    // 2. 设定初始比较基准：使用最新信号的【收盘价】
+    double threshold_close = source_signals[0].confirmation_close;
+
+    // 3. 向历史方向遍历
+    for (int i = 1; i < total; i++)
+    {
+        FilteredSignal older_signal = source_signals[i];
+        
+        // -------------------------------------------------------------
+        // 🚨 核心逻辑：新高优胜 🚨
+        // 看跌信号的 SL 是最高价 (压力位)
+        // -------------------------------------------------------------
+        
+        // 情况 A: 涨破 (Invalidation)
+        // 如果较新的 Close 价格 高于 历史信号的 SL (最高价)
+        // 说明最新的价格已经反向突破了该历史信号的压力位，该历史信号失效。
+        if (threshold_close > older_signal.stop_loss)
+        {
+            // Print("❌ 过滤 (看跌): 历史信号 K[", older_signal.shift, "] SL:", older_signal.stop_loss, 
+            //       " 被较新信号 Close:", threshold_close, " 涨破。排除。");
+            continue;
+        }
+
+        // 情况 B: 压力有效 (Validation)
+        // 较新的 Close 依然在 历史信号 SL 之下
+        int new_index = ArraySize(filtered_list);
+        ArrayResize(filtered_list, new_index + 1);
+        filtered_list[new_index] = older_signal;
+
+        // 更新阈值
+        threshold_close = older_signal.confirmation_close;
+    }
+
+    return ArraySize(filtered_list);
+}

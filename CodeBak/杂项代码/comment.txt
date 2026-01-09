@@ -1,0 +1,22 @@
+// KTarget_FinderBot.mq4 (在 CalculateTradeAndExecute 函数内部)
+
+    // --- L4. 交易执行 (修改 comment 逻辑) ---
+    
+    // 1. 生成信号 ID (用于防重复和追踪)
+    string signal_id = TimeToString(data.OpenTime, TIME_DATE|TIME_MINUTES); 
+    
+    // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态 (State 0: 刚开仓)
+    string comment = "[" + EA_Version_Tag + "] | ID:" + signal_id + " | State:0 | Risk:" + DoubleToString(Max_Risk_Per_Trade*100, 2) + "%";
+    
+    // 3. 最终 OrderSend (使用这个新的 comment)
+    int ticket = OrderSend(_Symbol, 
+                           trade_command, 
+                           lot_size, 
+                           entry_price, 
+                           3, // 滑点
+                           sl_price, 
+                           tp_price, 
+                           comment, // 🚨 使用新的 comment 🚨
+                           MagicNumber, 
+                           0, 
+                           (trade_command == OP_BUY) ? clrGreen : clrRed);

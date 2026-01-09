@@ -1,0 +1,44 @@
+// KTarget_FinderBot.mq4 (Bot 1.0 版本)
+
+// 假设 FindStructuralSL 的签名如下
+double FindStructuralSL(int command, int start_shift, int scan_range, string& signal_id)
+{
+    // ... 原始的魔术数字和过滤检查 ...
+
+    for(int shift = start_shift; shift < start_shift + scan_range; shift++)
+    {
+        // 1. 读取所有 4 个 Buffer 的数据
+        KBarSignal data = GetIndicatorBarData(shift); // 假设 GetIndicatorBarData 已经定义
+
+        // 2. 检查信号质量/存在性 (使用 Buffer 2/3)
+        // 信号质量 >= 0.1 即可认为信号存在 (旧代码可能只检查 != EMPTY_VALUE)
+        
+        bool bullish_signal = data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice >= 2.0;
+        bool bearish_signal = data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice >= 2.0;
+
+        // 3. 根据命令类型进行处理
+        if (command == OP_BUY && bullish_signal)
+        {
+            // 检查 SL 价格是否有效 (Buffer 0)
+            if (data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+            {
+                // 找到信号。返回绝对 SL 价格
+                signal_id = TimeToString(data.OpenTime, TIME_DATE|TIME_MINUTES); // 记录信号 ID
+                return data.BullishStopLossPrice; 
+            }
+        }
+        
+        if (command == OP_SELL && bearish_signal)
+        {
+            // 检查 SL 价格是否有效 (Buffer 1)
+            if (data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+            {
+                // 找到信号。返回绝对 SL 价格
+                signal_id = TimeToString(data.OpenTime, TIME_DATE|TIME_MINUTES); // 记录信号 ID
+                return data.BearishStopLossPrice; 
+            }
+        }
+    }
+    
+    return 0.0; // 未找到有效的 SL 价格
+}

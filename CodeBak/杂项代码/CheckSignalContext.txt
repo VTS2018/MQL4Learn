@@ -1,0 +1,129 @@
+//+------------------------------------------------------------------+
+//| 检查信号上下文：反转位置 or 区间回踩                             |
+//+------------------------------------------------------------------+
+int CheckSignalContext(int current_shift, int current_type, 
+                       FilteredSignal &history_bulls[], 
+                       FilteredSignal &history_bears[])
+{
+   double current_high = High[current_shift];
+   double current_low  = Low[current_shift];
+   
+   // =================================================================
+   // 逻辑 A: 斐波那契反转检查 (Reversal)
+   // 看跌信号 -> 检查历史看涨信号的 Fib 扩展区
+   // 看涨信号 -> 检查历史看跌信号的 Fib 扩展区
+   // =================================================================
+   
+   // 1. 确定我们要扫描的历史列表 (反向列表)
+   FilteredSignal *reversal_target_list[]; // 使用指针或引用逻辑
+   // 这里的数组引用在 MQL4 中处理较复杂，为了代码清晰，我们用 if-else 分开写
+   
+   int list_size = 0;
+   
+   if (current_type == OP_SELL) // 当前是看跌，找历史看涨
+   {
+      list_size = ArraySize(history_bulls);
+      for (int i = 0; i < list_size; i++)
+      {
+         FilteredSignal prev = history_bulls[i];
+         if (prev.shift <= current_shift) continue; // 必须是历史信号 (shift 更大)
+         
+         // 计算前一个看涨信号的 Risk
+         double risk = prev.confirmation_close - prev.stop_loss;
+         if (risk <= 0) continue;
+         
+         // 检查 Fib 区域 (1.618-2.0, 2.618-3.0 等)
+         // 这里简化演示 1.618 - 2.0 区域，您可以循环遍历所有定义的区域
+         double zone_low  = prev.confirmation_close + (risk * 1.618);
+         double zone_high = prev.confirmation_close + (risk * 2.000);
+         
+         // 检查触碰 (看跌信号从上方进入或处于区域内)
+         if (current_low <= zone_high && current_high >= zone_low)
+         {
+            Print("✅ [上下文] 斐波反转: 当前看跌信号 触碰 历史看涨信号(shift=", prev.shift, ") 的 1.618-2.0 区域");
+            return CONTEXT_FIB_REVERSAL;
+         }
+      }
+   }
+   else // OP_BUY, 当前是看涨，找历史看跌
+   {
+      list_size = ArraySize(history_bears);
+      for (int i = 0; i < list_size; i++)
+      {
+         FilteredSignal prev = history_bears[i];
+         if (prev.shift <= current_shift) continue;
+         
+         double risk = prev.stop_loss - prev.confirmation_close;
+         if (risk <= 0) continue;
+         
+         // 看跌信号的目标位在下方
+         double zone_low  = prev.confirmation_close - (risk * 2.000); 
+         double zone_high = prev.confirmation_close - (risk * 1.618);
+         
+         // 检查触碰
+         if (current_high >= zone_low && current_low <= zone_high)
+         {
+            Print("✅ [上下文] 斐波反转: 当前看涨信号 触碰 历史看跌信号(shift=", prev.shift, ") 的 1.618-2.0 区域");
+            return CONTEXT_FIB_REVERSAL;
+         }
+      }
+   }
+
+   // =================================================================
+   // 逻辑 B: 信号区间回踩检查 (Retest / Continuation)
+   // 看跌信号 -> 检查最近一个历史看跌信号的 [SL - Close] 区间
+   // 看涨信号 -> 检查最近一个历史看涨信号的 [Close - SL] 区间
+   // =================================================================
+   
+   if (current_type == OP_SELL) // 当前看跌，找历史看跌 (顺势)
+   {
+      list_size = ArraySize(history_bears);
+      // 我们只关心最近的一个有效同向信号，所以找 shift 最小但在 current_shift 之后的
+      // 假设列表已经按 shift 排序 (或者我们需要遍历找到最近的一个)
+      
+      for (int i = 0; i < list_size; i++)
+      {
+         FilteredSignal prev = history_bears[i];
+         if (prev.shift <= current_shift) continue; // 跳过比当前还新的
+         
+         // 找到最近的一个历史看跌信号 (因为我们可能按某种顺序遍历，这里简化为找到第一个符合条件的)
+         
+         // 定义区间: 止损价 (High) 到 确认价 (Low)
+         double zone_top = prev.stop_loss;
+         double zone_bottom = prev.confirmation_close;
+         
+         // 检查当前信号是否触碰或在这个区间内
+         // 这是一个“回马枪”：价格反弹回到了空头大本营
+         if (current_low <= zone_top && current_high >= zone_bottom)
+         {
+             Print("✅ [上下文] 区间回踩: 当前看跌信号 回踩了 历史看跌信号(shift=", prev.shift, ") 的基础风险区");
+             return CONTEXT_ZONE_RETEST;
+         }
+         
+         // 既然我们要找“最近”的一个，找到并检查完这一个后，通常就可以退出了
+         // 除非您想检查更远的同向信号（通常没必要，最近的最重要）
+         break; 
+      }
+   }
+   else // OP_BUY, 当前看涨，找历史看涨
+   {
+      list_size = ArraySize(history_bulls);
+      for (int i = 0; i < list_size; i++)
+      {
+         FilteredSignal prev = history_bulls[i];
+         if (prev.shift <= current_shift) continue;
+         
+         double zone_top = prev.confirmation_close;
+         double zone_bottom = prev.stop_loss;
+         
+         if (current_high >= zone_bottom && current_low <= zone_top)
+         {
+             Print("✅ [上下文] 区间回踩: 当前看涨信号 回踩了 历史看涨信号(shift=", prev.shift, ") 的基础风险区");
+             return CONTEXT_ZONE_RETEST;
+         }
+         break; // 只检查最近的一个
+      }
+   }
+
+   return CONTEXT_NONE;
+}

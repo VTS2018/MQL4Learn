@@ -1,0 +1,42 @@
+/**
+ * 绘制斐波那契高亮区域的文本说明 (OBJ_TEXT)
+ * @param text_name: 文本对象的唯一名称 (应包含父矩形名称)
+ * @param text_content: 要显示的文本内容 (例如 "H4 看跌斐波反转区域")
+ * @param anchor_time: 文本的锚定时间 (矩形左侧时间)
+ * @param anchor_price: 文本的锚定价格 (矩形顶部价格)
+ * @param tf_flag: 文本对象的周期可见性位标志
+ */
+void DrawFiboHighlightText(string text_name, string text_content, datetime anchor_time, double anchor_price, int tf_flag)
+{
+    if (Is_EA_Mode) return;
+    // 确保旧文本对象被删除
+    if (ObjectFind(0, text_name) != -1) ObjectDelete(0, text_name);
+
+    // 创建 OBJ_TEXT 对象
+    if (ObjectCreate(0, text_name, OBJ_TEXT, 0, anchor_time, anchor_price))
+    {
+        ObjectSetString(0, text_name, OBJPROP_TEXT, text_content);
+        
+        // 设置颜色：确保与高亮背景色形成强烈对比 (使用黑色)
+        ObjectSetInteger(0, text_name, OBJPROP_COLOR, clrBlack); 
+        
+        // 设置字体和大小 (可根据需求调整)
+        ObjectSetString(0, text_name, OBJPROP_FONT, "Arial"); 
+        ObjectSetInteger(0, text_name, OBJPROP_FONTSIZE, 8); 
+        
+        // 设置锚点：左上角
+        ObjectSetInteger(0, text_name, OBJPROP_CORNER, CORNER_LEFT_UPPER); 
+        ObjectSetInteger(0, text_name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER); 
+        
+        // 关键优化：设置文本位置微调，稍微远离边角，以避免与边框重叠
+        ObjectSetInteger(0, text_name, OBJPROP_XDISTANCE, 5); // 稍微右移 5 像素
+        ObjectSetInteger(0, text_name, OBJPROP_YDISTANCE, 5); // 稍微下移 5 像素
+        
+        // 设置周期可见性
+        if (tf_flag != 0) ObjectSetInteger(0, text_name, OBJPROP_TIMEFRAMES, tf_flag);
+        else ObjectSetInteger(0, text_name, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);
+        
+        // 确保文本对象不可选中
+        ObjectSetInteger(0, text_name, OBJPROP_SELECTABLE, true);
+    }
+}

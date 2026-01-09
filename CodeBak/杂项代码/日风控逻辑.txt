@@ -1,0 +1,33 @@
+// --- 新增输入参数 ---
+input double Daily_Max_Loss_Pips = 100.0; // 日最大亏损 (点数)
+input double Daily_Target_Profit_Pips = 200.0; // 日盈利目标 (点数)
+input int    Daily_Max_Trades = 5;      // 日最大交易次数
+
+//+------------------------------------------------------------------+
+//| 函数: 日内整体风控过滤 (包括亏损/盈利/次数限制)                 |
+//+------------------------------------------------------------------+
+bool IsDailyRiskAllowed()
+{
+    // 1. 达到日盈利目标
+    if (g_today_profit_pips >= Daily_Target_Profit_Pips)
+    {
+        Comment("日盈利目标达成，暂停交易。");
+        return false;
+    }
+    
+    // 2. 达到日最大亏损
+    if (g_today_profit_pips <= -Daily_Max_Loss_Pips)
+    {
+        Comment("日最大亏损触发，暂停交易。");
+        return false;
+    }
+    
+    // 3. 达到日最大交易次数
+    if (g_today_trades >= Daily_Max_Trades)
+    {
+        Comment("日交易次数已满，暂停交易。");
+        return false;
+    }
+    
+    return true;
+}

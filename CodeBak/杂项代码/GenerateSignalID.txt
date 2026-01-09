@@ -1,0 +1,54 @@
+//+------------------------------------------------------------------+
+//| 辅助函数：生成绝对唯一的信号 ID (品种前缀_月日_时分)             |
+//+------------------------------------------------------------------+
+string GenerateSignalID(datetime signal_time)
+{
+   // --- 定义辅助变量 (用于 StringReplace，避免歧义) ---
+   // 必须使用连接来确保 MQL4 编译器将其识别为明确的 string
+   string find_underscore = "_" + "";
+   string find_dot = "." + "";
+   string find_colon = ":" + "";
+   string replace_empty = "" + "";
+
+   // 1. 获取品种前缀 (例如: BTCUSD -> BTC)
+   string symbol_prefix = _Symbol;
+   if (StringLen(_Symbol) >= 3)
+   {
+      symbol_prefix = StringSubstr(_Symbol, 0, 3); // 截取前 3 个字符
+   }
+
+   // 2. 清理品种名中的下划线/点
+   // 将 symbol_prefix 赋值给一个临时变量，以便 StringReplace 进行修改 (引用传递)
+   string temp_symbol = symbol_prefix;
+
+   // 🚨 关键修正：StringReplace 仅作函数调用，不赋值给 string 变量 🚨
+   StringReplace(temp_symbol, find_underscore, replace_empty); // 正确用法：修改 temp_symbol
+   StringReplace(temp_symbol, find_dot, replace_empty);        // 正确用法：修改 temp_symbol
+
+   // ----------------------------------------------------
+   // 3. 修正日期/时间获取逻辑
+   // ----------------------------------------------------
+
+   // 3.1 获取完整日期: "yyyy.mm.dd" (使用 TIME_DATE 确保格式标准)
+   string full_date = TimeToString(signal_time, TIME_DATE);
+
+   // 3.2 截取月日部分: 从第 5 位开始，长度为 5 ("mm.dd")
+   // 格式： yyyy.mm.dd
+   // 索引： 0123456789
+   string month_day = StringSubstr(full_date, 5, 5);
+
+   // 3.3 获取时间: "hh:mi"
+   string hour_minute = TimeToString(signal_time, TIME_MINUTES);
+
+   // 4. 清理日期时间分隔符 (使用临时变量来处理 TimeToString 的结果)
+   string temp_month_day = month_day;
+   string temp_hour_minute = hour_minute;
+
+   // 🚨 关键修正：StringReplace 仅作函数调用 🚨
+   StringReplace(temp_month_day, find_dot, replace_empty);
+   StringReplace(temp_hour_minute, find_colon, replace_empty);
+
+   // 5. 最终 ID 拼接
+   // 格式: 品种前缀_月日_时分 (例如：XAU_1201_1517)
+   return temp_symbol + "_" + temp_month_day + "_" + temp_hour_minute;
+}

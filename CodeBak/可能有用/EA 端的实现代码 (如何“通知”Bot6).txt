@@ -1,0 +1,47 @@
+EA 端的实现代码 (如何“通知”Bot6)
+// KTarget_FinderBot6.mq4
+
+#include <K_Logic.mqh> // 引用同一个逻辑内核
+
+void OnTick()
+{
+    // 1. EA 自己去扫描当前是否有信号
+    // (调用 K_Logic.mqh 里的函数，逻辑与指标完全一致)
+    int shift = 1; // 检查刚收盘的 K 线
+    
+    // 假设您在 mqh 里封装了一个“扫描函数”
+    // 这个函数返回所有的核心数据
+    double p1, p2, sl;
+    int anchor_idx;
+    bool is_breakout = CheckBreakoutCondition(shift, p1, p2, sl, anchor_idx);
+
+    if (is_breakout)
+    {
+        // 2. 关键点：EA 现在可以调用评分函数，拿到完整的体检报告！
+        SignalQuality sq = CalculateSignalQuality(anchor_idx, shift, p1, p2, sl);
+
+        // 3. EA 根据全维度数据做决策
+        Print("EA 捕捉到信号: ", sq.description);
+        
+        // === 决策路由 ===
+        
+        // 场景 A: 结构破坏，绝对不做
+        if (sq.grade == GRADE_F) return; 
+        
+        // 场景 B: 空间太小，除非是 S 级(DB+CB)否则不做
+        if (sq.space_factor < 0.5 && sq.grade < GRADE_S) return;
+
+        // 场景 C: 计算仓位
+        double lots = 0.1;
+        if (sq.grade == GRADE_S) lots = 0.2; // S级加仓
+        if (sq.grade == GRADE_C) lots = 0.05; // C级减仓
+
+        // 场景 D: 智能设置止盈
+        double tp_price = 0;
+        if (sq.space_factor > 1.5) tp_price = p2 - 50*Point; // 空间大，TP设在 P2
+        else tp_price = Ask + 2.0 * (Ask - sl); // 空间小，按盈亏比设 TP
+
+        // 4. 执行开单
+        OrderSend(..., lots, ..., tp_price, ...);
+    }
+}

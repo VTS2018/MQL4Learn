@@ -1,0 +1,87 @@
+//+------------------------------------------------------------------+
+//| 上下文检查：基于“过滤后的有效信号列表”进行斐波反转检查           |
+//| 逻辑：检查当前信号是否落在 A, B, D 任意一个的 Fib 扩展区内       |
+//+------------------------------------------------------------------+
+bool CheckFibReversalContext(int current_shift, int current_type, 
+                             FilteredSignal &valid_history_list[]) // 传入经过 FilterWeak... 过滤后的列表
+{
+    double current_high = High[current_shift];
+    double current_low  = Low[current_shift];
+    double current_close = Close[current_shift];
+
+    int total_valid = ArraySize(valid_history_list);
+    
+    // 遍历每一个有效的历史基石信号 (D, B, A...)
+    for (int i = 0; i < total_valid; i++)
+    {
+        FilteredSignal base_signal = valid_history_list[i]; // 例如信号 D, 或 B, 或 A
+        
+        // 1. 基础数据准备
+        double base_risk = 0;
+        double base_ref_price = base_signal.confirmation_close;
+        
+        // 计算该历史信号的基础风险 (Risk)
+        // 注意：base_signal 是反向信号 (例如当前是看跌，history 是看涨)
+        if (current_type == OP_SELL) // 当前看跌，base 是看涨
+        {
+             base_risk = base_signal.confirmation_close - base_signal.stop_loss;
+        }
+        else // 当前看涨，base 是看跌
+        {
+             base_risk = base_signal.stop_loss - base_signal.confirmation_close;
+        }
+        
+        if (base_risk <= 0) continue;
+
+        // 2. 价格位置初筛 (L4a): 
+        // 您的要求：看跌信号必须高于历史看涨信号的收盘价 (不能在地下室谈反转)
+        if (current_type == OP_SELL && current_close <= base_ref_price) continue;
+        if (current_type == OP_BUY && current_close >= base_ref_price) continue;
+
+        // 3. 遍历所有定义的斐波区域 (1.618-2, 2.618-3, 4.236-5...)
+        // 这里使用循环遍历 FiboExhaustionZones 数组 (假设已定义)
+        for (int z = 0; z < FIBO_ZONES_COUNT; z++)
+        {
+            double level1 = FiboExhaustionZones[z].level1;
+            double level2 = FiboExhaustionZones[z].level2;
+            
+            double zone_low, zone_high;
+            
+            // 计算具体的区域价格
+            if (current_type == OP_SELL) // 历史是看涨，向上延伸
+            {
+                zone_low  = base_ref_price + (base_risk * level1);
+                zone_high = base_ref_price + (base_risk * level2);
+            }
+            else // 历史是看跌，向下延伸
+            {
+                zone_low  = base_ref_price - (base_risk * level2);
+                zone_high = base_ref_price - (base_risk * level1);
+            }
+            
+            // 4. 触碰检查 (Touching Check)
+            // 只要当前信号 K 线触碰到了这个区域
+            bool is_touching = false;
+            if (current_type == OP_SELL)
+            {
+                if (current_low <= zone_high && current_high >= zone_low) is_touching = true;
+            }
+            else
+            {
+                if (current_high >= zone_low && current_low <= zone_high) is_touching = true;
+            }
+            
+            if (is_touching)
+            {
+                // 🎯 找到了！
+                // 打印详细的上下文信息：是哪个历史信号(shift)，哪个区域
+                Print("✅ [上下文匹配] 当前信号 K[", current_shift, "] 命中历史有效信号 K[", base_signal.shift, 
+                      "] 的 Fib 区间 [", DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "]");
+                
+                return true; // 只要满足任意一个，就视为有上下文支持
+            }
+        }
+    }
+    
+    return false; // 扫描完所有历史有效信号，都没有命中
+}

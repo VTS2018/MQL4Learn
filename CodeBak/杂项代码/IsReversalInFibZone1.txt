@@ -1,0 +1,123 @@
+//+------------------------------------------------------------------+
+//| L2c: 斐波那契反转区域过滤 (Context Filter)                       |
+//| 修正：1. 使用 ArrayRange 2. 斐波那契扩展基准点改为 prev_sl      |
+//+------------------------------------------------------------------+
+bool IsReversalInFibZone(int current_shift, int current_type)
+{
+    // ----------------------------------------------------
+    // 🚨 修正：使用 ArrayRange(数组名, 0) 获取行数 🚨
+    // ----------------------------------------------------
+    // 假设 FiboExhaustionLevels 已在全局范围定义
+    int zones_count = ArrayRange(FiboExhaustionLevels, 0); 
+    
+    // 调试打印：此时 zones_count 应该正确显示行数 (例如 4)
+    // Print("•>[KTarget_FinderBot.mq4:1273]: zones_count: ", zones_count); 
+
+    if (zones_count == 0) return false; 
+    
+    // 1. 确定我们要找的前一个信号类型
+    int search_type = (current_type == OP_SELL) ? OP_BUY : OP_SELL;
+
+    // ... (查找 prev_data 的逻辑，代码省略) ...
+    int max_history_scan = 100;
+    int found_prev_shift = -1;
+    KBarSignal prev_data; 
+    ZeroMemory(prev_data); 
+    
+    for (int i = current_shift + 1; i < current_shift + max_history_scan; i++)
+    {
+      KBarSignal temp_data = GetIndicatorBarData(i);
+      bool is_target_found = false;
+
+      if (search_type == OP_BUY)
+      {
+         if (temp_data.BullishReferencePrice != (double)EMPTY_VALUE && temp_data.BullishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+      else
+      {
+         if (temp_data.BearishReferencePrice != (double)EMPTY_VALUE && temp_data.BearishReferencePrice != 0.0)
+            is_target_found = true;
+      }
+
+      if (is_target_found)
+      {
+         found_prev_shift = i;
+         prev_data = temp_data;
+         break;
+      }
+    }
+    
+    if (found_prev_shift == -1) return false;
+
+    // 3. 计算前一个信号的风险波幅 (Risk)
+    double prev_entry = Close[found_prev_shift]; // 锚点入场价
+    double prev_sl = 0; // 锚点止损价 (斐波那契计算的**基准价**)
+    
+    if (search_type == OP_BUY)
+    {
+        prev_sl = prev_data.BullishStopLossPrice;
+    }
+    else
+    {
+        prev_sl = prev_data.BearishStopLossPrice;
+    }
+    
+    double risk = (search_type == OP_BUY) ? (prev_entry - prev_sl) : (prev_sl - prev_entry);
+    if (risk <= 0) return false;
+
+    // 4. 准备当前信号的价格数据和容差
+    double current_low  = Low[current_shift];
+    double current_high = High[current_shift]; 
+    
+    double tolerance = risk * 0.1;
+    tolerance = NormalizeDouble(tolerance, _Digits);
+
+    // 5. 核心逻辑：循环检查所有定义的斐波那契区域 
+    for (int z = 0; z < zones_count; z++)
+    {
+        double level1 = FiboExhaustionLevels[z][0]; 
+        double level2 = FiboExhaustionLevels[z][1];
+        
+        double zone_low = 0;
+        double zone_high = 0;
+
+        // 计算该区域的绝对价格边界 (基于 **prev_sl** 进行扩展)
+        if (search_type == OP_BUY) // 前一个是涨势 (向上延伸)
+        {
+            // 🚨 修正：基准价从 prev_entry 改为 prev_sl 🚨
+            zone_low  = prev_sl + (risk * level1);
+            // Print("---->[KTarget_FinderBot.mq4:1368]: level1: ", level1); // 调试语句，建议删除或注释
+            zone_high = prev_sl + (risk * level2);
+            // Print("---->[KTarget_FinderBot.mq4:1370]: level2: ", level2); // 调试语句，建议删除或注释
+        }
+        else // 前一个是跌势 (向下延伸)
+        {
+            // 🚨 修正：基准价从 prev_entry 改为 prev_sl 🚨
+            zone_low  = prev_sl - (risk * level2); // level2 更大，价格更低 -> zone_low
+            zone_high = prev_sl - (risk * level1); // level1 更小，价格更高 -> zone_high
+        }
+        
+        // 精度修正
+        zone_low  = NormalizeDouble(zone_low, _Digits);
+        zone_high = NormalizeDouble(zone_high, _Digits);
+
+        // 6. 应用容差，计算实际检查区域
+        double check_zone_low  = NormalizeDouble(zone_low - tolerance, _Digits);
+        double check_zone_high = NormalizeDouble(zone_high + tolerance, _Digits);
+        
+        // 7. 触碰检查 (Touching Check)
+        if (current_low <= check_zone_high && current_high >= check_zone_low)
+        {
+            string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+            
+            Print(" L2c 斐波过滤通过 (触碰): 当前", type_str, "信号 @ K[", current_shift, "] 触碰前值 Fib [",
+                  DoubleToString(level1, 3), "-", DoubleToString(level2, 3), 
+                  "] 区域 (", DoubleToString(zone_low, _Digits), "-", DoubleToString(zone_high, _Digits), ")");
+            
+            return true;
+        }
+    }
+    
+    return false;
+}

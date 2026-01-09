@@ -1,0 +1,123 @@
+//+------------------------------------------------------------------+
+//| CalculateSignalQuality
+//| 功能：综合评估信号质量，计算分级
+//+------------------------------------------------------------------+
+SignalQuality CalculateSignalQuality(
+      int anchor_index, 
+      int breakout_index, 
+      double p1_price, 
+      double p2_price, 
+      double stop_loss_price
+      )
+{
+   SignalQuality result;
+   // 初始化
+   result.grade = GRADE_NONE;
+   result.description = "No Signal";
+   
+   // --- 0. 基础数据准备 ---
+   double close_break = Close[breakout_index];
+   double atr_val = iATR(NULL, 0, 14, breakout_index);
+   if(atr_val == 0) atr_val = Point; // 防止除零
+   
+   // --- 1. 结构判定 (Structure) ---
+   int n_geo = breakout_index - anchor_index; // 距离
+   
+   result.is_IB = (n_geo <= 2);
+   result.is_DB = (n_geo > 2);
+   
+   // CB 判定：收盘价是否站稳 P2
+   // 注意：如果是做多，Close > P2；做空则 Close < P2。这里以做多为例
+   result.is_CB = (close_break > p2_price); 
+
+   // --- 2. 空间判定 (Space & Risk) ---
+   // 计算 P2-P1 的 ATR 因子 (奔跑空间)
+   double dist_p2_p1 = MathAbs(p2_price - p1_price);
+   result.space_factor = dist_p2_p1 / atr_val;
+   
+   // 计算潜在盈亏比 (假设以 P2 为第一目标)
+   double risk = MathAbs(p1_price - stop_loss_price);
+   if(risk == 0) risk = Point;
+   result.reward_risk_ratio = dist_p2_p1 / risk;
+
+   // --- 3. 评级逻辑 (The Scoring Logic) ---
+   
+   // 过滤：如果有毒结构 (P2 < P1)，直接判负 (源代码可能已过滤，这里双重保险)
+   if (p2_price < p1_price) // 假设做多
+   {
+      result.grade = GRADE_F;
+      result.description = "结构破坏 (P2 < P1)";
+      return result;
+   }
+
+   // 过滤：如果空间太小 (共振太紧，且没有突破 P2)
+   // 也就是：没过 P2，且 P2 就在头顶上，这种单子没法做
+   if (!result.is_CB && result.space_factor < 0.5)
+   {
+      result.grade = GRADE_D;
+      result.description = "空间不足 (P2压制且距离太近)";
+      return result;
+   }
+
+   // === 评级晋升阶梯 ===
+   
+   if (result.is_CB) 
+   {
+      // 突破了 P2 (CB)，这是强信号
+      if (result.is_DB) {
+         result.grade = GRADE_S;
+         result.description = "S级: 完美主导突破 (DB+CB)";
+      } else {
+         result.grade = GRADE_A;
+         result.description = "A级: 强力爆发突破 (IB+CB)";
+      }
+   }
+   else 
+   {
+      // 没突破 P2 (Only P1 Break)，看空间够不够
+      if (result.space_factor > 1.5) // 空间巨大，ATR的1.5倍以上
+      {
+         if (result.is_DB) {
+             result.grade = GRADE_B;
+             result.description = "B级: 优质区间交易 (DB only + 大空间)";
+         } else {
+             result.grade = GRADE_C;
+             result.description = "C级: 激进填坑交易 (IB only + 大空间)";
+         }
+      }
+      else 
+      {
+         // 没过 P2，空间又一般 (0.5 - 1.5 ATR)
+         result.grade = GRADE_D;
+         result.description = "D级: 鸡肋，盈亏比一般";
+      }
+   }
+   
+   return result;
+}
+四、 如何在主程序中使用它？
+现在，在您的主循环 FindAndDrawTargetCandles 中，您不再是简单地画个箭头了。您可以根据评级做不同的处理。
+// 在主循环中检测到突破后...
+
+// 1. 计算信号质量
+SignalQuality sq = CalculateSignalQuality(i, breakout_idx, P1, P2, StopLoss);
+
+// 2. 将评级写入缓冲区 (为了显示或EA读取)
+// 我们可以约定：5=S, 4=A, 3=B, 2=C...
+BullishSignalBuffer[breakout_idx] = (double)sq.grade; 
+
+// 3. (可选) 控制台打印详细日志，方便复盘
+if (sq.grade >= GRADE_B) 
+{
+    Print("发现信号 [", Time[breakout_idx], "] | ", sq.description, 
+          " | 盈亏比: ", DoubleToString(sq.reward_risk_ratio, 2),
+          " | 空间因子: ", DoubleToString(sq.space_factor, 2));
+}
+
+// 4. (可选) 给不同等级画不同颜色的箭头
+if (sq.grade == GRADE_S) {
+    // 画个金色大箭头
+} else if (sq.grade == GRADE_D) {
+    // 这种垃圾信号，虽然满足逻辑，但我选择不画出来 (过滤)
+    BullishSignalBuffer[breakout_idx] = 0; // 清空
+}

@@ -1,0 +1,49 @@
+input string   _Alerts_         = "=== 提醒设置 ==="; 
+input bool     Alert_Popup      = true;  // 开启PC端弹窗
+input bool     Alert_Push       = true;  // 开启手机推送 (最重要)
+input bool     Alert_Sound      = true;  // 开启声音
+input string   Sound_File       = "alert.wav";
+
+// 关键设计：分级过滤
+input ENUM_SIGNAL_GRADE  Min_Alert_Grade = GRADE_B; // 最低报警级别
+// 选项：GRADE_S, GRADE_A, GRADE_B... 
+// 如果设为 B，则 C/D 级信号虽然会画箭头，但不会弹窗打扰交易员。
+
+=================================================================================
+void SendRichAlert(int index, string symbol, int timeframe, 
+                   string type, double entry, double sl, double p2, 
+                   SignalQuality &sq)
+{
+   // 1. 检查级别过滤
+   if (sq.grade < Min_Alert_Grade) return;
+
+   // 2. 构建标题
+   string title = StringFormat("%s M%d [%s] | 评级: %s", 
+                               symbol, timeframe, type, sq.description);
+
+   // 3. 构建详细参数
+   string details = "";
+   double risk = MathAbs(entry - sl) / Point;
+   
+   // 动态建议
+   string advice = "";
+   if (sq.grade >= GRADE_S) advice = ">> 建议: 重仓/强力突破";
+   else if (sq.is_CB)       advice = ">> 建议: 破位持有";
+   else                     advice = StringFormat(">> 建议: 目标看向 %.5f", p2);
+
+   details = StringFormat(
+      "\n--------------------\n"
+      "入场: %.5f\n"
+      "止损: %.5f (%d pts)\n"
+      "关键阻力(P2): %.5f\n"
+      "空间因子: %.1f | 盈亏比: %.1f\n"
+      "%s",
+      entry, sl, (int)risk, p2, sq.space_factor, sq.reward_risk_ratio, advice
+   );
+
+   string full_msg = title + details;
+
+   // 4. 发送
+   if (Alert_Popup) Alert(full_msg); // PC端
+   if (Alert_Push)  SendNotification(full_msg); // 手机端 (MetaQuotes ID)
+}

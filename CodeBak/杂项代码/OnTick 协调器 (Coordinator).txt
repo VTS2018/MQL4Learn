@@ -1,0 +1,32 @@
+// KTarget_FinderBot.mq4
+
+//+------------------------------------------------------------------+
+//| OnTick: 协调器 (Coordinator)
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // 1. 新 K 线检测与交易管理检查 (保持精简)
+    if(Time[0] == g_last_bar_time) return; 
+    g_last_bar_time = Time[0]; 
+
+    if (CountOpenTrades(MagicNumber) >= 1) return; // 单边交易管理
+
+    // 2. 批量获取信号数据 (集中 iCustom 调用)
+    KBarSignal last_bar_data = GetIndicatorBarData(1); 
+
+    // 3. 核心决策调用 (所有的过滤和判断都在这里完成)
+    int trade_command = CheckSignalAndFilter(last_bar_data); 
+
+    // 4. 执行结果 (OnTick 只需要知道做什么)
+    if (trade_command == OP_BUY)
+    {
+        CalculateTradeAndExecute(last_bar_data, OP_BUY); 
+    }
+    else if (trade_command == OP_SELL)
+    {
+        CalculateTradeAndExecute(last_bar_data, OP_SELL); 
+    }
+}
+
+
+(double)

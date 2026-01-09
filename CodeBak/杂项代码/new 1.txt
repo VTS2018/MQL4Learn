@@ -1,0 +1,48 @@
+/*
+    条件: 阴线，且收盘价是左右两侧周期内的最低收盘价。
+    优化: 增加跳空豁免机制，允许紧随其后的K线 (k=1) 因跳空低位探底而收盘价更低。
+*/
+bool CheckKTargetBottomCondition(int i, int total_bars)
+{
+    // 1. 必须是阴线 (Bearish Candle)
+    // 确保使用 Lookahead/Lookback 的最新参数值
+    TuningParameters p = Smart_Tuning_Enabled ? GetTunedParameters() : 
+                         TuningParameters {0, Lookahead_Bottom, Lookback_Bottom, 0, 0, 0}; 
+
+    if (Close[i] >= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= p.Lookahead_Bottom; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        
+        // 1. 检查是否存在更低的收盘价
+        if (Close[future_index] < Close[i])
+        {
+            // 2. 🚨 豁免条件 🚨
+            // 只有当它是紧随锚点 (k=1) 且其 Low 价格已经突破锚点 Close 时，才允许其收盘价更低。
+            if (k == 1 && Low[future_index] < Close[i])
+            {
+                // 满足豁免条件 (典型的跳空低位探底)，继续检查后面的 K 线 (i-2, i-3...)
+                continue; 
+            }
+            
+            // 3. 不满足豁免条件 (即 k > 1 或 k=1 但没有低位探底/跳空)，
+            // 且收盘价更低，则锚点 i 无效。
+            return false;
+        }
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    // 左侧（历史 K 线）不涉及跳空问题，逻辑保持不变。
+    for (int k = 1; k <= p.Lookback_Bottom; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最低收盘价
+        if (Close[past_index] < Close[i]) return false;
+    }
+    
+    return true;
+}

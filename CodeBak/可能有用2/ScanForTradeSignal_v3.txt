@@ -1,0 +1,105 @@
+//+------------------------------------------------------------------+
+//| ScanForTradeSignal_v3 (修复版)
+//| 功能：v3 引擎的信号扫描器 (适配器模式)
+//| 修复：直接使用本地 sl 变量，解决 struct member undefined 错误
+//+------------------------------------------------------------------+
+void ScanForTradeSignal_v3()
+{
+    // 1. 始终只扫描刚刚收盘的 K 线 (Shift 1)
+    int shift = 1;
+    
+    // 假设向前回溯 60 根 K 线寻找结构
+    int search_depth = 60; 
+
+    // =============================================================
+    // A. 扫描做多信号 (Bullish)
+    // =============================================================
+    for (int i = shift + 1; i < shift + search_depth; i++)
+    {
+        // 1. 调用主文件的找底函数
+        if (CheckKTargetBottomCondition(i, Bars)) 
+        {
+            double p1 = Open[i];
+            
+            // 2. 简单的 P2 查找
+            double p2 = 0;
+            for(int k=1; k<50; k++) { if(Close[i+k] > Open[i+k]) { p2=Close[i+k]; break; } }
+            if(p2==0) p2 = p1 * 1.001; // 容错
+            
+            // ✅ [重点] 止损价在这里已经计算好了
+            double sl = Low[i]; 
+
+            // 3. 检查 shift=1 是否触发了突破
+            bool is_breakout = (Close[shift] > p1); 
+
+            if (is_breakout)
+            {
+                // 4. 调用 v3 内核评分
+                SignalQuality sq = EvaluateSignal(Symbol(), Period(), i, shift, p1, p2, sl, true);
+                
+                // 5. 决策
+                if (sq.grade >= Min_Trade_Grade && sq.space_factor >= Min_Space_Factor)
+                {
+                    // === 适配器构造 ===
+                    KBarSignal adapter_data;
+                    adapter_data.OpenTime = Time[shift];
+                    
+                    // 🚨 [修复点 1] 直接使用本地变量 sl，而不是 sq.sl_price
+                    adapter_data.BullishStopLossPrice = sl; 
+                    
+                    // 借用 ReferencePrice 存储评级
+                    adapter_data.BullishReferencePrice = (double)sq.grade; 
+                    
+                    adapter_data.BearishStopLossPrice = 0;
+                    adapter_data.BearishReferencePrice = 0;
+
+                    Print("🔥 v3 引擎触发做多! 评级:", sq.description, " SL:", sl); // 这里也打印 sl
+
+                    CalculateTradeAndExecute_V2(adapter_data, OP_BUY);
+                    return; 
+                }
+            }
+        }
+    }
+
+    // =============================================================
+    // B. 扫描做空信号 (Bearish)
+    // =============================================================
+    for (int i = shift + 1; i < shift + search_depth; i++)
+    {
+        if (CheckKTargetTopCondition(i, Bars)) 
+        {
+            double p1 = Open[i];
+            double p2 = 0;
+            for(int k=1; k<50; k++) { if(Close[i+k] < Open[i+k]) { p2=Close[i+k]; break; } }
+            if(p2==0) p2 = p1 * 0.999;
+            
+            // ✅ [重点] 止损价在这里计算好了
+            double sl = High[i];
+            
+            if (Close[shift] < p1) // 突破 P1
+            {
+                SignalQuality sq = EvaluateSignal(Symbol(), Period(), i, shift, p1, p2, sl, false);
+                
+                if (sq.grade >= Min_Trade_Grade && sq.space_factor >= Min_Space_Factor)
+                {
+                    KBarSignal adapter_data;
+                    adapter_data.OpenTime = Time[shift];
+                    
+                    // 🚨 [修复点 2] 直接使用本地变量 sl
+                    adapter_data.BearishStopLossPrice = sl;
+                    
+                    adapter_data.BearishReferencePrice = (double)sq.grade;
+                    
+                    adapter_data.BullishStopLossPrice = 0;
+                    adapter_data.BullishReferencePrice = 0;
+
+                    Print("❄️ v3 引擎触发做空! 评级:", sq.description, " SL:", sl);
+
+                    CalculateTradeAndExecute_V2(adapter_data, OP_SELL);
+                    return;
+                }
+            }
+        }
+    }
+}

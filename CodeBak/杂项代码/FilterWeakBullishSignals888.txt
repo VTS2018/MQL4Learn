@@ -1,0 +1,50 @@
+//+------------------------------------------------------------------+
+//| 信号弱势过滤：修正后的 MQL4 稳定签名                             |
+//| 返回值：过滤后的信号数量。                                       |
+//| 参数：source[] 是原始信号列表；&filtered_list[] 是结果数组（引用）|
+//+------------------------------------------------------------------+
+int FilterWeakBullishSignals(FilteredSignal source_signals[], FilteredSignal &filtered_list[])
+{
+    // 确保结果数组为空
+    ArrayResize(filtered_list, 0); 
+    
+    int size = ArraySize(source_signals);
+    if (size < 2)
+    {
+        // 如果信号少于 2 个，直接返回原始列表（通过复制到结果数组）
+        ArrayCopy(filtered_list, source_signals);
+        return ArraySize(filtered_list);
+    }
+    
+    // ... (过滤逻辑开始) ...
+    
+    // 关键：从最旧的信号开始比较。最旧的信号在数组的最后一个元素。
+    int last_index = size - 1;
+    
+    // 假设最旧的信号总是有效的，将其加入结果列表
+    ArrayResize(filtered_list, 1);
+    filtered_list[0] = source_signals[last_index]; 
+    
+    // 逆序遍历，从倒数第二个信号开始，向前比较 (信号 A - 靠近 K[1])
+    for (int i = last_index - 1; i >= 0; i--)
+    {
+        FilteredSignal current_signal = source_signals[i];   // 信号 A (更靠近 K[1])
+        FilteredSignal previous_valid = filtered_list[ArraySize(filtered_list) - 1]; // 上一个有效信号 (信号 B - 更远离 K[1])
+        
+        // 过滤规则 (看涨信号弱势判断): 如果 SL 未抬升，视为无效
+        if (current_signal.stop_loss <= previous_valid.stop_loss)
+        {
+            // Print("❌ 弱势过滤 (看涨): 信号 @ ", TimeToString(current_signal.signal_time), " (SL:", current_signal.stop_loss, ") 未能抬升低点，过滤掉。");
+            continue; // 过滤掉信号 A
+        }
+
+        // 信号 A 通过过滤：将其加入有效列表
+        int new_index = ArraySize(filtered_list);
+        ArrayResize(filtered_list, new_index + 1);
+        filtered_list[new_index] = current_signal;
+    }
+    
+    ArrayReverse(filtered_list); // 逆转后，K[1] 的信号排在最前
+    
+    return ArraySize(filtered_list);
+}

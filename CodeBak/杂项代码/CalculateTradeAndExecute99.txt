@@ -1,0 +1,69 @@
+//+------------------------------------------------------------------+
+//| 函数: 计算 SL/TP 并执行交易 (L3)
+//| 职责: 最终的计算和 OrderSend 调用
+//+------------------------------------------------------------------+
+void CalculateTradeAndExecute(const KBarSignal &data, int type)
+{
+    double sl_price = 0;
+    double entry_price = Open[0]; // 实际入场价 (用于 OrderSend)
+    double tp_price = 0;
+    double reference_price = 0; // 斐波那契计算的基准价 (Close[1])
+    double risk = 0;
+    
+    // 1. 获取 SL/Reference Price
+    if (type == OP_BUY)
+    {
+        sl_price = data.BullishStopLossPrice;
+    }
+    else if (type == OP_SELL)
+    {
+        sl_price = data.BearishStopLossPrice;
+    }
+    
+    [cite_start]// 修正：将 reference_price 确定为 Close[1] (信号确认价) [cite: 6]
+    reference_price = Close[1]; 
+    
+    // 2. 🚨 修正计算风险 (用于 TP 计算的理论风险波幅) 🚨
+    // 风险 = 信号确认价 (Close[1]) 到 止损价 (sl_price) 的理论距离
+    if (type == OP_BUY)
+    {
+        // 做多：理论风险 = Close[1] - SL价
+        risk = reference_price - sl_price;
+    }
+    else if (type == OP_SELL)
+    {
+        // 做空：理论风险 = SL价 - Close[1]
+        risk = sl_price - reference_price;
+    }
+    
+    // 3. 计算 TP (基于 reference_price 和理论风险 risk)
+    // 斐波那契轴线是 SL价格 到 Close[1] 的距离 (即 risk)
+    double tp_level = 1.618; 
+    
+    if (type == OP_BUY)
+    {
+        // TP = 斐波那契基准价 (Close[1]) + 理论风险 * 斐波那契级别
+        tp_price = reference_price + (risk * tp_level); 
+    }
+    else if (type == OP_SELL)
+    {
+        // TP = 斐波那契基准价 (Close[1]) - 理论风险 * 斐波那契级别
+        tp_price = reference_price - (risk * tp_level);
+    }
+
+    // 1. 生成信号 ID (用于防重复和追踪)
+    [cite_start]string signal_id = GenerateSignalID(data.OpenTime); [cite: 13]
+
+    // 2. 订单注释：嵌入 版本标签、信号 ID 和初始追踪状态
+    string comment = EA_Version_Tag + "|" + [cite_start]signal_id; [cite: 16]
+    
+    // 4. 执行交易 (此处使用固定手数，未来需要加入资金管理)
+    // 注意：OrderSend 必须使用实际入场价 entry_price 和 sl_price/tp_price
+    [cite_start]ExecuteTrade(type, FixedLot, sl_price, tp_price, entry_price, comment); [cite: 17]
+    
+    Print("交易执行: ", (type == OP_BUY ? "BUY" : "SELL"),
+          " | SL:", DoubleToString(sl_price, _Digits),
+          " | TP(1.618):", DoubleToString(tp_price, _Digits),
+          " | 理论风险:", DoubleToString(risk, _Digits), // 打印理论风险方便调试
+          [cite_start]" | 质量:", IntegerToString((int)((type == OP_BUY) ? data.BullishReferencePrice : data.BearishReferencePrice))); [cite: 18]
+}

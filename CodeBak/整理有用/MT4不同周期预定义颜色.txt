@@ -1,0 +1,22 @@
+Orange
+Yellow
+Red
+Gold
+Blue
+Aqua
+DeepPink
+DeepSkyBlue
+LimeGreen
+==========================================
+M   233,30,99
+W   8,153,129
+D   255,152,0
+
+4H   Gold
+1H   Yellow
+30m  Aqua
+15m  PeachPuff
+==========================================
+
+密码
+C7xw*KDV

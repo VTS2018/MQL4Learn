@@ -1,0 +1,25 @@
+bool CheckKTargetBottomCondition(int i, int total_bars)
+{
+    // 1. 必须是阴线 (Bearish Candle)
+    if (Close[i] >= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= Lookahead_Bottom; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        // 必须是最低收盘价
+        if (Close[future_index] < Close[i]) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= Lookback_Bottom; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最低收盘价
+        if (Close[past_index] < Close[i]) return false;
+    }
+    
+    return true;
+}

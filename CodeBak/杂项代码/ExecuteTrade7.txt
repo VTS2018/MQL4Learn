@@ -1,0 +1,99 @@
+// KTarget_FinderBot.mq4
+
+// ... (其他函数保持不变) ...
+
+//+------------------------------------------------------------------+
+//| 批量获取 KTarget_Finder5 所有缓冲区数据                          |
+//+------------------------------------------------------------------+
+KBarSignal GetIndicatorBarData(int shift)
+{
+    KBarSignal data;
+    
+    // 集中 iCustom 调用 (读取 SL 价格和信号价格)
+    data.BullishStopLossPrice = GetIndicatorSignal(0, shift); // Buffer 0 (新的绝对SL价)
+    data.BearishStopLossPrice = GetIndicatorSignal(1, shift); // Buffer 1 (新的绝对SL价)
+    data.BullishSignalPrice   = GetIndicatorSignal(2, shift); // Buffer 2
+    data.BearishSignalPrice   = GetIndicatorSignal(3, shift); // Buffer 3
+    
+    // 附加信息：信号 K 线的收盘价 (用于入场)
+    data.SignalClosePrice = Close[shift]; 
+    
+    return data;
+}
+
+//+------------------------------------------------------------------+
+//| OnTick: 核心逻辑循环 (修正为使用批量数据)
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    if(Time[0] == g_last_bar_time) return; 
+    g_last_bar_time = Time[0]; 
+
+    if (CountOpenTrades(MagicNumber) >= 1) return; 
+    
+    // 🚨 集中获取所有信号数据和 SL 价格 🚨
+    KBarSignal last_bar_data = GetIndicatorBarData(1); // 获取 shift=1 (已收盘 K 线) 的数据
+
+    // --- 3. 执行交易逻辑 ---
+    
+    // 3.1 处理买入信号
+    if(last_bar_data.BullishSignalPrice != EMPTY_VALUE && last_bar_data.BullishSignalPrice != 0)
+    {
+        Print(">>> 侦测到看涨信号 @ ", Time[1]);
+        
+        // A. 止损价直接读取 Buffer 0
+        double sl_price = last_bar_data.BullishStopLossPrice; 
+        
+        // B. 入场价：新的逻辑是 Close[1] (即 Open[0])
+        double entry_price = last_bar_data.SignalClosePrice; 
+        
+        // C. 计算止盈
+        double risk = entry_price - sl_price;
+        double tp_price = entry_price + (risk * RewardRatio);
+
+        // D. 执行开仓 (注意：ExecuteTrade 内部需要使用 entry_price)
+        ExecuteTrade(OP_BUY, FixedLot, sl_price, tp_price, entry_price, "K-Target Buy"); 
+    }
+
+    // 3.2 处理卖出信号
+    if(last_bar_data.BearishSignalPrice != EMPTY_VALUE && last_bar_data.BearishSignalPrice != 0)
+    {
+        Print(">>> 侦测到看跌信号 @ ", Time[1]);
+        
+        // A. 止损价直接读取 Buffer 1
+        double sl_price = last_bar_data.BearishStopLossPrice;
+        
+        // B. 入场价：新的逻辑是 Close[1] (即 Open[0])
+        double entry_price = last_bar_data.SignalClosePrice;
+        
+        // C. 计算止盈
+        double risk = sl_price - entry_price;
+        double tp_price = entry_price - (risk * RewardRatio);
+
+        // D. 执行开仓
+        ExecuteTrade(OP_SELL, FixedLot, sl_price, tp_price, entry_price, "K-Target Sell");
+    }
+}
+
+//+------------------------------------------------------------------+
+//| 函数: 执行交易 (OrderSend 封装 - 🚨 需要增加 entry_price 参数 🚨)
+//+------------------------------------------------------------------+
+// 增加 open_price 参数，确保使用 Open[0] (即 SignalClosePrice)
+void ExecuteTrade(int type, double lots, double sl, double tp, double open_price, string comment)
+{
+   // 1. 规范化价格
+   sl = NormalizeDouble(sl, Digits);
+   tp = NormalizeDouble(tp, Digits);
+   open_price = NormalizeDouble(open_price, Digits); // 使用传入的 Open[0] 价格
+   
+   // 2. 发送订单
+   // 注意：现价单 (OP_BUY/OP_SELL) 传入的开仓价 open_price 实际上是 MT4 引擎用于价格检查的。
+   // 实际开仓价依然是 Ask/Bid，但在新 K 线开盘时，Ask/Bid 会非常接近 Open[0]。
+   int ticket = OrderSend(Symbol(), type, lots, open_price, Slippage, sl, tp, comment, MagicNumber, 0, clrNONE);
+   
+   // ... (结果检查逻辑保持不变) ...
+}
+
+// ------------------------------------------------------------------
+// 🚨 旧的 FindStructuralSL 函数现在可以删除了，因为它已经被批量读取取代 🚨
+// ------------------------------------------------------------------

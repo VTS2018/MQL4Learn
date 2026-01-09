@@ -1,0 +1,55 @@
+// KTarget_FinderBot.mq4
+
+//+------------------------------------------------------------------+
+//| 函数: 检查信号质量和所有 L2 过滤 (核心决策引擎)
+//| 职责: 协调所有时间/风控/质量/外部环境过滤规则
+//| 返回: OP_BUY, OP_SELL, 或 0 (OP_NONE)
+//+------------------------------------------------------------------+
+int CheckSignalAndFilter(KBarSignal data, int signal_shift)
+{
+    // --- 过滤 A: 时间窗口和日内风控 (L3) ---
+    // 检查：交易时间、日最大亏损、日最大交易次数、日盈利目标
+    if (!IsTimeWindowAllowed()) return OP_NONE;
+    if (!IsDailyRiskAllowed()) return OP_NONE;
+    // if (!IsTradingAllowedByStreak()) return OP_NONE; // 连续止损控制
+    
+    int trade_command = OP_NONE;
+
+    // --- 过滤 B: 信号质量和外部环境 (L2) ---
+
+    // 1. 检查看涨信号 (Buffer 2)
+    // BullishReferencePrice 现在是 3.0 或 2.0
+    if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+    {
+        int signal_quality = (int)data.BullishReferencePrice;
+        
+        // 1.1 内部过滤：检查信号质量是否满足最低要求
+        if (signal_quality >= Min_Signal_Quality)
+        {
+            // 1.2 外部过滤：检查矩形区域、MA 趋势等复杂条件
+            // if (IsExternalConditionMet(OP_BUY, signal_shift))
+            // {
+                trade_command = OP_BUY;
+            // }
+        }
+    }
+
+    // 2. 检查看跌信号 (Buffer 3)
+    // BearishReferencePrice 现在是 3.0 或 2.0
+    if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+    {
+        int signal_quality = (int)data.BearishReferencePrice;
+
+        // 2.1 内部过滤：检查信号质量是否满足最低要求
+        if (signal_quality >= Min_Signal_Quality)
+        {
+            // 2.2 外部过滤：检查矩形区域、MA 趋势等复杂条件
+            // if (IsExternalConditionMet(OP_SELL, signal_shift))
+            // {
+                trade_command = OP_SELL;
+            // }
+        }
+    }
+    
+    return trade_command;
+}

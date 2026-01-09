@@ -1,0 +1,77 @@
+int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
+{
+
+   return -1;
+   // --- 过滤 A: 时间窗口和日内风控 (L3) ---
+   // 检查：交易时间、日最大亏损、日最大交易次数、日盈利目标
+   // if (!IsTimeWindowAllowed())
+   //    return OP_NONE;
+   // if (!IsDailyRiskAllowed())
+   //    return OP_NONE;
+   // if (!IsTradingAllowedByStreak()) return OP_NONE; // 连续止损控制
+
+   int trade_command = OP_NONE;
+
+   // --- 过滤 B: 信号质量和外部环境 (L2) ---
+
+   // --- 1. 检查看涨信号 ---
+   // 使用 ReferencePrice (现在是质量代码) 进行判断
+   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+   {
+      string log_message = ">>> 侦测到信号 @ K线索引 shift=" + IntegerToString(signal_shift) + " (时间: " + TimeToString(data.OpenTime) + ") <<<";
+      // A. 内部过滤：检查信号质量是否满足最低要求
+      if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
+      {
+         // B. 外部过滤：检查矩形区域、MA等外部条件 (暂未实现，默认通过)
+         // if (IsExternalConditionMet(OP_BUY))
+         // {
+         trade_command = OP_BUY;
+         log_message += " | 看涨 SL (Buffer 0): " + DoubleToString(data.BullishStopLossPrice, _Digits);
+         log_message += " | 质量 (Buffer 2): " + DoubleToString(data.BullishReferencePrice, 1);
+         Print(log_message, " | ", trade_command);
+         // goto L3_FILTER_START;
+         // }
+      }
+   }
+
+    // --- 2. 检查看跌信号 ---
+   if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+   {
+      string log_message = ">>> 侦测到信号 @ K线索引 shift=" + IntegerToString(signal_shift) + " (时间: " + TimeToString(data.OpenTime) + ") <<<";
+      // A. 内部过滤：检查信号质量是否满足最低要求
+      if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
+      {
+         // B. 外部过滤：检查矩形区域、MA等外部条件 (暂未实现，默认通过)
+         // if (IsExternalConditionMet(OP_SELL))
+         // {
+         trade_command = OP_SELL;
+         log_message += " | 看跌 SL (Buffer 1): " + DoubleToString(data.BearishStopLossPrice, _Digits);
+         log_message += " | 质量 (Buffer 3): " + DoubleToString(data.BearishReferencePrice, 1);
+         Print(log_message, " | ", trade_command);
+         // goto L3_FILTER_START;
+         // }
+      }
+   }
+
+   // 如果以上都没有找到信号，trade_command 仍为 OP_NONE。
+   // return OP_NONE;
+
+   // L3_FILTER_START:
+    // --- 过滤 C (L3: 信号使用追踪 - 防重复交易) ---
+   if (trade_command != OP_NONE)
+   {
+      // 生成唯一 ID: 使用信号 K 线的开盘时间作为 ID
+      // string signal_id = TimeToString(data.OpenTime, TIME_DATE | TIME_MINUTES);
+      string signal_id = GenerateSignalID(data.OpenTime);
+      // Print("---->[KTarget_FinderBot.mq4:605]: signal_id: ", signal_id);
+
+      // 🚨 检查该信号是否已交易 🚨
+      if (IsSignalAlreadyTraded(signal_id))
+      {
+         Print("signal_id:", signal_id, "信号已被交易，阻止开仓");
+         return OP_NONE; // 信号已被交易，阻止开仓
+      }
+   }
+
+    return trade_command;
+}

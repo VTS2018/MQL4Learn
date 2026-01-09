@@ -1,0 +1,27 @@
+void OnTick()
+{
+    // --- 1. Tick 级别管理 (必须每 Tick 运行) ---
+    if (CountOpenTrades(MagicNumber) >= 1) 
+    {
+        ManageOpenTrades(); // 负责动态止盈追踪 (我们上一步讨论的)
+    }
+    
+    // --- 2. 新 K 线检测 (New Bar Check - 仅在K线收盘时运行) ---
+    if(Time[0] == g_last_bar_time) return; 
+    g_last_bar_time = Time[0]; 
+
+    // 2.1 每日统计数据重置
+    CheckDailyReset(); 
+
+    // 2.2 批量读取数据 (集中 iCustom 调用)
+    KBarSignal last_bar_data = GetIndicatorBarData(1); 
+
+    // 2.3 核心决策调用 (所有过滤都在这里完成)
+    int trade_command = CheckSignalAndFilter(last_bar_data); 
+
+    // 2.4 执行交易
+    if (trade_command != OP_NONE)
+    {
+        CalculateTradeAndExecute(last_bar_data, trade_command); 
+    }
+}

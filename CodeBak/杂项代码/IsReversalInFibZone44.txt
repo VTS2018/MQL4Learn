@@ -1,0 +1,80 @@
+//+------------------------------------------------------------------+
+//| L2c: 斐波那契反转区域过滤 (Context Filter)                       |
+//| 检查当前反转信号 K 线 (High/Low) 是否触碰了前一个趋势的衰竭区      |
+//+------------------------------------------------------------------+
+bool IsReversalInFibZone(int current_shift, int current_type)
+{
+   // ... (代码前部不变：初始化 prev_data，寻找 found_prev_shift，计算 risk) ...
+
+   // 5. 检查风险是否有效 (防止除以零或错误计算)
+   if (risk <= 0) 
+   {
+       // Print("前置信号风险计算无效 (Risk <= 0)。");
+       return false;
+   }
+
+   // 6. 核心修改：遍历所有预设的斐波那契衰竭区域
+   double current_high = High[current_shift]; // 🚨 新增：当前信号K线的最高价
+   double current_low  = Low[current_shift];  // 🚨 新增：当前信号K线的最低价
+   double tolerance = risk * 0.1;               // 设置容差 (例如 10% 的理论风险距离)
+   
+   // 遍历 FiboExhaustionZones 数组
+   for (int i = 0; i < FIBO_ZONES_COUNT; i++)
+   {
+       double level1 = FiboExhaustionZones[i].level1;
+       double level2 = FiboExhaustionZones[i].level2;
+       
+       double zone_low = 0;
+       double zone_high = 0;
+       
+       // 6.1 计算当前区域的边界
+       if (search_type == OP_BUY)
+       {
+          // 前一个是涨势，目标位在上方 (看涨Fib：价格随级别增大而增大)
+          zone_low  = reference_price + (risk * level1);
+          zone_high = reference_price + (risk * level2);
+       }
+       else
+       {
+          // 前一个是跌势，目标位在下方 (看跌Fib：价格随级别增大而减小)
+          zone_low  = reference_price - (risk * level2); 
+          zone_high = reference_price - (risk * level1);
+       }
+       
+       // 6.2 🚨 核心逻辑修改：检查 K 线是否与区域有交叉 (触碰即有效) 🚨
+       
+       // 我们检查当前 K 线的 [Low, High] 范围是否与区域的 [zone_low, zone_high] 范围有重叠
+       bool is_touching = false;
+       
+       if (current_type == OP_SELL) // 检查看跌信号（价格从上方进入或穿过区域）
+       {
+           // 检查：K线的 Low 是否低于区域的 High (即进入区域)，同时 K线的 High 必须高于区域的 Low
+           if (current_low <= zone_high && current_high >= zone_low)
+           {
+               is_touching = true;
+           }
+       }
+       else // OP_BUY，检查看涨信号（价格从下方进入或穿过区域）
+       {
+           // 检查：K线的 High 是否高于区域的 Low (即进入区域)，同时 K线的 Low 必须低于区域的 High
+           if (current_high >= zone_low && current_low <= zone_high)
+           {
+               is_touching = true;
+           }
+       }
+       
+       // ⚠️ 注意：为了简化且符合您的“触碰”需求，我们将容差逻辑移除，只检查价格区间交叉。
+       // 也可以将容差应用于 zone_low/zone_high 的边界计算。此处保持简化交叉检查。
+       
+       if (is_touching)
+       {
+           // 只要落入任何一个有效区域，立即返回 true
+           string type_str = (current_type == OP_SELL) ? "看跌" : "看涨";
+           Print("✅ L2c 斐波过滤通过: 当前", type_str, "信号 K线 (", TimeToString(Time[current_shift]), ") 触碰了 Fib [", DoubleToString(level1, 3), "-", DoubleToString(level2, 3), "] 区域。");
+           return true; 
+       }
+   }
+   
+   // 7. 如果遍历完所有区域都没有命中，则返回 false
+   return false;
+}

@@ -1,0 +1,71 @@
+// KTarget_FinderBot.mq4
+
+//+------------------------------------------------------------------+
+//| 函数: 计算 SL/TP 并执行交易 (L3)
+//| 职责: 最终的计算和 OrderSend 调用
+//+------------------------------------------------------------------+
+void CalculateTradeAndExecute(KBarSignal data, int type)
+{
+    double sl_price = 0;
+    double entry_price = Open[0]; // 始终在新K线开盘时入场
+    double tp_price = 0;
+    double reference_price = 0; // 斐波那契计算的基准价 (Close[1])
+    double risk = 0;
+    
+    // 1. 获取 SL/Reference Price
+    if (type == OP_BUY)
+    {
+        sl_price = data.BullishStopLossPrice;
+        reference_price = data.BullishReferencePrice; // 🚨 注意：现在是质量代码，需要改为获取 Close[1]
+    }
+    else if (type == OP_SELL)
+    {
+        sl_price = data.BearishStopLossPrice;
+        reference_price = data.BearishReferencePrice;
+    }
+    
+    // 🚨 修正：由于 Buffer 2/3 现在是质量代码，我们不能再用它作为 Reference Price。
+    // 我们必须回到之前的方法：直接使用 Close[1] 作为斐波那契的计算基准价。
+    // 幸运的是，Reference Price 只是 Close[1]，EA 可以直接获取。
+    reference_price = Close[1]; 
+    
+    // 2. 计算风险
+    if (type == OP_BUY)
+    {
+        risk = entry_price - sl_price;
+    }
+    else if (type == OP_SELL)
+    {
+        risk = sl_price - entry_price;
+    }
+    
+    // 3. 计算 TP (固定为 1.618 斐波那契级别)
+    // 斐波那契轴线是 SL价格 到 Close[1] 的距离 (即 risk)
+    // 假设我们使用 1.618 作为固定止盈位，为实现动态追踪准备。
+    double tp_level = 1.618; 
+    
+    if (type == OP_BUY)
+    {
+        // TP = 斐波那契基准价 + 距离 * 斐波那契级别
+        // 斐波那契基准价通常是 SL 对应的 K 线的 Low/High，但简化为 Entry Price
+        tp_price = entry_price + (risk * tp_level); 
+    }
+    else if (type == OP_SELL)
+    {
+        tp_price = entry_price - (risk * tp_level);
+    }
+
+    // 4. 执行交易 (此处使用固定手数，未来需要加入资金管理)
+    ExecuteTrade(type, FixedLot, sl_price, tp_price, entry_price, "Q" + IntegerToString((int)data.BullishReferencePrice) + " Trade"); 
+    
+    Print("交易执行: ", (type == OP_BUY ? "BUY" : "SELL"), 
+          " | SL:", DoubleToString(sl_price, Digits), 
+          " | TP(1.618):", DoubleToString(tp_price, Digits),
+          " | 质量:", IntegerToString((int)data.BullishReferencePrice));
+}
+
+// ------------------------------------------------------------------
+// 🚨 注意：由于 Buffer 2/3 现在存储了信号质量代码，您必须在 GetIndicatorBarData 中：
+// 1. 确保读取出来的 double 值在 CalculateTradeAndExecute 中被正确转换为 int (质量)。
+// 2. 斐波那契的 Reference Price 必须改为直接使用 Close[1] 来获取，如 CalculateTradeAndExecute 中所示。
+// ------------------------------------------------------------------

@@ -1,0 +1,71 @@
+int CheckSignalAndFilter(const KBarSignal &data, int signal_shift)
+{
+
+   // --- 过滤 A: 时间窗口和日内风控 (L3) --- (保留您的原始代码)
+   // ...
+
+   int trade_command = OP_NONE;
+
+   // --- 过滤 B: 信号质量和外部环境 (L2) --- (检查看涨/看跌信号，并设置 trade_command)
+   // ... 您的 L2 信号质量检查逻辑 ...
+   
+   // ----------------------------------------------------------------------------------
+   // --- L3 过滤器集合：在执行交易前的最后检查 ---
+   // ----------------------------------------------------------------------------------
+   
+   if (trade_command != OP_NONE)
+   {
+      // 1. 🚨 L3a: 信号新鲜度过滤 (防止交易过期信号，例如 shift=220) 🚨
+      if (signal_shift > Max_Signal_Freshness_Shift)
+      {
+         Print("❌ L3a 过滤：信号太旧，shift=", signal_shift, " 超过最大新鲜度阈值 ", Max_Signal_Freshness_Shift, "。阻止开仓。");
+         return OP_NONE; // 信号太旧，阻止
+      }
+      
+      // 2. 🚨 L3b: 最大容忍风险过滤 (防止交易高成本/大止损的信号) 🚨
+      
+      // 获取当前入场价和信号止损价
+      double sl_price;
+      double entry_price = Open[0]; // 当前 K 线的开盘价
+      
+      if (trade_command == OP_BUY)
+      {
+         sl_price = data.BullishStopLossPrice;
+      }
+      else // OP_SELL
+      {
+         sl_price = data.BearishStopLossPrice;
+      }
+      
+      // 计算实际风险距离 (点数)
+      // 注意：使用 MathAbs 来获取绝对距离
+      double actual_risk_points = MathAbs(entry_price - sl_price) / Point();
+      actual_risk_points = NormalizeDouble(actual_risk_points, 0); // 取整
+      
+      // 检查风险距离是否超过阈值，或止损价位于错误一侧 (sl_price > entry_price for BUY)
+      bool risk_too_high = (actual_risk_points > Max_Risk_Distance_Points);
+      bool sl_on_wrong_side = (trade_command == OP_BUY && sl_price >= entry_price) || 
+                              (trade_command == OP_SELL && sl_price <= entry_price);
+
+      if (risk_too_high || sl_on_wrong_side)
+      {
+         Print("❌ L3b 过滤：风险距离过大 (", actual_risk_points, " 点)，或止损位位于错误一侧。阻止开仓。");
+         Print("  [DEBUG] Entry:", DoubleToString(entry_price, _Digits), " | SL:", DoubleToString(sl_price, _Digits));
+         return OP_NONE; // 风险过高或止损无效，阻止
+      }
+      
+      // 3. 🚨 L3c: 信号使用追踪过滤 (防重复交易) 🚨
+      // 这是您原有的 IsSignalAlreadyTraded 检查
+      
+      string signal_id = GenerateSignalID(data.OpenTime);
+      Print("---->[KTarget_FinderBot.mq4:589]: signal_id: ", signal_id);
+
+      if (IsSignalAlreadyTraded(signal_id))
+      {
+         Print("❌ L3c 过滤：信号已被交易，阻止开仓。ID: ", signal_id);
+         return OP_NONE; // 信号已被交易，阻止
+      }
+   }
+   
+   return trade_command;
+}

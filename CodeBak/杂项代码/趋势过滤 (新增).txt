@@ -1,0 +1,63 @@
+// KTarget_FinderBot.mq4 (CheckSignalAndFilter 函数内部)
+
+   // ... (L2 之前的代码保持不变) ...
+
+   // ------------------------------------------------------------------
+   // 准备工作：计算当前的均线数值 (基于当前的 signal_shift)
+   // ------------------------------------------------------------------
+   double ma_value = 0;
+   if (Use_Trend_Filter)
+   {
+      // iMA 函数详解见下文
+      ma_value = iMA(_Symbol, 0, Trend_MA_Period, 0, Trend_MA_Method, PRICE_CLOSE, signal_shift);
+   }
+
+   // ------------------------------------------------------------------
+   // 1. 检查看涨信号 (OP_BUY)
+   // ------------------------------------------------------------------
+   if (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0)
+   {
+      // A. 质量检查
+      if ((int)data.BullishReferencePrice >= Min_Signal_Quality)
+      {
+         // 🚨 B. 趋势过滤 (新增) 🚨
+         // 如果开启了过滤，且 收盘价 < 均线，说明是逆势单，我们要过滤掉
+         if (Use_Trend_Filter && Close[signal_shift] < ma_value)
+         {
+             // Print("[趋势过滤] 忽略看涨信号 @ ", TimeToString(data.OpenTime), "。价格(", Close[signal_shift], ") 在均线(", ma_value, ")之下");
+             // 不做任何操作，trade_command 保持 OP_NONE
+         }
+         else
+         {
+             trade_command = OP_BUY; // 顺势，通过！
+             // ... (原来的日志打印代码)
+         }
+      }
+   }
+
+   // ------------------------------------------------------------------
+   // 2. 检查看跌信号 (OP_SELL) - 仅当 trade_command 仍为 OP_NONE 时
+   // ------------------------------------------------------------------
+   if (trade_command == OP_NONE)
+   {
+      if (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0)
+      {
+         // A. 质量检查
+         if ((int)data.BearishReferencePrice >= Min_Signal_Quality)
+         {
+            // 🚨 B. 趋势过滤 (新增) 🚨
+            // 如果开启了过滤，且 收盘价 > 均线，说明是逆势单
+            if (Use_Trend_Filter && Close[signal_shift] > ma_value)
+            {
+                // Print("[趋势过滤] 忽略看跌信号。价格在均线之上");
+            }
+            else
+            {
+                trade_command = OP_SELL; // 顺势，通过！
+                // ... (原来的日志打印代码)
+            }
+         }
+      }
+   }
+   
+   // ... (后续的 L3 逻辑保持不变) ...

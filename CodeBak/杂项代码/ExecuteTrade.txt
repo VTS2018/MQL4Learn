@@ -1,0 +1,45 @@
+// KTarget_FinderBot.mq4
+
+// 🚨 修正后的函数签名：增加 entry_price 参数 🚨
+void ExecuteTrade(int type, double lots, double sl, double tp, double entry_price, string comment)
+{
+    // 1. 规范化价格
+    sl = NormalizeDouble(sl, _Digits);
+    tp = NormalizeDouble(tp, _Digits);
+    
+    // 2. 确定实际开仓价 (仍然使用市价 Ask/Bid)
+    double open_price = (type == OP_BUY) ? Ask : Bid;
+    open_price = NormalizeDouble(open_price, _Digits);
+    
+    // 🚨 3. 可选：滑点检查 (如果实际开仓价 open_price 偏离预期入场价 entry_price 太远，则拒绝交易)
+    /*
+    if (MathAbs(open_price - entry_price) > Max_Allowed_Slippage * Point())
+    {
+        Print("交易被拒绝: 实际开仓价 (", open_price, ") 滑点过大，预期价 (", entry_price, ")");
+        return;
+    }
+    */
+    
+    // 4. 发送订单 (使用 Ask/Bid 作为市价单 price)
+    int ticket = OrderSend(_Symbol, 
+                           type, 
+                           lots, 
+                           open_price, // 实际开仓价
+                           Slippage,   // 使用 input 定义的滑点
+                           sl, 
+                           tp, 
+                           comment, 
+                           MagicNumber, 
+                           0, 
+                           (type == OP_BUY) ? clrGreen : clrRed); 
+                           
+    // 5. 结果检查 (使用 _Symbol 替代 Symbol()，使用 _Digits 替代 Digits)
+    if(ticket > 0)
+    {
+        Print("订单执行成功! Ticket: ", ticket, " 类型: ", (type==OP_BUY?"BUY":"SELL"), " SL: ", sl, " TP: ", tp);
+    }
+    else
+    {
+        Print("订单执行失败! 错误代码: ", GetLastError(), ", 预期入场价: ", entry_price);
+    }
+}

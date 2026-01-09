@@ -1,0 +1,71 @@
+// ==========================================================================
+   // 第二阶段：核心执行循环 (只针对精英信号进行决策)
+   // ==========================================================================
+
+   // 🚨 新版核心扫描逻辑：循环“有效信号列表 X” 🚨
+   for (int i = 0; i < total_valid_signals; i++)
+   {
+      // A. 从列表中提取关键信息
+      FilteredSignal signal_item = sorted_valid_signals[i];
+      int current_shift = signal_item.shift;
+      
+      Print("===> 循环检查信号 K[", current_shift, "] 类型: ", (signal_item.type == OP_BUY ? "BUY" : "SELL"));
+
+      // B. 获取基础数据
+      KBarSignal full_data = GetIndicatorBarData(current_shift);
+
+      // =======================================================================
+      // 🧠 [新增] 共享大脑解码器 (Brain Decoder)
+      // =======================================================================
+      // 为了获取含评级的小数(如 3.4)，我们必须直接读取 Buffer，防止被底层截断
+      double raw_signal_value = 0.0;
+      int    signal_type_int  = 0;
+      int    signal_grade_int = 0;
+
+      // 1. 根据信号方向读取对应的指标缓冲区 (2=Buy, 3=Sell)
+      if (signal_item.type == OP_BUY)
+      {
+          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
+                                     Indi_Smart_Tuning, Indi_Scan_Range, 
+                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
+                                     Indi_Lookahead_Top, Indi_Lookback_Top,
+                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
+                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
+                                     Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo, // 注意：Bot7如果还没加这两个新参数，就先去掉
+                                     2, current_shift); // Buffer 2
+      }
+      else if (signal_item.type == OP_SELL)
+      {
+          raw_signal_value = iCustom(_Symbol, _Period, IndicatorName, Indi_Is_EA_Mode,
+                                     // ... 同上的参数 ...
+                                     Indi_Smart_Tuning, Indi_Scan_Range, 
+                                     Indi_Lookahead_Bottom, Indi_Lookback_Bottom,
+                                     Indi_Lookahead_Top, Indi_Lookback_Top,
+                                     Indi_Max_Signal_Look, Indi_DB_Threshold, Indi_LLHH_Candles, 
+                                     Indi_Timer_Interval_Seconds, Indi_DrawFibonacci,
+                                     Indi_Show_History_Fibo, Indi_Hide_Invalid_Fibo,
+                                     3, current_shift); // Buffer 3
+      }
+
+      // 2. 解码 (例如 3.4 -> Type=3, Grade=4)
+      DecodeSignalQuality(raw_signal_value, signal_type_int, signal_grade_int);
+      ENUM_SIGNAL_GRADE current_grade = (ENUM_SIGNAL_GRADE)signal_grade_int;
+
+      // 3. 评级过滤 (Quality Gate)
+      if (current_grade < Min_Trade_Grade)
+      {
+          string grade_str = EnumToString(current_grade);
+          string limit_str = EnumToString(Min_Trade_Grade);
+          Print("🛑 [Bot7过滤] 信号 K[", current_shift, "] 被拒绝。评级不足: ", grade_str, " < 门槛: ", limit_str);
+          continue; // 🚨 跳过当前信号，直接进入下一轮循环
+      }
+      
+      Print("✅ [Bot7通过] 发现优质信号! 评级: ", EnumToString(current_grade), " (Raw: ", DoubleToString(raw_signal_value, 1), ")");
+      // =======================================================================
+
+      // ----------------------------------------------------
+      // 🚨 原有逻辑：上下文检查 (Context Check)
+      // ----------------------------------------------------
+      int context_result = CheckSignalContext(current_shift, signal_item.type, clean_bulls, clean_bears);
+      
+      // ... (后续原有代码保持不变) ...

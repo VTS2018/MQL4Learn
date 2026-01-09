@@ -1,0 +1,53 @@
+// KTarget_FinderBot.mq4 (在 OnTick 或主循环中)
+
+// 全局变量：用于存储收集到的所有信号
+FilteredSignal collected_bullish_signals[]; 
+
+// --- 信号收集阶段 ---
+// 1. 清空数组，准备重新收集
+ArrayResize(collected_bullish_signals, 0); 
+
+// 2. 开始扫描：从 K[1] 往历史左侧扫描 Indi_LastScan_Range 根 K线
+for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+{
+    // A. 批量读取所有缓冲区数据 (包括质量代码和 SL 价格)
+    KBarSignal data = GetIndicatorBarData(shift);
+    
+    // B. 检查看涨信号是否存在且满足最低质量要求 (L2a)
+    // 假设 Min_Signal_Quality 为最低质量阈值
+    if (data.BullishReferencePrice != (double)EMPTY_VALUE && 
+        (int)data.BullishReferencePrice >= Min_Signal_Quality)
+    {
+        // C. 检查 SL 价格是否有效 (Buffer 0)
+        if (data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+        {
+            // 🚨 信号合格，将其添加到收集数组中 🚨
+            
+            // 获取当前数组大小 (新元素索引)
+            int current_size = ArraySize(collected_bullish_signals); 
+            // 调整数组大小
+            ArrayResize(collected_bullish_signals, current_size + 1); 
+
+            // 填充结构体数据
+            collected_bullish_signals[current_size].shift = shift;
+            collected_bullish_signals[current_size].signal_time = data.OpenTime;
+            collected_bullish_signals[current_size].confirmation_close = Close[shift]; // K[shift]的收盘价
+            collected_bullish_signals[current_size].stop_loss = data.BullishStopLossPrice; // 绝对止损价
+            collected_bullish_signals[current_size].type = OP_BUY;
+
+            // Print("收集到看涨信号 @ K[", shift, "] | SL:", data.BullishStopLossPrice);
+        }
+    }
+    
+    // ⚠️ 注意：此处应去除所有 break 或 return 语句，确保循环扫描到底
+}
+
+// 3. 收集完成。现在 collected_bullish_signals 数组中包含了所有合格的看涨信号。
+// 数组的索引 0 存储了 shift 最小（最新的）信号。
+// 数组的最后一个索引存储了 shift 最大（最旧的）信号。
+
+// --- 信号过滤和执行阶段 ---
+// 接下来，您就可以调用 FilterWeakBullishSignals 函数来过滤 collected_bullish_signals
+// ...
+// FilteredSignal final_bullish_signals[] = FilterWeakBullishSignals(collected_bullish_signals);
+// ...

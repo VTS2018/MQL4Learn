@@ -1,0 +1,47 @@
+void CollectAllSignals(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+{
+    // 1. 清空数组，准备重新收集
+    ArrayResize(bullish_list, 0); 
+    ArrayResize(bearish_list, 0); 
+
+    // 2. 开始扫描：从 K[1] 往历史左侧扫描
+    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+    {
+        // A. 批量读取所有缓冲区数据 (假设 GetIndicatorBarData 可用)
+        KBarSignal data = GetIndicatorBarData(shift); 
+        
+        // -----------------------
+        // 检查看涨信号
+        // -----------------------
+        if (data.BullishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BullishReferencePrice >= Min_Signal_Quality &&
+            data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+        {
+            int current_size = ArraySize(bullish_list); 
+            ArrayResize(bullish_list, current_size + 1); 
+
+            bullish_list[current_size].shift = shift;
+            bullish_list[current_size].signal_time = data.OpenTime;
+            bullish_list[current_size].confirmation_close = Close[shift]; 
+            bullish_list[current_size].stop_loss = data.BullishStopLossPrice; 
+            bullish_list[current_size].type = OP_BUY;
+        }
+        
+        // -----------------------
+        // 检查看跌信号
+        // -----------------------
+        if (data.BearishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BearishReferencePrice >= Min_Signal_Quality &&
+            data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+        {
+            int current_size = ArraySize(bearish_list); 
+            ArrayResize(bearish_list, current_size + 1); 
+
+            bearish_list[current_size].shift = shift;
+            bearish_list[current_size].signal_time = data.OpenTime;
+            bearish_list[current_size].confirmation_close = Close[shift]; 
+            bearish_list[current_size].stop_loss = data.BearishStopLossPrice; 
+            bearish_list[current_size].type = OP_SELL;
+        }
+    }
+}

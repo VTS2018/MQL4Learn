@@ -1,0 +1,83 @@
+//+------------------------------------------------------------------+
+//| 收集所有合格信号：扫描历史K线并分离看涨和看跌信号                |
+//| @param bullish_list: 引用 - 存储看涨信号列表                    |
+//| @param bearish_list: 引用 - 存储看跌信号列表                    |
+//+------------------------------------------------------------------+
+void CollectAllSignals_V1(FilteredSignal &bullish_list[], FilteredSignal &bearish_list[])
+{
+    // 1. 清空数组，准备重新收集
+    ArrayResize(bullish_list, 0); 
+    ArrayResize(bearish_list, 0); 
+
+    // -----------------------------------------------------------
+    // 🚨 核心修正 1：获取现价基准 (使用当前 K 线的收盘价)
+    // Close[0] 代表当前正在形成的 K 线的收盘价（或最新的价格）
+    // -----------------------------------------------------------
+    double current_price = Close[0];
+
+    // 2. 开始扫描：从 K[1] 往历史左侧扫描
+    for (int shift = 1; shift <= Indi_LastScan_Range; shift++)
+    {
+        // A. 批量读取所有缓冲区数据 (假设 GetIndicatorBarData 可用)
+        KBarSignal data = GetIndicatorBarData(shift); 
+        
+        // -----------------------
+        // 检查看涨信号
+        // -----------------------
+        if (data.BullishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BullishReferencePrice >= Min_Signal_Quality &&
+            data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+        {
+
+            // --------------------------------------------------------
+            // 🚨 核心修正 2：看涨信号价格区位过滤 (信号价必须低于现价)
+            // 我们使用信号的确认收盘价 (Close[shift]) 作为其“价格”的代表
+            // 为什么加入这个判断？就是为了保证 找到的 看涨信号 一定是小于现价的
+            // 因为 如果扫描到 【高于现价的 历史做多信号】 是没有意义的
+            // 扫描到的看跌信号 在现价的下方 则没有意义
+            // 这里最纠结的两点 就是 K[1] 如果是信号 该如何处理的问题？
+            // 如果我们不加判断 则一定能收集到K[1],但是会有无效的历史信号混入
+            // 如果我们加了判断 则K[1] 信号有可能会丢失掉，如此在后续的上下文计算时就会bug
+            // 上下文的算法 就是将当前确认信号 和 历史相对比
+            // 这就要考虑 要不要 自己和自己对比的问题
+            // --------------------------------------------------------
+
+            if (Close[shift] < current_price)
+            {
+               int current_size = ArraySize(bullish_list);
+               ArrayResize(bullish_list, current_size + 1);
+
+               bullish_list[current_size].shift = shift;
+               bullish_list[current_size].signal_time = data.OpenTime;
+               bullish_list[current_size].confirmation_close = Close[shift];
+               bullish_list[current_size].stop_loss = data.BullishStopLossPrice;
+               bullish_list[current_size].type = OP_BUY;
+            }
+        }
+        
+        // -----------------------
+        // 检查看跌信号
+        // -----------------------
+        if (data.BearishReferencePrice != (double)EMPTY_VALUE && 
+            (int)data.BearishReferencePrice >= Min_Signal_Quality &&
+            data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+        {
+
+            // --------------------------------------------------------
+            // 🚨 核心修正 3：看跌信号价格区位过滤 (信号价必须高于现价)
+            // --------------------------------------------------------
+
+            if (Close[shift] > current_price)
+            {
+               int current_size = ArraySize(bearish_list);
+               ArrayResize(bearish_list, current_size + 1);
+
+               bearish_list[current_size].shift = shift;
+               bearish_list[current_size].signal_time = data.OpenTime;
+               bearish_list[current_size].confirmation_close = Close[shift];
+               bearish_list[current_size].stop_loss = data.BearishStopLossPrice;
+               bearish_list[current_size].type = OP_SELL;
+            }
+        }
+    }
+}

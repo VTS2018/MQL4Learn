@@ -1,0 +1,86 @@
+void CheckBullishSignalConfirmationV1(int target_index, int P2_index, int K_Geo_Index, int N_Geo, int abs_lowindex)
+{
+    // *** 关键修改：在处理新信号之前，清除该锚点上可能存在的任何旧矩形 ***
+    // ClearSignalRectangle_v2(abs_lowindex, true); 
+    // ***************************************************************
+
+    // K_Geo_Index 必须有效，否则协调者已经跳过了。
+    // P2_price 必须有效，否则协调者已经跳过了。
+
+    // P1 价格，用于判断 P2 是否高于 P1 (安全检查)
+    double P1_price = Open[target_index];
+    
+    double P2_price = Close[P2_index];
+
+    // --- 阶段 A: 信号箭头标记 (瀑布式查找) ---
+
+    // 1. 最高优先级: 查找 P2 突破 (K_P2)
+    // P2 价格必须高于 P1 价格，否则 P2 突破不成立
+    if (P2_price > P1_price)
+    {
+        // 查找范围从锚点右侧到 Max_Signal_Lookforward 结束
+        for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+        {
+            if (j < 0) break;
+            // 检查 P2 突破条件：收盘价高于 P2 价格
+            if (Close[j] > P2_price) 
+            {
+                // **绘制 P2 辅助线** (职责：只有在 P2 突破时才绘制 P2 线)
+                DrawP2Baseline(P2_index, j, true);
+
+                if (abs_lowindex != -1)
+                {
+                    /* 只有信号成立才绘制矩形 */
+                    DrawP1P2Rectangle(abs_lowindex, j, true);
+
+                    //DrawP1P2Fibonacci(abs_lowindex, j, true); 这里会绘制出所有的 斐波所以我设置了一个开关 所以这里取消就行了
+                }
+
+                // 找到 K_P2。绘制 P2 箭头 (高偏移)
+
+                if (Is_EA_Mode)
+                {
+                    BullishSignalBuffer[j] = 3.0;
+                }
+                else
+                {
+                    BullishSignalBuffer[j] = Low[j] - 30 * Point();
+                }
+
+                return; // 找到最高级别信号，立即退出函数
+            }
+        }
+    }
+    
+    // 2. 次优先级: 查找 P1-DB 突破 (K_DB) - 检查第一次 P1 突破是否满足 DB 延迟
+    // 如果代码执行到这里，说明整个 N=5 范围内都没有 P2 突破。同时还说明 没有找到P2突破 但是一定有P1突破的索引 一定有P1突破
+    
+    // 检查第一次 P1 突破是否满足 DB 延迟 (N >= 3)
+    if (N_Geo >= DB_Threshold_Candles)
+    {
+        //**绘制 P2 辅助线** (职责：在 P1-DB 确认时也绘制 P2 线)
+        DrawP2Baseline(P2_index, K_Geo_Index, true);
+
+        if (abs_lowindex != -1)
+        {
+            /* 只有信号成立才绘制矩形 */
+            DrawP1P2Rectangle(abs_lowindex, K_Geo_Index, true);
+        }
+
+        // 找到 K_DB。绘制 P1-DB 箭头 (标准偏移)
+        // 箭头标记在 K_Geo_Index (即第一次 P1 突破的 K 线)
+        if (Is_EA_Mode)
+        {
+            BullishSignalBuffer[K_Geo_Index] = 2.0;
+        }
+        else
+        {
+            BullishSignalBuffer[K_Geo_Index] = Low[K_Geo_Index] - 20 * Point();
+        }
+
+        return; // 找到次高级别信号，立即退出函数
+    }
+    
+    // 3. 最终退出: 仅 IB 突破发生 (线已绘制，无箭头) 或 循环耗尽。
+    return;
+}

@@ -1,0 +1,77 @@
+// KTarget_Test_Bot.mq4
+
+// --- 新增输入参数：扫描范围 ---
+input int    Indi_Scan_Range      = 100; // 扫描最近多少根 K 线
+
+// --- 核心结构体定义 (从 K_Data.mqh 复制过来) ---
+struct KBarSignal
+{
+    // ... (包含 BullishStopLossPrice, BearishStopLossPrice, BullishReferencePrice, BearishReferencePrice 等)
+    // 确保您将 K_Data.mqh 中的 KBarSignal 结构体定义复制到此测试 EA 的顶部
+    double BullishStopLossPrice; 
+    double BearishStopLossPrice;
+    double BullishReferencePrice; 
+    double BearishReferencePrice;
+    datetime OpenTime; 
+};
+
+// --- GetIndicatorBarData 函数 (已在上一个回复中提供，此处不重复) ---
+// ... (确保 GetIndicatorBarData 已经定义在测试 EA 中) ...
+
+
+//+------------------------------------------------------------------+
+//| Expert Tick 函数 (已修正：实现信号扫描)                            |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+    // --- 1. 新 K 线检测 (仅在新 K 线收盘时执行读取) ---
+    if(Time[0] == g_last_bar_time) return; 
+    g_last_bar_time = Time[0]; 
+
+    // --- 2. 🚨 扫描循环：从 shift=1 开始向历史 K 线扫描 🚨
+    for(int shift = 1; shift <= Indi_Scan_Range; shift++)
+    {
+        // A. 批量读取所有缓冲区数据
+        KBarSignal data = GetIndicatorBarData(shift);
+
+        // B. 检查信号质量/存在性 (使用 Buffer 2/3 - ReferencePrice)
+        // 注意：现在 Buffer 2/3 是信号质量代码 (3.0/2.0/1.0)
+        
+        bool bullish_signal_exists = (data.BullishReferencePrice != (double)EMPTY_VALUE && data.BullishReferencePrice != 0.0);
+        bool bearish_signal_exists = (data.BearishReferencePrice != (double)EMPTY_VALUE && data.BearishReferencePrice != 0.0);
+        
+        if (bullish_signal_exists || bearish_signal_exists)
+        {
+            // C. 找到第一个信号，打印结果并退出循环/函数
+            string log_message = ">>> 侦测到信号 @ K线索引 shift=" + IntegerToString(shift) + " (时间: " + TimeToString(data.OpenTime) + ") <<<";
+            
+            if (bullish_signal_exists)
+            {
+                // 同时验证 Buffer 0 是否也有效 (绝对 SL 价格)
+                if (data.BullishStopLossPrice != (double)EMPTY_VALUE && data.BullishStopLossPrice != 0.0)
+                {
+                    log_message += " | 看涨 SL (Buffer 0): " + DoubleToString(data.BullishStopLossPrice, _Digits);
+                    log_message += " | 质量 (Buffer 2): " + DoubleToString(data.BullishReferencePrice, 1);
+                }
+            }
+
+            if (bearish_signal_exists)
+            {
+                // 同时验证 Buffer 1 是否也有效 (绝对 SL 价格)
+                if (data.BearishStopLossPrice != (double)EMPTY_VALUE && data.BearishStopLossPrice != 0.0)
+                {
+                    log_message += " | 看跌 SL (Buffer 1): " + DoubleToString(data.BearishStopLossPrice, _Digits);
+                    log_message += " | 质量 (Buffer 3): " + DoubleToString(data.BearishReferencePrice, 1);
+                }
+            }
+            
+            Print(log_message);
+            
+            // 找到信号后，我们停止扫描（假设只需要最新信号）
+            return; 
+        }
+    }
+    
+    // 如果循环结束仍未找到信号
+    Print("新 K 线 @ ", TimeToString(Time[1]), "：在扫描范围内 (", Indi_Scan_Range, " 根 K 线) 未发现信号。");
+}
