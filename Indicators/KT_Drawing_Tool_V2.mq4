@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2026, KT Expert."
 #property link      "https://www.mql5.com/zh/users/lovellcecil" // 换成你的主页链接
-#property version   "1.00" // 初始版本
+#property version   "2.00" // 初始版本
 #property description "KT Drawing Tool - Professional SMC & PA Drawing Assistant"
 #property description " "
 #property description "Key Features:"
@@ -15,7 +15,6 @@
 #property description "4. Visual confirmations with checkmarks."
 // #property icon      "Images\\KT_Logo.ico" // (可选) 如果你有做ICON的话
 
-// #property copyright "CD_SMC_Analysis"
 #property strict
 #property indicator_chart_window
 
@@ -61,9 +60,6 @@ string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名
 int OnInit()
   {
    // 创建UI按钮
-   // CreateButton(btnName1, "画水平线 (H)", 150, 20, 80, 25, clrGray, clrWhite);
-   // CreateButton(btnName2, "画射线 (R)",   240, 20, 80, 25, clrGray, clrWhite);
-
    CreateButton(btnName1, "Line (H)", 150, 20, 80, 25, BtnBgColor, BtnTxtColor);
    CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
 
