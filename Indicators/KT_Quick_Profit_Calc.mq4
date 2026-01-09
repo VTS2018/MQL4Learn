@@ -5,7 +5,7 @@
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2023, Lovell Cecil."
 #property link      "https://www.mql5.com/zh/users/lovellcecil"
-#property version   "1.00"
+#property version   "2.00"
 #property strict
 #property indicator_chart_window
 
