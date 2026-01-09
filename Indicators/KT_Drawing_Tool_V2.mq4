@@ -71,6 +71,9 @@ int OnInit()
    // [修复] 重启后重建对象关联关系
    RebuildObjectPairs();
    
+   // [新增] 更新所有射线的终点到最新K线，防止射线"变短"
+   UpdateRayEndpoints();
+   
    return(INIT_SUCCEEDED);
   }
 
@@ -426,4 +429,56 @@ void RebuildObjectPairs()
    // 输出日志（可选，用于调试）
    int pairCount = ArraySize(g_drawnObjects) / 2;
    Print("重建对象关联: 找到 ", pairCount, " 对关联对象");
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 更新所有射线的终点到最新K线
+//+------------------------------------------------------------------+
+void UpdateRayEndpoints()
+{
+   int total = ObjectsTotal(0, 0, -1);
+   datetime currentTime = Time[0]; // 当前最新K线时间
+   int updateCount = 0;
+   
+   for(int i = 0; i < total; i++)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 处理射线对象（以 "Draw_" 开头的 OBJ_TREND）
+      if(StringFind(objName, "Draw_") == 0)
+      {
+         if(ObjectGetInteger(0, objName, OBJPROP_TYPE) == OBJ_TREND)
+         {
+            // 获取射线的价格
+            double price = ObjectGetDouble(0, objName, OBJPROP_PRICE, 0);
+            
+            // 更新射线的第二个时间点到当前K线
+            ObjectSetInteger(0, objName, OBJPROP_TIME, 1, currentTime);
+            ObjectSetDouble(0, objName, OBJPROP_PRICE, 1, price);
+            updateCount++;
+            
+            // 同时更新对应的价格标签位置
+            string parts[];
+            int count = StringSplit(objName, '_', parts);
+            if(count >= 3)
+            {
+               string tfStr = parts[1];
+               string uniqueID = parts[2];
+               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+               
+               if(ObjectFind(0, priceLabelName) >= 0)
+               {
+                  ObjectSetInteger(0, priceLabelName, OBJPROP_TIME, 0, currentTime);
+                  ObjectSetDouble(0, priceLabelName, OBJPROP_PRICE, 0, price);
+               }
+            }
+         }
+      }
+   }
+   
+   if(updateCount > 0)
+   {
+      Print("更新射线终点: 共更新 ", updateCount, " 条射线到最新K线");
+      ChartRedraw(0);
+   }
 }
