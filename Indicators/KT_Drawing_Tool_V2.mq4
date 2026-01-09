@@ -3,21 +3,46 @@
 //|                                  Copyright 2024, CD_SMC_Analysis |
 //|                                             https://www.mql5.com |
 //+------------------------------------------------------------------+
-#property copyright "CD_SMC_Analysis"
+#property copyright "Copyright 2026, KT Expert."
+#property link      "https://www.mql5.com/zh/users/lovellcecil" // 换成你的主页链接
+#property version   "1.00" // 初始版本
+#property description "KT Drawing Tool - Professional SMC & PA Drawing Assistant"
+#property description " "
+#property description "Key Features:"
+#property description "1. OHLC Magnetic Adsorption: Automatically snaps to Key Prices."
+#property description "2. Multi-Timeframe Color Mapping: Auto-color based on H1/H4/D1."
+#property description "3. One-Click Ray & Level Drawing."
+#property description "4. Visual confirmations with checkmarks."
+// #property icon      "Images\\KT_Logo.ico" // (可选) 如果你有做ICON的话
+
+// #property copyright "CD_SMC_Analysis"
 #property strict
 #property indicator_chart_window
 
 //--- 参数设置
-input color ColorHLine = clrRed;        // 水平线颜色
-input color ColorRay   = clrDeepSkyBlue;// 射线(趋势水平线)颜色
-input int   LineWidth  = 2;             // 线条宽度
+// input color ColorHLine = clrRed;        // 水平线颜色
+// input color ColorRay   = clrDeepSkyBlue;// 射线(趋势水平线)颜色
+// input int   LineWidth  = 2;             // 线条宽度
+
+input color ColorHLine = clrRed;          // Horizontal Line Color
+input color ColorRay   = clrDeepSkyBlue;  // Ray Color (Segment)
+input int   LineWidth  = 2;               // Line Width
+
+input color BtnBgColor  = clrGray;        // Button Background Color
+input color BtnTxtColor = clrWhite;       // Button Text Color
 
 //--- [新增] 周期专属颜色设置 (针对浅色背景 229,230,250 优化)
-input color Color_H1   = clrBlue;         // H1 周期颜色
-input color Color_H4   = clrDarkOrange;   // H4 周期颜色
-input color Color_D1   = clrRed;          // D1 周期颜色
-input color Color_W1   = clrDarkGreen;    // W1 周期颜色
-input color Color_MN1  = clrDarkViolet;   // MN1 周期颜色
+// input color Color_H1   = clrBlue;         // H1 周期颜色
+// input color Color_H4   = clrDarkOrange;   // H4 周期颜色
+// input color Color_D1   = clrRed;          // D1 周期颜色
+// input color Color_W1   = clrDarkGreen;    // W1 周期颜色
+// input color Color_MN1  = clrDarkViolet;   // MN1 周期颜色
+
+input color Color_H1   = clrBlue;         // H1 Timeframe Color
+input color Color_H4   = clrDarkOrange;   // H4 Timeframe Color
+input color Color_D1   = clrRed;          // D1 Timeframe Color
+input color Color_W1   = clrDarkGreen;    // W1 Timeframe Color
+input color Color_MN1  = clrDarkViolet;   // MN1 Timeframe Color
 
 //--- 内部变量
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
@@ -33,8 +58,11 @@ uint lastBtnClickTime = 0;
 int OnInit()
   {
    // 创建UI按钮
-   CreateButton(btnName1, "画水平线 (H)", 150, 20, 80, 25, clrGray, clrWhite);
-   CreateButton(btnName2, "画射线 (R)",   240, 20, 80, 25, clrGray, clrWhite);
+   // CreateButton(btnName1, "画水平线 (H)", 150, 20, 80, 25, clrGray, clrWhite);
+   // CreateButton(btnName2, "画射线 (R)",   240, 20, 80, 25, clrGray, clrWhite);
+
+   CreateButton(btnName1, "Line (H)", 150, 20, 80, 25, BtnBgColor, BtnTxtColor);
+   CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    return(INIT_SUCCEEDED);
