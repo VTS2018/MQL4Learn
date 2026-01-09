@@ -50,7 +50,10 @@ string btnName1 = "Btn_Draw_HLine";
 string btnName2 = "Btn_Draw_Ray";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
-uint lastBtnClickTime = 0; 
+uint lastBtnClickTime = 0;
+
+// [新增] 存储对象对关系：记录每个画线对象及其关联的标记对象
+string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名 
 
 //+------------------------------------------------------------------+
 //| 初始化函数
@@ -65,6 +68,13 @@ int OnInit()
    CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
+   
+   // [新增] 启动定时器，每1秒检查一次对象是否被删除
+   EventSetTimer(1);
+   
+   // [修复] 重启后重建对象关联关系
+   RebuildObjectPairs();
+   
    return(INIT_SUCCEEDED);
   }
 
@@ -73,6 +83,7 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
+   EventKillTimer();  // 关闭定时器
    ObjectDelete(0, btnName1);
    ObjectDelete(0, btnName2);
    // Comment("");
@@ -171,8 +182,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // 执行画图
             // -------------------------------------------------------------
             string tfStr = GetPeriodName(Period());
-            string objName = "Draw_" + tfStr + "_" + IntegerToString(GetTickCount());
-            // string objName = "Draw_" + IntegerToString(GetTickCount());
+            // [修改] 生成唯一ID，用于关联线条和标记
+            string uniqueID = IntegerToString(GetTickCount());
+            string objName = "Draw_" + tfStr + "_" + uniqueID;
 
             // --- [新增] 自动匹配周期颜色 ---
             color finalColor;
@@ -201,13 +213,17 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                bool isBullish = (close > open); // 判断阳线/阴线
                double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
                datetime time1 = iTime(NULL, 0, barIndex);
-               string markName = "Mark_" + tfStr + "_" + IntegerToString(GetTickCount());
+               // [修改] 使用相同的uniqueID，建立名称关联
+               string markName = "Mark_" + tfStr + "_" + uniqueID;
                
                ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
                ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
                ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, true);
+               
+               // [新增] 记录对象对关系
+               RecordObjectPair(objName, markName);
               }
             else if(drawingState == 2) // 画射线
               {
@@ -219,7 +235,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
                
                // [新增功能] 在图表右侧价格轴显示射线价格标签
-               string priceLabelName = "PriceLabel_" + tfStr + "_" + IntegerToString(GetTickCount());
+               // [修改] 使用uniqueID建立关联
+               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
                datetime currentTime = Time[0]; // 当前K线时间
                ObjectCreate(0, priceLabelName, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, finalPrice);
                ObjectSetInteger(0, priceLabelName, OBJPROP_COLOR, finalColor);
@@ -230,13 +247,18 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                // [新增功能] 在磁吸的K线上绘制Check标记
                bool isBullish = (close > open); // 判断阳线/阴线
                double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
-               string markName = "Mark_" + tfStr + "_" + IntegerToString(GetTickCount());
+               // [修改] 使用相同的uniqueID
+               string markName = "Mark_" + tfStr + "_" + uniqueID;
                
                ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
                ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
                ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, true);
+               
+               // [新增] 记录对象对关系（射线+标记+价格标签）
+               RecordObjectPair(objName, markName);
+               RecordObjectPair(objName, priceLabelName); // 价格标签也关联到射线
               }
             
             ChartRedraw();
@@ -296,4 +318,116 @@ string GetPeriodName(int p)
       case PERIOD_MN1: return "MN";
    }
    return "Unknown";
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 定时器事件处理：检查并清理孤立的标记对象
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   CheckAndCleanOrphanedObjects();
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 记录对象对关系
+//+------------------------------------------------------------------+
+void RecordObjectPair(string mainObj, string associatedObj)
+{
+   int size = ArraySize(g_drawnObjects) / 2;
+   ArrayResize(g_drawnObjects, size + 1);
+   g_drawnObjects[size][0] = mainObj;
+   g_drawnObjects[size][1] = associatedObj;
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 检查并清理孤立的标记对象
+//+------------------------------------------------------------------+
+void CheckAndCleanOrphanedObjects()
+{
+   int size = ArraySize(g_drawnObjects) / 2;
+   
+   for(int i = size - 1; i >= 0; i--)
+   {
+      string mainObj = g_drawnObjects[i][0];
+      string assocObj = g_drawnObjects[i][1];
+      
+      // 如果主对象（线条）不存在了，删除关联对象（标记）
+      if(ObjectFind(0, mainObj) == -1)
+      {
+         if(ObjectFind(0, assocObj) >= 0)
+         {
+            ObjectDelete(0, assocObj);
+         }
+         
+         // 从数组中移除这一对
+         RemoveObjectPair(i);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 从数组中移除指定索引的对象对
+//+------------------------------------------------------------------+
+void RemoveObjectPair(int index)
+{
+   int size = ArraySize(g_drawnObjects) / 2;
+   
+   // 将后面的元素前移
+   for(int i = index; i < size - 1; i++)
+   {
+      g_drawnObjects[i][0] = g_drawnObjects[i + 1][0];
+      g_drawnObjects[i][1] = g_drawnObjects[i + 1][1];
+   }
+   
+   // 缩小数组
+   ArrayResize(g_drawnObjects, size - 1);
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 重启后重建对象对关系
+//+------------------------------------------------------------------+
+void RebuildObjectPairs()
+{
+   // 清空现有数组
+   ArrayResize(g_drawnObjects, 0);
+   
+   int total = ObjectsTotal(0, 0, -1);
+   
+   for(int i = 0; i < total; i++)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 只处理以 "Draw_" 开头的线条对象
+      if(StringFind(objName, "Draw_") == 0)
+      {
+         // 提取对象名称中的周期和uniqueID
+         // 格式: "Draw_H1_1234567890"
+         string parts[];
+         int count = StringSplit(objName, '_', parts);
+         
+         if(count >= 3)
+         {
+            string tfStr = parts[1];    // "H1"
+            string uniqueID = parts[2]; // "1234567890"
+            
+            // 查找对应的标记对象
+            string markName = "Mark_" + tfStr + "_" + uniqueID;
+            if(ObjectFind(0, markName) >= 0)
+            {
+               RecordObjectPair(objName, markName);
+            }
+            
+            // 查找对应的价格标签对象（如果是射线）
+            string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+            if(ObjectFind(0, priceLabelName) >= 0)
+            {
+               RecordObjectPair(objName, priceLabelName);
+            }
+         }
+      }
+   }
+   
+   // 输出日志（可选，用于调试）
+   int pairCount = ArraySize(g_drawnObjects) / 2;
+   Print("重建对象关联: 找到 ", pairCount, " 对关联对象");
 }
