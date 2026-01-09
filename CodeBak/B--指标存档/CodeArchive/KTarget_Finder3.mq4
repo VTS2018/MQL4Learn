@@ -1,0 +1,329 @@
+//+------------------------------------------------------------------+
+//|                          版本迭代日志 (Changelog)                  |
+//+------------------------------------------------------------------+
+/*
+   日期           | 版本    | 描述
+   ------------------------------------------------------------------
+   2025.10.28     | v1.11   | 前面的版本1和2 完成对 K-target的查找，找到是第一步非常重要，前面两份代码 很基础但是很有用，从版本 1.11 开始，实现确认突破的逻辑
+   ------------------------------------------------------------------
+*/
+//+------------------------------------------------------------------+
+
+#property copyright "Copyright 2025, MQL Developer"
+#property link      "https://www.mql5.com"
+#property version   "1.11" // 版本更新为 1.11
+#property strict
+#property indicator_chart_window // 绘制在主图表窗口
+#property indicator_buffers 4 // 两个锚点 + 两个最终信号
+#property indicator_plots   4 // 对应四个绘图
+
+// --- 外部可调参数 (输入) ---
+extern int Scan_Range = 500;              // 总扫描范围：向后查找 N 根 K 线
+
+// --- 看涨 K-Target (底部) 锚点参数 ---
+extern int Lookahead_Bottom = 20;         // 看涨信号右侧检查周期 (未来/较新的K线)
+extern int Lookback_Bottom = 20;          // 看涨信号左侧检查周期 (历史/较旧的K线)
+
+// --- 看跌 K-Target (顶部) 锚点参数 ---
+extern int Lookahead_Top = 20;            // 看跌信号右侧检查周期
+extern int Lookback_Top = 20;             // 看跌信号左侧检查周期
+
+// --- 信号确认参数 (V1.11 新增) ---
+extern int Max_Signal_Lookforward = 10;    // 最大信号确认前瞻 K 线数量 (IB/DB 突破检查范围)
+
+// --- 指标缓冲区 ---
+double BullishTargetBuffer[]; // 0: 用于标记看涨K-Target锚点 (底部)
+double BearishTargetBuffer[]; // 1: 用于标记看跌K-Target锚点 (顶部)
+double BullishSignalBuffer[]; // 2: 最终看涨信号 (IB/DB突破确认) - V1.11 新增
+double BearishSignalBuffer[]; // 3: 最终看跌信号 (IB/DB突破确认) - V1.11 新增
+
+// --- 绘图属性 ---
+// Plot 1: K-Target Bottom (锚点)
+#property indicator_label1 "KTarget_Bottom"
+#property indicator_type1  DRAW_ARROW
+#property indicator_color1 clrBlue
+#property indicator_style1 STYLE_SOLID
+#property indicator_width1 1
+#define ARROW_CODE_UP 233 // 向上箭头
+
+// Plot 2: K-Target Top (锚点)
+#property indicator_label2 "KTarget_Top"
+#property indicator_type2  DRAW_ARROW
+#property indicator_color2 clrRed
+#property indicator_style2 STYLE_SOLID
+#property indicator_width2 1
+#define ARROW_CODE_DOWN 234 // 向下箭头
+
+// Plot 3: 最终看涨信号 (V1.11 新增)
+#property indicator_label3 "Bullish_Signal"
+#property indicator_type3  DRAW_ARROW
+#property indicator_color3 clrLimeGreen
+#property indicator_style3 STYLE_SOLID
+#property indicator_width3 2
+#define ARROW_CODE_SIGNAL_UP 233 // 向上信号箭头 (使用与锚点相同箭头，但颜色和宽度不同)
+
+// Plot 4: 最终看跌信号 (V1.11 新增)
+#property indicator_label4 "Bearish_Signal"
+#property indicator_type4  DRAW_ARROW
+#property indicator_color4 clrDarkViolet
+#property indicator_style4 STYLE_SOLID
+#property indicator_width4 2
+#define ARROW_CODE_SIGNAL_DOWN 234 // 向下信号箭头
+
+// --- 函数原型 ---
+void FindAndDrawTargetCandles(int total_bars); 
+bool CheckKTargetBottomCondition(int i, int total_bars);
+bool CheckKTargetTopCondition(int i, int total_bars);
+void DrawTargetBottom(int target_index);
+void DrawTargetTop(int target_index);
+void CheckBullishSignalConfirmation(int target_index); // V1.11 新增
+void CheckBearishSignalConfirmation(int target_index); // V1.11 新增
+
+//========================================================================
+// 1. OnInit: 指标初始化
+//========================================================================
+int OnInit()
+{
+    // 缓冲区 1：看涨 K-Target 锚点
+    SetIndexBuffer(0, BullishTargetBuffer);
+    SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, 1, clrBlue); 
+    SetIndexArrow(0, ARROW_CODE_UP);
+    
+    // 缓冲区 2：看跌 K-Target 锚点
+    SetIndexBuffer(1, BearishTargetBuffer);
+    SetIndexStyle(1, DRAW_ARROW, STYLE_SOLID, 1, clrRed); 
+    SetIndexArrow(1, ARROW_CODE_DOWN);
+    
+    // 缓冲区 3：最终看涨信号 (V1.11 新增)
+    SetIndexBuffer(2, BullishSignalBuffer);
+    SetIndexStyle(2, DRAW_ARROW, STYLE_SOLID, 2, clrLimeGreen); 
+    SetIndexArrow(2, ARROW_CODE_SIGNAL_UP);
+    
+    // 缓冲区 4：最终看跌信号 (V1.11 新增)
+    SetIndexBuffer(3, BearishSignalBuffer);
+    SetIndexStyle(3, DRAW_ARROW, STYLE_SOLID, 2, clrDarkViolet); 
+    SetIndexArrow(3, ARROW_CODE_SIGNAL_DOWN);
+    
+    // 初始化所有缓冲区数据为 0.0
+    ArrayInitialize(BullishTargetBuffer, 0.0);
+    ArrayInitialize(BearishTargetBuffer, 0.0);
+    ArrayInitialize(BullishSignalBuffer, 0.0);
+    ArrayInitialize(BearishSignalBuffer, 0.0);
+    
+    // 指标简称
+    string shortName = "K-Target (B:"+IntegerToString(Lookback_Bottom)+" L:"+IntegerToString(Max_Signal_Lookforward)+")";
+    IndicatorShortName(shortName);
+    return(INIT_SUCCEEDED);
+}
+
+//========================================================================
+// 2. OnCalculate: 主计算函数
+//========================================================================
+int OnCalculate(const int rates_total, 
+                const int prev_calculated, 
+                const datetime &time[], 
+                const double& open[], 
+                const double& high[], 
+                const double& low[], 
+                const double& close[], 
+                const long& tick_volume[],
+                const long& volume[],    
+                const int& spread[])     
+{
+    // 检查是否有 K 线存在
+    if(rates_total < 1) return(0); 
+
+    // 清除缓冲区中的所有旧标记 (包括 V1.11 新增的信号缓冲区)
+    ArrayInitialize(BullishTargetBuffer, 0.0);
+    ArrayInitialize(BearishTargetBuffer, 0.0);
+    ArrayInitialize(BullishSignalBuffer, 0.0);
+    ArrayInitialize(BearishSignalBuffer, 0.0);
+    
+    // 寻找并绘制所有符合条件的 K-Target 及突破信号
+    FindAndDrawTargetCandles(rates_total);
+    
+    // 返回 rates_total 用于下一次调用
+    return(rates_total);
+}
+
+
+//========================================================================
+// 3. FindAndDrawTargetCandles: 寻找 K-Target 的核心逻辑 (双向)
+//========================================================================
+void FindAndDrawTargetCandles(int total_bars)
+{
+    // 确定实际循环上限: 取 total_bars 和 Scan_Range 中的最小值，确保不越界
+    int max_bars_to_scan = MathMin(total_bars, Scan_Range);
+    
+    // 循环从第一根已收盘 K 线 (i=1) 开始
+    for (int i = 1; i < max_bars_to_scan; i++)
+    {
+        // 1. 检查 K-Target Bottom (看涨) 锚定条件
+        if (CheckKTargetBottomCondition(i, total_bars))
+        {
+            DrawTargetBottom(i); 
+            // V1.11 新增: 检查信号确认逻辑 (IB/DB 突破)
+            CheckBullishSignalConfirmation(i);
+        }
+        
+        // 2. 检查 K-Target Top (看跌) 锚定条件
+        if (CheckKTargetTopCondition(i, total_bars))
+        {
+            DrawTargetTop(i); 
+            // V1.11 新增: 检查信号确认逻辑
+            CheckBearishSignalConfirmation(i);
+        }
+    }
+}
+
+
+//========================================================================
+// 4. CheckKTargetBottomCondition: 检查目标反转阴线 (K-Target Bottom)
+//========================================================================
+/*
+   条件: 阴线，且收盘价是左右两侧周期内的最低收盘价。
+*/
+bool CheckKTargetBottomCondition(int i, int total_bars)
+{
+    // 1. 必须是阴线 (Bearish Candle)
+    if (Close[i] >= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= Lookahead_Bottom; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        // 必须是最低收盘价
+        if (Close[future_index] < Close[i]) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= Lookback_Bottom; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最低收盘价
+        if (Close[past_index] < Close[i]) return false;
+    }
+    
+    return true;
+}
+
+
+//========================================================================
+// 5. CheckKTargetTopCondition: 检查目标反转阳线 (K-Target Top)
+//========================================================================
+/*
+   条件: 阳线，且收盘价是左右两侧周期内的最高收盘价。
+*/
+bool CheckKTargetTopCondition(int i, int total_bars)
+{
+    // 1. 必须是阳线 (Bullish Candle)
+    if (Close[i] <= Open[i]) return false;
+    
+    // --- 检查右侧 (未来/较新的K线) ---
+    for (int k = 1; k <= Lookahead_Top; k++)
+    {
+        int future_index = i - k; 
+        if (future_index < 0) break; 
+        // 必须是最高收盘价
+        if (Close[future_index] > Close[i]) return false;
+    }
+    
+    // --- 检查左侧 (历史/较旧的K线) ---
+    for (int k = 1; k <= Lookback_Top; k++)
+    {
+        int past_index = i + k; 
+        if (past_index >= total_bars) break; 
+        // 必须是最高收盘价
+        if (Close[past_index] > Close[i]) return false;
+    }
+    
+    return true;
+}
+
+//========================================================================
+// 8. CheckBullishSignalConfirmation: 检查看涨信号的突破/确认逻辑 (V1.11 新增)
+//========================================================================
+/*
+   看涨信号确认 (IB/DB): 
+   在 K-Target Bottom (target_index) 之后的 Max_Signal_Lookforward 根 K 线内，
+   检查后续 K 线的收盘价 (Close[j]) 是否大于 K-Target 的开盘价 (Open[target_index])。
+   一旦找到第一根突破 K 线，即标记信号。
+*/
+void CheckBullishSignalConfirmation(int target_index)
+{
+    // K-Target 锚点的开盘价 (突破基准线)
+    double target_open_price = Open[target_index];
+    
+    // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
+    // j 索引越小，K 线越新，离当前价格越近
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+    {
+        // 1. 检查索引是否有效 (必须大于等于 0)
+        if (j < 0) break;
+        
+        // 2. 突破确认条件: 突破 K 线的收盘价 > K-Target 的开盘价
+        if (Close[j] > target_open_price)
+        {
+            // 找到突破 K 线，在此 K 线上绘制最终信号
+            // 信号位置放在突破 K 线的最低价下方 20 个点
+            BullishSignalBuffer[j] = Low[j] - 20 * Point(); 
+            
+            // 找到第一个突破后，IB/DB 确认完成，立即退出循环
+            return;
+        }
+    }
+}
+
+//========================================================================
+// 9. CheckBearishSignalConfirmation: 检查看跌信号的突破/确认逻辑 (V1.11 新增)
+//========================================================================
+/*
+   看跌信号确认 (IB/DB): 
+   在 K-Target Top (target_index) 之后的 Max_Signal_Lookforward 根 K 线内，
+   检查后续 K 线的收盘价 (Close[j]) 是否小于 K-Target 的开盘价 (Open[target_index])。
+   一旦找到第一根突破 K 线，即标记信号。
+*/
+void CheckBearishSignalConfirmation(int target_index)
+{
+    // K-Target 锚点的开盘价 (突破基准线)
+    double target_open_price = Open[target_index];
+    
+    // 从 K-Target 的下一根 K 线 (target_index - 1) 开始向前检查
+    for (int j = target_index - 1; j >= target_index - Max_Signal_Lookforward; j--)
+    {
+        // 1. 检查索引是否有效
+        if (j < 0) break;
+        
+        // 2. 突破确认条件: 突破 K 线的收盘价 < K-Target 的开盘价
+        if (Close[j] < target_open_price)
+        {
+            // 找到突破 K 线，在此 K 线上绘制最终信号
+            // 信号位置放在突破 K 线的最高价上方 20 个点
+            BearishSignalBuffer[j] = High[j] + 20 * Point();
+            
+            // 找到第一个突破后，确认完成，立即退出循环
+            return;
+        }
+    }
+}
+
+
+//========================================================================
+// 6. DrawTargetBottom: 绘图函数，用向上箭头标记 K-Target Bottom
+//========================================================================
+void DrawTargetBottom(int target_index)
+{
+    // 将箭头标记在 K-Target 的最低价之下
+    BullishTargetBuffer[target_index] = Low[target_index] - 10 * Point(); 
+}
+
+//========================================================================
+// 7. DrawTargetTop: 绘图函数，用向下箭头标记 K-Target Top
+//========================================================================
+void DrawTargetTop(int target_index)
+{
+    // 将箭头标记在 K-Target 的最高价之上
+    BearishTargetBuffer[target_index] = High[target_index] + 10 * Point(); 
+}
