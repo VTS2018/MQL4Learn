@@ -66,6 +66,26 @@ OBJ_RECTANGLE_LABEL 和 OBJ_LABEL：我们使用这两种对象而不是 Comment
 // #property description "3. 自动计算点数和对应的金额盈亏。"
 // #property description "4. 完美支持黄金、外汇、原油、加密货币等所有品种。"
 
+//+------------------------------------------------------------------+
+//| 多语言设置模块
+//+------------------------------------------------------------------+
+// 1. 定义支持的语言列表
+enum ENUM_LANGUAGE
+{
+   LANG_AUTO,     // Auto Detect (System Default)
+   LANG_ENGLISH,  // English
+   LANG_CHINESE,  // Simplified Chinese
+   LANG_RUSSIAN,  // Russian
+   LANG_JAPANESE  // Japanese
+};
+
+// 2. 定义UI显示的文本变量 (全局变量)
+string g_txt_lots    = "";
+string g_txt_points  = "";
+string g_txt_profit  = "";
+string g_txt_pts_unit= ""; // 单位后缀
+string g_txt_warning = ""; // 错误提示
+
 //--- 输入参数
 // input double InpDefaultLots = 0.01;    // 测算手数 (默认 0.01)
 // input color  InpLineColor   = clrBlack; // 测距线颜色
@@ -74,6 +94,7 @@ OBJ_RECTANGLE_LABEL 和 OBJ_LABEL：我们使用这两种对象而不是 Comment
 // input color  InpTextColor   = clrWhite;// 字体颜色
 // input color  InpBgColor     = clrBlack;// 提示框背景色
 
+input ENUM_LANGUAGE InpLanguage = LANG_AUTO;  // Language Settings
 input double InpDefaultLots = 0.01;    // Calculation Lots (Default 0.01)
 input color  InpLineColor   = clrBlack; // Measurement Line Color
 input int    InpLineWidth   = 1;       // Line Width
@@ -96,11 +117,13 @@ datetime Start_Time = 0;
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   LoadLanguage();
+
    // 开启鼠标移动事件检测
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true);
    
    // 设置指标简称
-   IndicatorShortName("KT Quick Profit Calc");
+   // IndicatorShortName("KT Quick Profit Calc");
    
    return(INIT_SUCCEEDED);
 }
@@ -249,10 +272,14 @@ void UpdateCalculation(datetime end_time, double end_price, int x, int y)
    // 3. 格式化显示文本（每行独立）
    string lines[];
    ArrayResize(lines, 3);
-   lines[0] = "手数: " + DoubleToString(InpDefaultLots, 2);
-   lines[1] = "点数: " + DoubleToString(points, 0) + " pts";
-   lines[2] = "盈亏: " + DoubleToString(profit_money, 2) + " " + AccountCurrency();
-   
+   // lines[0] = "手数: " + DoubleToString(InpDefaultLots, 2);
+   // lines[1] = "点数: " + DoubleToString(points, 0) + " pts";
+   // lines[2] = "盈亏: " + DoubleToString(profit_money, 2) + " " + AccountCurrency();
+   // 修改后的多语言代码:
+   lines[0] = g_txt_lots + DoubleToString(InpDefaultLots, 2);
+   lines[1] = g_txt_points + DoubleToString(points, 0) + g_txt_pts_unit;
+   lines[2] = g_txt_profit + DoubleToString(profit_money, 2) + " " + AccountCurrency();
+
    // 4. 更新文本标签位置 (跟随鼠标)
    // 我们稍微偏移一点坐标，避免挡住鼠标指针
    int offset_x = 15;
@@ -343,3 +370,65 @@ void DeleteObjects()
    }
 }
 //+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| 核心功能：加载语言包
+//+------------------------------------------------------------------+
+void LoadLanguage()
+{
+   int lang_mode = InpLanguage;
+   
+   // 如果选择自动检测
+   if(lang_mode == LANG_AUTO)
+   {
+      string terminal_lang = TerminalInfoString(TERMINAL_LANGUAGE);
+      if(terminal_lang == "Chinese" || terminal_lang == "Chinese (Simplified)") 
+         lang_mode = LANG_CHINESE;
+      else if(terminal_lang == "Russian") 
+         lang_mode = LANG_RUSSIAN;
+      else if(terminal_lang == "Japanese")
+         lang_mode = LANG_JAPANESE;
+      else 
+         lang_mode = LANG_ENGLISH; // 默认英文
+   }
+
+   // 字典匹配
+   switch(lang_mode)
+   {
+      case LANG_CHINESE:
+         g_txt_lots     = "手数: ";
+         g_txt_points   = "点数: ";
+         g_txt_profit   = "盈亏: ";
+         g_txt_pts_unit = " 微点"; // 或者 pts
+         g_txt_warning  = "请按住 Ctrl + 左键 进行测算";
+         IndicatorShortName("KT 快速盈亏计算器");
+         break;
+         
+      case LANG_RUSSIAN:
+         g_txt_lots     = "Лоты: ";
+         g_txt_points   = "Пункты: ";
+         g_txt_profit   = "Прибыль: ";
+         g_txt_pts_unit = " пт";
+         g_txt_warning  = "Нажмите Ctrl + ЛКМ";
+         IndicatorShortName("KT Quick Calc (RU)");
+         break;
+         
+      case LANG_JAPANESE:
+         g_txt_lots     = "ロット: ";
+         g_txt_points   = "ポイント: ";
+         g_txt_profit   = "损益: ";
+         g_txt_pts_unit = " pts";
+         g_txt_warning  = "Ctrl + クリックで測定";
+         IndicatorShortName("KT Quick Calc (JP)");
+         break;
+
+      default: // LANG_ENGLISH
+         g_txt_lots     = "Lots: ";
+         g_txt_points   = "Points: ";
+         g_txt_profit   = "Profit: ";
+         g_txt_pts_unit = " pts";
+         g_txt_warning  = "Hold Ctrl + Click to Measure";
+         IndicatorShortName("KT Quick Profit Calc");
+         break;
+   }
+}
