@@ -33,6 +33,7 @@ input double   InpTrailStep      = 0.5;     // 追踪步进 (Trail Step in $)
 
 //--- 过滤参数
 input bool     InpOnlyCurrentTF  = false;   // 仅当前周期线条 (Only Current Timeframe)
+input int      InpCooldownSeconds = 60;     // 冷却时间(秒) (Cooldown Seconds)
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
 
@@ -237,8 +238,8 @@ void CheckKeyLevelHits()
       
       if(hitFromAbove || hitFromBelow)
       {
-         // 1. 防止同一位置短时间内重复开单（60秒冷却）
-         if(TimeCurrent() - g_keyLevels[i].lastCheckTime < 60)
+         // 1. 防止同一位置短时间内重复开单（冷却期）
+         if(TimeCurrent() - g_keyLevels[i].lastCheckTime < InpCooldownSeconds)
             continue;
          
          // 2. 方向检查：防止同方向重复开单
