@@ -85,7 +85,6 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   /*
    // 每10秒重新扫描一次关键位（防止新画的线）
    if(TimeCurrent() - g_lastScanTime > 10)
    {
@@ -101,7 +100,6 @@ void OnTick()
    
    // 更新界面显示
    UpdateDisplay();
-   */
 }
 
 //+------------------------------------------------------------------+
@@ -254,6 +252,12 @@ bool HasPositionAtLevel(double price)
 //+------------------------------------------------------------------+
 void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
 {
+   // 先只打印，不实际下单
+   Print("【触发信号】", level.objectName, 
+         " 价格:", level.price, 
+         " 方向:", (hitFromAbove ? "从上方触达" : "从下方触达"));
+   // return; // 暂时不执行下单
+
    // 确定交易方向（反向）
    int orderType = hitFromAbove ? OP_BUY : OP_SELL;
    double entryPrice = (orderType == OP_BUY) ? Ask : Bid;
@@ -266,7 +270,22 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
    
    // 计算止盈（基于目标盈利金额）
    double takeProfit = CalculateTakeProfit(orderType, entryPrice, lots);
+
+   // 详细日志输出
+   Print("【触发信号】", level.objectName, 
+         " 价格:", level.price, 
+         " 方向:", (hitFromAbove ? "从上方触达→买入" : "从下方触达→卖出"));
+   Print("  入场:", entryPrice, 
+         " 止损:", stopLoss, 
+         " 止盈:", takeProfit);
+   Print("  止损距离:", MathAbs(entryPrice - stopLoss) / Point, " 点",
+         " 止盈距离:", MathAbs(takeProfit - entryPrice) / Point, " 点");
+   Print("  手数:", lots, 
+         " 预期盈利: $", InpTargetProfit,
+         " 预期亏损: $", CalculatePotentialLoss(lots, entryPrice, stopLoss));
    
+   return; // 暂时不执行下单
+
    // 构建订单注释
    string comment = InpTradeComment + "_" + level.objectName;
    
@@ -531,3 +550,10 @@ string ErrorDescription(int errorCode)
    }
 }
 //+------------------------------------------------------------------+
+// 辅助函数
+double CalculatePotentialLoss(double lots, double entry, double sl)
+{
+   double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
+   double points = MathAbs(entry - sl) / Point;
+   return points * tickValue * lots;
+}
