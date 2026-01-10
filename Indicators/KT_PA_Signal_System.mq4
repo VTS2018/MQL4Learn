@@ -91,70 +91,47 @@ void OnDeinit(const int reason) {
 }
 
 //+------------------------------------------------------------------+
-//| 主计算循环
+//| 主计算循环 [OPTIMIZED V3]
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total, const int prev_calculated,
                 const datetime &time[], const double &open[],
                 const double &high[], const double &low[], const double &close[],
                 const long &tick_volume[], const long &volume[], const int &spread[]) {
 
-   // >>> [修改 2] 核心优化：新K线检测 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-   // 必须设置数组为序列，确保 time[0] 是最新K线时间
+   // ========== 性能优化：提前设置数组序列化 ==========
    ArraySetAsSeries(time, true);
    ArraySetAsSeries(high, true);
    ArraySetAsSeries(low, true);
    ArraySetAsSeries(close, true);
-   ArraySetAsSeries(open, true); // 其他数组也建议设置，防止逻辑混乱
+   ArraySetAsSeries(open, true);
    ArraySetAsSeries(BufferBuy, true);
    ArraySetAsSeries(BufferSell, true);
 
-   // 如果不是第一次运行(有历史数据)，且当前K线时间没变，直接跳过！
+   // ========== 新K线检测：跳过 Tick 更新 ==========
    if(prev_calculated > 0 && time[0] == lastBarTime) {
-       return(rates_total); 
+       return(rates_total);  // 非新K线，直接退出
    }
-   // 更新时间戳
    lastBarTime = time[0];
-   // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-   // 如果是第一次运行(prev_calculated=0)，计算过去1000根
-   // 如果是实时运行(新K线)，limit 通常等于 1 (或者少量几根)
-   int limit = rates_total - prev_calculated;
+   // ========== 计算范围设定 ==========
+   int limit;
+   
+   // 首次加载：计算历史数据
+   if(prev_calculated == 0) {
+      // 计算安全边界（避免数组越界）
+      int max_lookback_needed = InpKeyLevelPeriod + 5;
+      int max_safe_limit = rates_total - max_lookback_needed - 1;
+      
+      if(max_safe_limit < 1) return(rates_total);
+      
+      limit = MathMin(1000, max_safe_limit);  // 最多计算1000根
+   } 
+   // 实时更新：只计算新收盘的K线
+   else {
+      limit = 1;  // 只检查 i=1（刚收盘的K线）
+   }
 
-   /*
-   Print("--->[KT_PA_Signal_System.mq4:95]: limit: ", limit);
-
-   if(limit > 1000) limit = 1000; // 首次加载只算最近1000根
-   if(limit <= 0) return(rates_total);
-   Print("--->[KT_PA_Signal_System.mq4:99]: limit: ", limit);
-   */
-
-   // --- [修复逻辑] 动态安全边界计算 ---
-   
-   // 1. 定义我们需要回溯的最大K线数量
-   // Fakey需要+2，KeyLevel需要+InpKeyLevelPeriod，我们多预留几根作为缓冲
-   int max_lookback_needed = InpKeyLevelPeriod + 5; 
-   
-   // 2. 计算允许的最大索引值 (总数 - 回溯需求 - 1)
-   // 举例：总数500，回溯25，那么最大能计算到的索引是 474 (474+25 < 500)
-   int max_safe_limit = rates_total - max_lookback_needed - 1;
-   
-   // 3. 安全性修正：如果图表数据太少(比回溯需求还少)，直接不计算
-   if(max_safe_limit < 1) return(rates_total); 
-
-   // 4. 施加限制：
-   // 情况A: 首次加载(limit很大)，限制在 max_safe_limit 内
-   if(limit > max_safe_limit) limit = max_safe_limit;
-   
-   // 情况B: 正常限制(不要算太多太久远的数据，省资源)
-   if(limit > 1000) limit = 1000; 
-   
-   // 情况C: 实时更新(limit可能很小)，但也必须确保不越界(虽然通常不会，但为了严谨)
-   // (一般实时更新时 limit=1, max_safe_limit 肯定是几千，所以不会触发)
-   
-   // 5. 基础检查
-   if(limit <= 0) return(rates_total);
-
-   // --- [修复结束] ---   
+   // ========== 主循环：信号检测 ==========   
 
    // --- 循环检测每一根K线 ---
    // 注意：i 从 limit 开始，到 1 结束。
