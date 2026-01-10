@@ -1697,7 +1697,7 @@ double GetGradeWeight(ENUM_SIGNAL_GRADE grade)
 //+------------------------------------------------------------------+
 //| 🛡️ 参数同步模块：将当前参数保存到隐藏对象，供脚本读取
 //+------------------------------------------------------------------+
-void SaveParamsToChart()
+void SaveParamsToChart_V1()
 {
    if(Is_EA_Mode) return; // EA后台模式不需要保存
 
@@ -1728,6 +1728,52 @@ void SaveParamsToChart()
 
    // 6. 取消隐藏 (原代码设置为 true 且移出屏幕，现在改为可见)
    ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
+
+   // 2. 拼接核心参数 (顺序必须与 Config_Core.mqh 一致!)
+   // 格式: Smart_Tuning|Scan_Range|La_B|Lb_B|La_T|Lb_T|Max_Look|DB_Thres|LLHH|Model
+   string param_str = 
+      (string)Smart_Tuning_Enabled + "|" +
+      (string)Scan_Range + "|" +
+      (string)Lookahead_Bottom + "|" +
+      (string)Lookback_Bottom + "|" +
+      (string)Lookahead_Top + "|" +
+      (string)Lookback_Top + "|" +
+      (string)Max_Signal_Lookforward + "|" +
+      (string)DB_Threshold_Candles + "|" +
+      (string)Look_LLHH_Candles + "|" +
+      (string)Find_Target_Model;
+
+   // 3. 写入对象描述
+   ObjectSetString(0, obj_name, OBJPROP_TEXT, param_str);
+   ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
+
+   // 打印日志方便确认
+   Print("---->参数已同步至图表: ", param_str);
+}
+
+//+------------------------------------------------------------------+
+//| 🛡️ 参数同步模块：将当前参数保存到隐藏对象，供脚本读取
+//+------------------------------------------------------------------+
+void SaveParamsToChart()
+{
+   if(Is_EA_Mode) return; // EA后台模式不需要保存
+
+   string obj_name = "KTarget_Param_Store"; // 固定名称
+   
+   // 1. 如果对象不存在，创建它 (使用 OBJ_LABEL 作为数据容器)
+   if(ObjectFind(0, obj_name) == -1) {
+      ObjectCreate(0, obj_name, OBJ_LABEL, 0, 0, 0);
+   }
+
+   // --- 关键设置：让对象不可见但可读取 ---
+   
+   // 方法1: 设置对象在所有时间周期都不显示 (推荐)
+   ObjectSetInteger(0, obj_name, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+   
+   // 方法2: 将对象移出屏幕外 (备用方案)
+   ObjectSetInteger(0, obj_name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, obj_name, OBJPROP_XDISTANCE, -10000); // 移到屏幕左侧很远的位置
+   ObjectSetInteger(0, obj_name, OBJPROP_YDISTANCE, -10000); // 移到屏幕上方很远的位置
 
    // 2. 拼接核心参数 (顺序必须与 Config_Core.mqh 一致!)
    // 格式: Smart_Tuning|Scan_Range|La_B|Lb_B|La_T|Lb_T|Max_Look|DB_Thres|LLHH|Model
