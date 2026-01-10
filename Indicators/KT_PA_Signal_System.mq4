@@ -336,7 +336,7 @@ void CreateSignalObj(int i, const PA_Signal &sig, datetime time, double price) {
          break;
       case SIG_PINBAR:     
          text = "Pin";     // Pin Bar 简称
-         clr  = clrGold;   // Pin Bar 用金色
+         clr  = clrIndigo;   // Pin Bar 用金色
          break;
       case SIG_FAKEY:      
          text = "Fky";     // Fakey 简称
