@@ -12,40 +12,46 @@
 //+------------------------------------------------------------------+
 void OnStart()
 {
-  /*
-  datetime current_time = TimeCurrent();
-  Print("-->[Console1.mq4:16]: current_time: ", current_time);
+    datetime current_time = TimeCurrent();
+    Print("-->[Console1.mq4:16]: current_time: ", current_time);
 
-  //---
-  datetime P1_time = Time[1];
-  string time_id_str = TimeToString(P1_time, TIME_DATE | TIME_SECONDS);
-  Print("-->[Console1.mq4:18]: time_id_str: ", time_id_str);
+    //---
+    datetime P1_time = Time[1];
+    string time_id_str = TimeToString(P1_time, TIME_DATE | TIME_SECONDS);
+    Print("-->[Console1.mq4:18]: time_id_str: ", time_id_str);
 
-  string ids = StringFormat("_%d_", ChartID());
-  Print("-->[Console1.mq4:21]: ChartID(): ", ChartID());
-  Print("-->[Console1.mq4:21]: ids: ", ids);
+    string ids = StringFormat("_%d_", ChartID());
+    Print("-->[Console1.mq4:21]: ChartID(): ", ChartID());
+    Print("-->[Console1.mq4:21]: ids: ", ids);
 
-  */
+    // 在全局或函数内部定义一个 3 行 4 列的二维数组
+    int matrix[][4] = {
+        {10, 11, 12, 13},
+        {20, 21, 22, 23},
+        {30, 31, 32, 33}};
 
-  int arr[3][4] = {
-      {1, 2, 3, 4},
-      {5, 6, 7, 8},
-      {9, 10, 11, 12}}; // 静态初始化
+    // 获取第一维（行）的大小 - 使用 ArrayRange(数组名, 0)
+    int totalRows = ArrayRange(matrix, 0);
 
-  int rows = ArrayRange(arr,0); // 获取第一维（行）的大小
-  // int rows = ArrayRange(arr, 0); // 另一种获取维数大小的方法
+    // 获取第二维（列）的大小 - 使用 ArrayRange(数组名, 1)
+    int totalCols = ArrayRange(matrix, 1);
 
-  Print("数组的行数: ", rows);
+    Print("数组总行数: ", totalRows);
+    Print("数组总列数: ", totalCols);
+    Print("--- 开始遍历 ---");
 
-  double FiboExhaustionLevels[4][2] = {
-      {1.618, 1.88},
-      {2.618, 2.88},
-      {4.236, 4.88},
-      {6.000, 7.000} // 使用您最新的自定义级别
-  };
+    // 外部循环：遍历每一行
+    for (int i = 0; i < totalRows; i++) // i 是行索引
+    {
+        // 内部循环：遍历当前行的每一列
+        for (int j = 0; j < totalCols; j++) // j 是列索引
+        {
+            // 访问元素并打印到日志（专家日志或终端日志）
+            // 使用 DoubleToString 是为了格式化输出，确保日志可读性
+            Print("Element[", i, "][", j, "] = ", matrix[i][j]);
+        }
+    }
 
-  int zones_count = ArrayRange(FiboExhaustionLevels,0);
-  // 调试打印：此时 zones_count 应该正确显示 4
-  Print("---->[KTarget_FinderBot.mq4:1273]: zones_count: ", zones_count);
+    Print("--- 遍历结束 ---");
 }
 //+------------------------------------------------------------------+
