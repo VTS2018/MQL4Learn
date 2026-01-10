@@ -9,9 +9,19 @@
 //+------------------------------------------------------------------+
 //| ✅ 专门研究 (OnCalculate)
 //+------------------------------------------------------------------+
-extern int Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
+//extern int Timer_Interval_Seconds = 5; // OnTimer 触发间隔 (秒)
 
 //+------------------------------------------------------------------+
 //| ✅ 绘图控制开关
 //+------------------------------------------------------------------+
-extern bool Is_DrawFibonacciLines = true; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
+//extern bool Is_DrawFibonacciLines = true; // 控制是否绘制 信号的 斐波那契回调线 (true=开启, false=关闭)
+
+//+------------------------------------------------------------------+
+//| ✅ Specialized / OnTimer Settings
+//+------------------------------------------------------------------+
+extern int Timer_Interval_Seconds = 5;    // Timer Interval (Sec)
+
+//+------------------------------------------------------------------+
+//| ✅ Visual Control Switches
+//+------------------------------------------------------------------+
+extern bool Is_DrawFibonacciLines = true; // Draw Signal Fibo Lines
