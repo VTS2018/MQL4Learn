@@ -24,7 +24,7 @@ input bool     InpUseMoneyMgmt   = false;   // 启用资金管理 (Use Money Man
 input double   InpTargetProfit   = 2.0;     // 目标盈利金额 (Target Profit in $)
 input double   InpATRMultiplier  = 1.5;     // 止损ATR倍数 (SL ATR Multiplier)
 input int      InpATRPeriod      = 14;      // ATR周期 (ATR Period)
-input int      InpPriceBuffer    = 5;       // 价格触发缓冲点数 (Price Buffer in Points)
+input int      InpPriceBuffer    = 1000;       // 价格触发缓冲点数 (Price Buffer in Points)
 
 //--- 追踪减仓参数
 input bool     InpEnableTrailing = true;    // 启用追踪减仓 (Enable Trailing)
@@ -107,6 +107,18 @@ void OnTick()
 //+------------------------------------------------------------------+
 void ScanKeyLevels()
 {
+   // 保存旧状态（防止重新扫描时丢失 lastCheckTime 和 tradeCount）
+   KeyLevel oldLevels[];
+   int oldSize = ArraySize(g_keyLevels);
+   ArrayResize(oldLevels, oldSize);
+   for(int i = 0; i < oldSize; i++)
+   {
+      oldLevels[i].objectName = g_keyLevels[i].objectName;
+      oldLevels[i].lastCheckTime = g_keyLevels[i].lastCheckTime;
+      oldLevels[i].tradeCount = g_keyLevels[i].tradeCount;
+   }
+   
+   // 清空并重新扫描
    ArrayResize(g_keyLevels, 0);
    int total = ObjectsTotal(0, 0, -1);
    
@@ -140,6 +152,21 @@ void ScanKeyLevels()
             }
             
             AddKeyLevel(objName, price, tf, false);
+         }
+      }
+   }
+   
+   // 恢复旧状态（根据对象名称匹配）
+   for(int i = 0; i < ArraySize(g_keyLevels); i++)
+   {
+      for(int j = 0; j < oldSize; j++)
+      {
+         if(g_keyLevels[i].objectName == oldLevels[j].objectName)
+         {
+            // 恢复该关键位的历史记录
+            g_keyLevels[i].lastCheckTime = oldLevels[j].lastCheckTime;
+            g_keyLevels[i].tradeCount = oldLevels[j].tradeCount;
+            break;
          }
       }
    }
@@ -284,7 +311,7 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
          " 预期盈利: $", InpTargetProfit,
          " 预期亏损: $", CalculatePotentialLoss(lots, entryPrice, stopLoss));
    
-   return; // 暂时不执行下单
+   // return; // 暂时不执行下单
 
    // 构建订单注释
    string comment = InpTradeComment + "_" + level.objectName;
