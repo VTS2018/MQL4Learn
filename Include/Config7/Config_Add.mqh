@@ -5,6 +5,7 @@
 //| 14.12.2025 - Initial release                                     |
 //+------------------------------------------------------------------+
 
+/*
 //+------------------------------------------------------------------+
 //| ✅ K_Logic v3.0 Parameters
 //+------------------------------------------------------------------+
@@ -19,4 +20,21 @@ datetime g_LastAlertTime = 0; // 记录上一次成功报警的K线时间
 //+------------------------------------------------------------------+
 input bool Show_History_Fibo   = false;  // [开关] 是否显示历史信号的斐波投影 (False=只看当前最新)
 input bool Hide_Invalid_Fibo   = true;   // [智能] 是否隐藏已失效(止损)或已完成(止盈)的信号
+//+------------------------------------------------------------------+
+*/
+
+//+------------------------------------------------------------------+
+//| ✅ K_Logic v3.0 Parameters
+//+------------------------------------------------------------------+
+input string   __V3_Settings__   = "=== v3.0 Smart Logic ===";
+input bool     Enable_V3_Logic   = true;         // Enable v3 Logic
+input ENUM_SIGNAL_GRADE Min_Alert_Grade = GRADE_B; // Min Alert Grade (Rec. B/A)
+
+datetime g_LastAlertTime = 0; // Last Alert Time (Internal)
+
+//+------------------------------------------------------------------+
+//| ✅ [New] Fibonacci Drawing Filters
+//+------------------------------------------------------------------+
+input bool Show_History_Fibo   = false; // Show History Fibo (False=Latest)
+input bool Hide_Invalid_Fibo   = true;  // Auto Hide Invalid/Done Fibo
 //+------------------------------------------------------------------+
