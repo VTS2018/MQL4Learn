@@ -1791,6 +1791,7 @@ void SaveParamsToChart()
 
    // 3. 写入对象描述
    ObjectSetString(0, obj_name, OBJPROP_TEXT, param_str);
+   ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
    ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
 
    // 打印日志方便确认
