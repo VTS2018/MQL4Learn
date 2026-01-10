@@ -1025,7 +1025,7 @@ void DrawMarketSessions(int lookback_days, int gmt_offset)
    // 伦敦: 08:00 - 17:00 GMT (欧盘核心)
    // 纽约: 13:00 - 22:00 GMT (美盘核心)
    
-   int Sess_Syd_Start = 21; int Sess_Syd_End = 6;
+   //int Sess_Syd_Start = 21; int Sess_Syd_End = 6;
    int Sess_Tok_Start = 0;  int Sess_Tok_End = 9;
    int Sess_Lon_Start = 8;  int Sess_Lon_End = 17;
    int Sess_NY_Start  = 13; int Sess_NY_End  = 22;
