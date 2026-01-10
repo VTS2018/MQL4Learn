@@ -69,6 +69,7 @@ struct PA_Signal {
 double BufferBuy[];
 double BufferSell[];
 datetime lastAlertTime = 0;
+datetime lastBarTime = 0;
 
 //+------------------------------------------------------------------+
 //| 初始化
@@ -96,7 +97,27 @@ int OnCalculate(const int rates_total, const int prev_calculated,
                 const datetime &time[], const double &open[],
                 const double &high[], const double &low[], const double &close[],
                 const long &tick_volume[], const long &volume[], const int &spread[]) {
-   
+
+   // >>> [修改 2] 核心优化：新K线检测 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+   // 必须设置数组为序列，确保 time[0] 是最新K线时间
+   ArraySetAsSeries(time, true);
+   ArraySetAsSeries(high, true);
+   ArraySetAsSeries(low, true);
+   ArraySetAsSeries(close, true);
+   ArraySetAsSeries(open, true); // 其他数组也建议设置，防止逻辑混乱
+   ArraySetAsSeries(BufferBuy, true);
+   ArraySetAsSeries(BufferSell, true);
+
+   // 如果不是第一次运行(有历史数据)，且当前K线时间没变，直接跳过！
+   if(prev_calculated > 0 && time[0] == lastBarTime) {
+       return(rates_total); 
+   }
+   // 更新时间戳
+   lastBarTime = time[0];
+   // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+   // 如果是第一次运行(prev_calculated=0)，计算过去1000根
+   // 如果是实时运行(新K线)，limit 通常等于 1 (或者少量几根)
    int limit = rates_total - prev_calculated;
 
    /*
@@ -136,6 +157,8 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    // --- [修复结束] ---   
 
    // --- 循环检测每一根K线 ---
+   // 注意：i 从 limit 开始，到 1 结束。
+   // i=0 是当前未收盘的K线，我们故意不检测它，只检测 i>=1 的已收盘K线
    for(int i = limit; i >= 1; i--) { // i=1 表示上一根收盘的K线（确认信号）
       
       PA_Signal signal;
@@ -168,6 +191,8 @@ int OnCalculate(const int rates_total, const int prev_calculated,
       // >>> [结束] <<<
 
       // 3.2 报警 (功能2) - 仅针对刚收盘的K线(i=1)报警一次
+      // 因为代码限制了只在新K线开盘时运行，且循环包含了 i=1
+      // 所以只要检测到 i==1 有信号，就可以直接报警，不用担心重复报警
       if(i == 1 && time[0] != lastAlertTime) {
          SendAlert(signal);
          lastAlertTime = time[0];
