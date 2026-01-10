@@ -1041,7 +1041,7 @@ void DrawMarketSessions(int lookback_days, int gmt_offset)
       datetime current_day_base = day_start - (i * PeriodSeconds(PERIOD_D1));
       
       // 绘制四大时段
-      DrawSingleSession(current_day_base, "Sydney",  Sess_Syd_Start, Sess_Syd_End, gmt_offset, Color_Sydney);
+      // DrawSingleSession(current_day_base, "Sydney",  Sess_Syd_Start, Sess_Syd_End, gmt_offset, Color_Sydney);
       DrawSingleSession(current_day_base, "Asian",   Sess_Tok_Start, Sess_Tok_End, gmt_offset, Color_Tokyo);
       DrawSingleSession(current_day_base, "London",  Sess_Lon_Start, Sess_Lon_End, gmt_offset, Color_London);
       DrawSingleSession(current_day_base, "NewYork", Sess_NY_Start,  Sess_NY_End,  gmt_offset, Color_NewYork);
