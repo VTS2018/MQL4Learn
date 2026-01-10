@@ -34,6 +34,7 @@ input double   InpTrailStep      = 0.5;     // 追踪步进 (Trail Step in $)
 //--- 过滤参数
 input bool     InpOnlyCurrentTF  = false;   // 仅当前周期线条 (Only Current Timeframe)
 input int      InpCooldownSeconds = 60;     // 冷却时间(秒) (Cooldown Seconds)
+input bool     InpCheckHistory   = false;   // 检查历史订单 (Check History Orders)
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
 
@@ -251,6 +252,10 @@ void CheckKeyLevelHits()
          if(HasPositionAtLevel(levelPrice, spread))
             continue;
          
+         // 3.5. 检查历史订单（可选，防止EA重启后重复开仓）
+         if(InpCheckHistory && HasTradedAtLevel(levelPrice, spread, g_keyLevels[i].objectName))
+            continue;
+         
          // 4. 执行反向交易
          bool isHitFromAbove = hitFromAbove;
          ExecuteReverseTrade(g_keyLevels[i], isHitFromAbove);
@@ -285,6 +290,40 @@ bool HasPositionAtLevel(double price, double spread)
       double openPrice = OrderOpenPrice();
       if(MathAbs(openPrice - price) < tolerance)
          return true;
+   }
+   
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| 检查某个价格位置是否在历史订单中交易过
+//+------------------------------------------------------------------+
+bool HasTradedAtLevel(double price, double spread, string objectName)
+{
+   // 动态容差：至少是点差的1.5倍，确保不同品种都能正确检测
+   double tolerance = MathMax(spread * 1.5, 10 * Point);
+   
+   // 遍历历史订单
+   for(int i = OrdersHistoryTotal() - 1; i >= 0; i--)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY))
+         continue;
+      
+      if(OrderSymbol() != Symbol())
+         continue;
+      
+      if(OrderMagicNumber() != InpMagicNumber)
+         continue;
+      
+      // 检查价格是否在容差范围内
+      double openPrice = OrderOpenPrice();
+      if(MathAbs(openPrice - price) < tolerance)
+      {
+         // 进一步检查订单注释是否包含该对象名称（更精确的匹配）
+         string comment = OrderComment();
+         if(StringFind(comment, objectName) >= 0)
+            return true;
+      }
    }
    
    return false;
