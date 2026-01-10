@@ -45,6 +45,7 @@ struct KeyLevel
    bool     isHLine;        // 是否水平线（false=射线）
    datetime lastCheckTime;  // 最后检查时间
    int      tradeCount;     // 该位置的交易次数
+   int      lastTradeDirection; // 最后交易方向: 0=未交易, 1=从上触达(买入), -1=从下触达(卖出)
 };
 
 KeyLevel g_keyLevels[];     // 存储所有关键位
@@ -107,7 +108,7 @@ void OnTick()
 //+------------------------------------------------------------------+
 void ScanKeyLevels()
 {
-   // 保存旧状态（防止重新扫描时丢失 lastCheckTime 和 tradeCount）
+   // 保存旧状态（防止重新扫描时丢失 lastCheckTime、tradeCount 和 lastTradeDirection）
    KeyLevel oldLevels[];
    int oldSize = ArraySize(g_keyLevels);
    ArrayResize(oldLevels, oldSize);
@@ -116,6 +117,7 @@ void ScanKeyLevels()
       oldLevels[i].objectName = g_keyLevels[i].objectName;
       oldLevels[i].lastCheckTime = g_keyLevels[i].lastCheckTime;
       oldLevels[i].tradeCount = g_keyLevels[i].tradeCount;
+      oldLevels[i].lastTradeDirection = g_keyLevels[i].lastTradeDirection;
    }
    
    // 清空并重新扫描
@@ -166,6 +168,7 @@ void ScanKeyLevels()
             // 恢复该关键位的历史记录
             g_keyLevels[i].lastCheckTime = oldLevels[j].lastCheckTime;
             g_keyLevels[i].tradeCount = oldLevels[j].tradeCount;
+            g_keyLevels[i].lastTradeDirection = oldLevels[j].lastTradeDirection;
             break;
          }
       }
@@ -190,6 +193,7 @@ void AddKeyLevel(string objName, double price, int tf, bool isHLine)
    g_keyLevels[size].isHLine = isHLine;
    g_keyLevels[size].lastCheckTime = 0;
    g_keyLevels[size].tradeCount = 0;
+   g_keyLevels[size].lastTradeDirection = 0;  // 初始化为未交易
 }
 
 //+------------------------------------------------------------------+
@@ -233,20 +237,27 @@ void CheckKeyLevelHits()
       
       if(hitFromAbove || hitFromBelow)
       {
-         // 防止同一位置短时间内重复开单
+         // 1. 防止同一位置短时间内重复开单（60秒冷却）
          if(TimeCurrent() - g_keyLevels[i].lastCheckTime < 60)
             continue;
          
-         // 检查该位置是否已有持仓
-         if(HasPositionAtLevel(levelPrice))
+         // 2. 方向检查：防止同方向重复开单
+         int currentDirection = hitFromAbove ? 1 : -1;  // 1=从上触达, -1=从下触达
+         if(g_keyLevels[i].lastTradeDirection == currentDirection)
+            continue;  // 同方向已交易过，跳过
+         
+         // 3. 检查该位置是否已有持仓（动态容差）
+         if(HasPositionAtLevel(levelPrice, spread))
             continue;
          
-         // 执行反向交易
+         // 4. 执行反向交易
          bool isHitFromAbove = hitFromAbove;
          ExecuteReverseTrade(g_keyLevels[i], isHitFromAbove);
          
+         // 5. 更新状态
          g_keyLevels[i].lastCheckTime = TimeCurrent();
          g_keyLevels[i].tradeCount++;
+         g_keyLevels[i].lastTradeDirection = currentDirection;  // 记录交易方向
       }
    }
 }
@@ -254,9 +265,10 @@ void CheckKeyLevelHits()
 //+------------------------------------------------------------------+
 //| 检查某个价格位置是否已有持仓
 //+------------------------------------------------------------------+
-bool HasPositionAtLevel(double price)
+bool HasPositionAtLevel(double price, double spread)
 {
-   double tolerance = 10 * Point; // 10点容差
+   // 动态容差：至少是点差的1.5倍，确保不同品种都能正确检测
+   double tolerance = MathMax(spread * 1.5, 10 * Point);
    
    for(int i = OrdersTotal() - 1; i >= 0; i--)
    {
