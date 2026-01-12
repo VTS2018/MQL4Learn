@@ -18,6 +18,17 @@
 #property strict
 #property indicator_chart_window
 
+//+------------------------------------------------------------------+
+//| 枚举：周期可见性模式
+//+------------------------------------------------------------------+
+enum ENUM_VISIBILITY_MODE
+{
+   VISIBILITY_ALL = 0,        // All Timeframes
+   VISIBILITY_CURRENT = 1,    // Current Only
+   VISIBILITY_LOWER = 2,      // Current & Lower TFs
+   VISIBILITY_HIGHER = 3      // Current & Higher TFs
+};
+
 //--- 参数设置
 // input color ColorHLine = clrRed;        // 水平线颜色
 // input color ColorRay   = clrDeepSkyBlue;// 射线(趋势水平线)颜色
@@ -26,6 +37,9 @@
 input color ColorHLine = clrRed;          // Horizontal Line Color
 input color ColorRay   = clrDeepSkyBlue;  // Ray Color (Segment)
 input int   LineWidth  = 2;               // Line Width
+
+//--- [新增] 周期可见性控制
+input ENUM_VISIBILITY_MODE VisibilityMode = VISIBILITY_ALL; // Timeframe Visibility Mode
 
 input color BtnBgColor  = clrGray;        // Button Background Color
 input color BtnTxtColor = clrWhite;       // Button Text Color
@@ -208,6 +222,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
                
+               // [新增] 应用周期可见性设置
+               int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
+               ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
+               
                // [新增功能] 在磁吸的K线上绘制Check标记
                bool isBullish = (close > open); // 判断阳线/阴线
                double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
@@ -234,6 +252,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, false);
                ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
+               
+               // [新增] 应用周期可见性设置
+               int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
+               ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
                
                // [新增功能] 在图表右侧价格轴显示射线价格标签
                // [修改] 使用uniqueID建立关联
@@ -318,6 +340,70 @@ string GetPeriodName(int p)
       case PERIOD_MN1: return "MN";
    }
    return "Unknown";
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 辅助函数：计算周期可见性标志位
+//+------------------------------------------------------------------+
+int CalculateVisibilityFlags(int currentPeriod, ENUM_VISIBILITY_MODE mode)
+{
+   // 模式 A：全周期可见（默认）
+   if(mode == VISIBILITY_ALL)
+   {
+      return OBJ_ALL_PERIODS; // 0x1FF
+   }
+   
+   // 定义周期层级映射表（从小到大）
+   int periods[] = {PERIOD_M1, PERIOD_M5, PERIOD_M15, PERIOD_M30, PERIOD_H1, PERIOD_H4, PERIOD_D1, PERIOD_W1, PERIOD_MN1};
+   int flags[]   = {0x0001,    0x0002,    0x0004,     0x0008,     0x0010,    0x0020,    0x0040,    0x0080,    0x0100};
+   
+   int currentIndex = -1;
+   int currentFlag = 0;
+   
+   // 找到当前周期在数组中的位置
+   for(int i = 0; i < ArraySize(periods); i++)
+   {
+      if(periods[i] == currentPeriod)
+      {
+         currentIndex = i;
+         currentFlag = flags[i];
+         break;
+      }
+   }
+   
+   // 如果当前周期不在标准列表中，返回全周期可见
+   if(currentIndex == -1) return OBJ_ALL_PERIODS;
+   
+   // 模式 B：仅当前周期
+   if(mode == VISIBILITY_CURRENT)
+   {
+      return currentFlag;
+   }
+   
+   // 模式 C：当前及更小周期
+   if(mode == VISIBILITY_LOWER)
+   {
+      int result = 0;
+      for(int i = 0; i <= currentIndex; i++)
+      {
+         result |= flags[i];
+      }
+      return result;
+   }
+   
+   // 模式 D：当前及更大周期
+   if(mode == VISIBILITY_HIGHER)
+   {
+      int result = 0;
+      for(int i = currentIndex; i < ArraySize(periods); i++)
+      {
+         result |= flags[i];
+      }
+      return result;
+   }
+   
+   // 默认返回全周期
+   return OBJ_ALL_PERIODS;
 }
 
 //+------------------------------------------------------------------+
