@@ -288,6 +288,27 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
     // 角点 B (P2 侧)
     datetime time2 = Time[P2_index];
     double price2 = Close[P2_index]; // P2 侧的价格锚定 P2 K 线的收盘价
+    
+    // 🚨 修复：检测并处理 time1 == time2 的情况（强制设置最小宽度）
+    if (target_index == P2_index || time1 == time2)
+    {
+        Print(" 警告: P1和P2时间相同! target_index=", target_index,
+              ", P2_index=", P2_index, ", time1=", TimeToString(time1),
+              " | 应用最小宽度修正...");
+        
+        // 强制给矩形设置最小宽度（向左延伸 3 根 K线）
+        int min_width_bars = 3;
+        
+        // 确保不超出数组边界
+        int adjusted_index = P2_index + min_width_bars;
+        if (adjusted_index >= Bars - 1)
+            adjusted_index = Bars - 1;
+        
+        time2 = Time[adjusted_index];
+        
+        Print("    修正后: time2 调整为 ", TimeToString(time2), 
+              " (索引: ", adjusted_index, ")");
+    }
 
     // 1. 根据看涨/看跌确定 P1 侧的价格锚定点
     if (is_bullish)
