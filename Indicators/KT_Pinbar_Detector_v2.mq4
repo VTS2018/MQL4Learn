@@ -52,6 +52,9 @@ bool     g_firstRun = true;           // 首次运行标志
 //+------------------------------------------------------------------+
 int OnInit()
 {
+   // 清理旧对象（切换周期时）
+   CleanupAllObjects();
+   
    // 设置缓冲区
    SetIndexBuffer(0, BullishPinBuffer);
    SetIndexStyle(0, DRAW_ARROW, STYLE_SOLID, ArrowSize, BullishColor);
@@ -77,8 +80,11 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
-   // 可选：清理所有对象（如果使用对象标注的话）
-   // Comment("");
+   // 清理所有指标创建的对象
+   CleanupAllObjects();
+   Comment("");
+   
+   Print("KT Pinbar Detector unloaded. Reason: ", reason);
 }
 
 //+------------------------------------------------------------------+
@@ -472,5 +478,34 @@ string GetTimeframeName(int period)
       case PERIOD_W1:  return "W1";
       case PERIOD_MN1: return "MN1";
       default:         return "Unknown";
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 清理所有指标创建的对象
+//+------------------------------------------------------------------+
+void CleanupAllObjects()
+{
+   int totalObjects = ObjectsTotal(0, 0, -1);
+   int deletedCount = 0;
+   
+   // 从后向前遍历，避免索引问题
+   for(int i = totalObjects - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查对象名是否以指标前缀开头
+      if(StringFind(objName, g_prefix) == 0)
+      {
+         if(ObjectDelete(0, objName))
+         {
+            deletedCount++;
+         }
+      }
+   }
+   
+   if(deletedCount > 0)
+   {
+      Print("Cleaned up ", deletedCount, " objects with prefix: ", g_prefix);
    }
 }
