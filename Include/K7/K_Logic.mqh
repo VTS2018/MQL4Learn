@@ -222,9 +222,19 @@ int FindP2Index(int target_index, bool is_bullish)
 
     int P2_index = -1;
 
+    // --- [新增约束 A] 计算锚点 K 线的波幅（用于价格距离约束）---
+    double anchor_range = High[target_index] - Low[target_index];
+    // P2 必须距离 P1 至少 "锚点波幅的 50%"（黄金比例可调整为 0.618）
+    double min_price_distance = anchor_range * 0.5;
+
+    // --- [新增约束 F] 最小 K 线数量约束（确保结构完整性）---
+    // P2 必须距离锚点至少 3 根 K 线
+    int min_bars_between = 3;
+
     // 从锚点 K 线的左侧 (历史 K 线，索引 i+k) 开始回溯
+    // 🚨 修改起始点：从 k=min_bars_between 开始，而不是 k=1
     // 使用外部参数 Scan_Range 作为回溯上限
-    for (int k = 1; k <= Scan_Range; k++)
+    for (int k = min_bars_between; k <= Scan_Range; k++)
     {
         int past_index = target_index + k;
         
@@ -239,8 +249,8 @@ int FindP2Index(int target_index, bool is_bullish)
             if (Close[past_index] > Open[past_index])
             {
                 candidate_P2 = Close[past_index];
-                // 2. [新增约束] P2 价格必须高于 P1 价格
-                if (candidate_P2 > P1_price)
+                // 🚨 增强约束：P2 价格必须高于 P1 + 最小距离
+                if (candidate_P2 > P1_price + min_price_distance)
                 {
                     P2_price = candidate_P2;
                     P2_index = past_index;
@@ -254,8 +264,8 @@ int FindP2Index(int target_index, bool is_bullish)
             if (Close[past_index] < Open[past_index])
             {
                 candidate_P2 = Close[past_index];
-                // 2. [新增约束] P2 价格必须低于 P1 价格
-                if (candidate_P2 < P1_price)
+                // 🚨 增强约束：P2 价格必须低于 P1 - 最小距离
+                if (candidate_P2 < P1_price - min_price_distance)
                 {
                     P2_price = candidate_P2;
                     P2_index = past_index;
