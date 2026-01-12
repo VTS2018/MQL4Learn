@@ -1011,6 +1011,29 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
 }
 
 //+------------------------------------------------------------------+
+//| ParseHourFromTimeString: 将 "HH:MM" 格式的时间字符串转换为小时数
+//| ------------------------------------------------------------------
+//| 例如: "09:00" -> 9, "13:30" -> 13
+//+------------------------------------------------------------------+
+int ParseHourFromTimeString(string time_str)
+{
+    // 查找冒号位置
+    int colon_pos = StringFind(time_str, ":");
+    
+    if (colon_pos == -1)
+    {
+        // 如果没有找到冒号，尝试直接转换为整数
+        return (int)StringToInteger(time_str);
+    }
+    
+    // 提取小时部分（冒号之前的字符）
+    string hour_str = StringSubstr(time_str, 0, colon_pos);
+    
+    // 转换为整数并返回
+    return (int)StringToInteger(hour_str);
+}
+
+//+------------------------------------------------------------------+
 //| 🌍 DrawMarketSessions: 绘制全球四大市场时段矩形
 //| ------------------------------------------------------------------
 //| 逻辑: 基于标准 GMT 时间定义时段，然后加上 Server_Offset 进行平移
@@ -1019,16 +1042,19 @@ void DrawMarketSessions(int lookback_days, int gmt_offset)
 {
    if (Is_EA_Mode) return;
 
-   // --- 1. 定义标准市场的 GMT 开始和结束时间 (24小时制) ---
-   // 悉尼: 21:00 - 06:00 GMT
+   // --- 1. 从配置文件读取并转换时间 (原硬编码方式已废弃) ---
+   // 原硬编码值（仅供参考）:
    // 东京: 00:00 - 09:00 GMT (亚盘核心)
    // 伦敦: 08:00 - 17:00 GMT (欧盘核心)
    // 纽约: 13:00 - 22:00 GMT (美盘核心)
    
-   //int Sess_Syd_Start = 21; int Sess_Syd_End = 6;
-   int Sess_Tok_Start = 0;  int Sess_Tok_End = 9;
-   int Sess_Lon_Start = 8;  int Sess_Lon_End = 17;
-   int Sess_NY_Start  = 13; int Sess_NY_End  = 22;
+   // 从配置文件读取时间并转换为整数小时
+   int Sess_Tok_Start = ParseHourFromTimeString(Session1_Start);
+   int Sess_Tok_End   = ParseHourFromTimeString(Session1_End);
+   int Sess_Lon_Start = ParseHourFromTimeString(Session2_Start);
+   int Sess_Lon_End   = ParseHourFromTimeString(Session2_End);
+   int Sess_NY_Start  = ParseHourFromTimeString(Session3_Start);
+   int Sess_NY_End    = ParseHourFromTimeString(Session3_End);
 
    // 获取当前服务器时间的日初 (00:00)
    datetime time_current = TimeCurrent();
@@ -1042,9 +1068,9 @@ void DrawMarketSessions(int lookback_days, int gmt_offset)
       
       // 绘制四大时段
       // DrawSingleSession(current_day_base, "Sydney",  Sess_Syd_Start, Sess_Syd_End, gmt_offset, Color_Sydney);
-      DrawSingleSession(current_day_base, "Asian",   Sess_Tok_Start, Sess_Tok_End, gmt_offset, Color_Tokyo);
-      DrawSingleSession(current_day_base, "London",  Sess_Lon_Start, Sess_Lon_End, gmt_offset, Color_London);
-      DrawSingleSession(current_day_base, "NewYork", Sess_NY_Start,  Sess_NY_End,  gmt_offset, Color_NewYork);
+      DrawSingleSession(current_day_base, "Asian",   Sess_Tok_Start, Sess_Tok_End, gmt_offset, Session1_Color);
+      DrawSingleSession(current_day_base, "London",  Sess_Lon_Start, Sess_Lon_End, gmt_offset, Session2_Color);
+      DrawSingleSession(current_day_base, "NewYork", Sess_NY_Start,  Sess_NY_End,  gmt_offset, Session3_Color);
    }
 }
 
