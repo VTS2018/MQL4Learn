@@ -39,6 +39,7 @@ datetime g_lastBarTime = 0;           // 记录上一根 K 线时间
 datetime g_lastBullishAlert = 0;      // 上次看涨提醒时间
 datetime g_lastBearishAlert = 0;      // 上次看跌提醒时间
 string   g_prefix = "KT_Pin_";        // 对象名前缀
+bool     g_firstRun = true;           // 首次运行标志
 
 //+------------------------------------------------------------------+
 //| 初始化函数
@@ -60,10 +61,7 @@ int OnInit()
    ArraySetAsSeries(BullishPinBuffer, true);
    ArraySetAsSeries(BearishPinBuffer, true);
    
-   // 扫描历史 K 线
-   ScanHistoricalBars();
-   
-   Print("KT Pinbar Detector initialized. Scanning ", LookbackBars, " bars.");
+   Print("KT Pinbar Detector initialized. Waiting for data...");
    
    return(INIT_SUCCEEDED);
 }
@@ -93,6 +91,18 @@ int OnCalculate(const int rates_total,
 {
    // 设置数组为时间序列模式
    ArraySetAsSeries(time, true);
+   ArraySetAsSeries(open, true);
+   ArraySetAsSeries(high, true);
+   ArraySetAsSeries(low, true);
+   ArraySetAsSeries(close, true);
+   
+   // 首次运行：扫描历史 K 线
+   if(g_firstRun && rates_total > 10)
+   {
+      g_firstRun = false;
+      ScanHistoricalBars();
+      Print("Historical scan completed: ", LookbackBars, " bars analyzed.");
+   }
    
    // 检测新 K 线形成
    if(time[0] != g_lastBarTime)
