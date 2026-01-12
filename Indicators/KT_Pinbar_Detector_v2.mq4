@@ -34,6 +34,12 @@ input color    BullishColor = clrLimeGreen;  // Bullish Pinbar Color
 input color    BearishColor = clrRed;        // Bearish Pinbar Color
 input int      ArrowSize = 2;                // Arrow Width
 
+input string   __Fibonacci_Settings__ = "=== Fibonacci Retracement ===";
+input bool     DrawFibo = true;              // Draw Fibonacci Levels
+input int      FiboExtension = 15;           // Fibo Line Extension (Bars)
+input bool     ShowFibo050 = true;           // Show 0.5 Level
+input bool     ShowFibo618 = true;           // Show 0.618 Level
+
 //--- 全局变量
 datetime g_lastBarTime = 0;           // 记录上一根 K 线时间
 datetime g_lastBullishAlert = 0;      // 上次看涨提醒时间
@@ -129,6 +135,7 @@ void ScanHistoricalBars()
       if(IsBullishPinbar(i))
       {
          BullishPinBuffer[i] = Low[i] - GetArrowOffset(i);
+         DrawFibonacciLevels(i, true);  // 绘制斐波那契
       }
       else
       {
@@ -139,6 +146,7 @@ void ScanHistoricalBars()
       if(IsBearishPinbar(i))
       {
          BearishPinBuffer[i] = High[i] + GetArrowOffset(i);
+         DrawFibonacciLevels(i, false);  // 绘制斐波那契
       }
       else
       {
@@ -159,6 +167,7 @@ void CheckNewBar()
    if(isBullish)
    {
       BullishPinBuffer[1] = Low[1] - GetArrowOffset(1);
+      DrawFibonacciLevels(1, true);  // 绘制斐波那契
       
       // 检查是否需要提醒
       if(ShouldAlert(true))
@@ -171,6 +180,7 @@ void CheckNewBar()
    if(isBearish)
    {
       BearishPinBuffer[1] = High[1] + GetArrowOffset(1);
+      DrawFibonacciLevels(1, false);  // 绘制斐波那契
       
       // 检查是否需要提醒
       if(ShouldAlert(false))
@@ -270,6 +280,110 @@ double GetArrowOffset(int index)
    
    // 方法 2：固定点数（更简单）
    return 10 * Point;
+}
+
+//+------------------------------------------------------------------+
+//| 计算斐波那契回撤级别价格
+//+------------------------------------------------------------------+
+double CalculateFiboLevel(double high, double low, double level, bool isBullish)
+{
+   double range = high - low;
+   
+   if(isBullish)
+   {
+      // 看涨：从低到高回撤（0在高，100在低）
+      return low + range * level;
+   }
+   else
+   {
+      // 看跌：从高到低回撤（0在低，100在高）
+      return high - range * level;
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 绘制斐波那契回撤级别（0.5 和 0.618）
+//+------------------------------------------------------------------+
+void DrawFibonacciLevels(int index, bool isBullish)
+{
+   if(!DrawFibo) return;
+   if(index < 0 || index >= Bars) return;
+   
+   double h = High[index];
+   double l = Low[index];
+   datetime barTime = Time[index];
+   
+   // 计算终点时间（向右延伸）
+   int endIndex = index - FiboExtension;
+   if(endIndex < 0) endIndex = 0;
+   datetime endTime = Time[endIndex];
+   
+   // 生成唯一时间戳ID
+   string timeID = IntegerToString((long)barTime);
+   string dirStr = isBullish ? "B" : "S";
+   color lineColor = isBullish ? BullishColor : BearishColor;
+   
+   // 绘制 0.5 级别
+   if(ShowFibo050)
+   {
+      double price050 = CalculateFiboLevel(h, l, 0.5, isBullish);
+      string lineName050 = g_prefix + "Fibo_" + dirStr + "_050_" + timeID;
+      string labelName050 = g_prefix + "FiboLabel_" + dirStr + "_050_" + timeID;
+      
+      // 绘制水平趋势线
+      if(ObjectFind(0, lineName050) == -1)
+      {
+         ObjectCreate(0, lineName050, OBJ_TREND, 0, barTime, price050, endTime, price050);
+         ObjectSetInteger(0, lineName050, OBJPROP_COLOR, lineColor);
+         ObjectSetInteger(0, lineName050, OBJPROP_STYLE, STYLE_DOT);
+         ObjectSetInteger(0, lineName050, OBJPROP_WIDTH, 1);
+         ObjectSetInteger(0, lineName050, OBJPROP_RAY_RIGHT, false);
+         ObjectSetInteger(0, lineName050, OBJPROP_BACK, true);
+         ObjectSetInteger(0, lineName050, OBJPROP_SELECTABLE, false);
+         ObjectSetString(0, lineName050, OBJPROP_TEXT, "Fibo 0.5");
+      }
+      
+      // 绘制价格标签
+      if(ObjectFind(0, labelName050) == -1)
+      {
+         ObjectCreate(0, labelName050, OBJ_ARROW_RIGHT_PRICE, 0, endTime, price050);
+         ObjectSetInteger(0, labelName050, OBJPROP_COLOR, lineColor);
+         ObjectSetInteger(0, labelName050, OBJPROP_WIDTH, 1);
+         ObjectSetInteger(0, labelName050, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, labelName050, OBJPROP_HIDDEN, true);
+      }
+   }
+   
+   // 绘制 0.618 级别
+   if(ShowFibo618)
+   {
+      double price618 = CalculateFiboLevel(h, l, 0.618, isBullish);
+      string lineName618 = g_prefix + "Fibo_" + dirStr + "_618_" + timeID;
+      string labelName618 = g_prefix + "FiboLabel_" + dirStr + "_618_" + timeID;
+      
+      // 绘制水平趋势线
+      if(ObjectFind(0, lineName618) == -1)
+      {
+         ObjectCreate(0, lineName618, OBJ_TREND, 0, barTime, price618, endTime, price618);
+         ObjectSetInteger(0, lineName618, OBJPROP_COLOR, lineColor);
+         ObjectSetInteger(0, lineName618, OBJPROP_STYLE, STYLE_DOT);
+         ObjectSetInteger(0, lineName618, OBJPROP_WIDTH, 1);
+         ObjectSetInteger(0, lineName618, OBJPROP_RAY_RIGHT, false);
+         ObjectSetInteger(0, lineName618, OBJPROP_BACK, true);
+         ObjectSetInteger(0, lineName618, OBJPROP_SELECTABLE, false);
+         ObjectSetString(0, lineName618, OBJPROP_TEXT, "Fibo 0.618");
+      }
+      
+      // 绘制价格标签
+      if(ObjectFind(0, labelName618) == -1)
+      {
+         ObjectCreate(0, labelName618, OBJ_ARROW_RIGHT_PRICE, 0, endTime, price618);
+         ObjectSetInteger(0, labelName618, OBJPROP_COLOR, lineColor);
+         ObjectSetInteger(0, labelName618, OBJPROP_WIDTH, 1);
+         ObjectSetInteger(0, labelName618, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, labelName618, OBJPROP_HIDDEN, true);
+      }
+   }
 }
 
 //+------------------------------------------------------------------+
