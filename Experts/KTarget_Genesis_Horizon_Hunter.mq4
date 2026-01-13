@@ -335,9 +335,9 @@ bool HasTradedAtLevel(double price, double spread, string objectName)
 void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
 {
    // 先只打印，不实际下单
-   Print("【触发信号】", level.objectName, 
-         " 价格:", level.price, 
-         " 方向:", (hitFromAbove ? "从上方触达" : "从下方触达"));
+   // Print("【触发信号】", level.objectName, 
+   //       " 价格:", level.price, 
+   //       " 方向:", (hitFromAbove ? "从上方触达" : "从下方触达"));
    // return; // 暂时不执行下单
 
    // 确定交易方向（反向）
