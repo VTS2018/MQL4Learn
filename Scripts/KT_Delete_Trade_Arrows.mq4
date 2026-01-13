@@ -28,12 +28,14 @@ void OnStart()
       // StringFind 返回 0 表示在字符串起始位置找到
       if(StringFind(obj_name, "#") == 0)
       {
-         // 2. 特征二：名称中通常包含 "buy" 或 "sell" (双重确认，防止误删自定义的 # 标签)
+         // 2. 特征二：名称中包含 "buy"、"sell" 或 "modified" (双重确认，防止误删自定义的 # 标签)
          // StringToLower 将名称转为小写，忽略大小写差异
          string name_lower = obj_name;
          StringToLower(name_lower);
          
-         if(StringFind(name_lower, " buy ") != -1 || StringFind(name_lower, " sell ") != -1)
+         if(StringFind(name_lower, " buy ") != -1 || 
+            StringFind(name_lower, " sell ") != -1 || 
+            StringFind(name_lower, "modified") != -1)
          {
             // 3. 执行删除
             if(ObjectDelete(0, obj_name))
@@ -41,8 +43,8 @@ void OnStart()
                deleted_count++;
             }
          }
-         // 特殊情况：如果是限价单(Limit/Stop)可能包含其他关键词，
-         // 如果您只想删除所有 # 开头的，可以把上面的 if(StringFind...) 注释掉，
+         // 特殊情况：如果您想删除所有 # 开头的对象，
+         // 可以把上面的 if(StringFind...) 注释掉，
          // 只保留 if(StringFind(obj_name, "#") == 0) 这一层判断。
       }
    }
