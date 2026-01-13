@@ -416,6 +416,20 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
 
    // 详细日志输出
    double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
+   
+   // 计算预期盈利（根据模式）
+   double expectedProfit = 0;
+   if(InpTPMode == TP_MODE_PRICE_DISTANCE)
+   {
+      double tpDistance = MathAbs(takeProfit - entryPrice);
+      expectedProfit = tpDistance / tickSize * tickValue * lots;
+   }
+   else
+   {
+      expectedProfit = InpTargetProfit;
+   }
+   
    Print("【触发信号】", level.objectName, 
          " 价格:", level.price, 
          " 方向:", (hitFromAbove ? "从上方触达→买入" : "从下方触达→卖出"));
@@ -425,7 +439,7 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
    Print("  止损距离:", MathAbs(entryPrice - stopLoss) / tickSize, " 点",
          " 止盈距离:", MathAbs(takeProfit - entryPrice) / tickSize, " 点");
    Print("  手数:", lots, 
-         " 预期盈利: $", InpTargetProfit,
+         " 预期盈利: $", expectedProfit,
          " 预期亏损: $", CalculatePotentialLoss(lots, entryPrice, stopLoss));
    
    // return; // 暂时不执行下单
