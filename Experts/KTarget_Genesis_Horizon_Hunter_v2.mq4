@@ -436,11 +436,11 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
    Print("  入场:", entryPrice, 
          " 止损:", stopLoss, 
          " 止盈:", takeProfit);
-   Print("  止损距离:", MathAbs(entryPrice - stopLoss) / tickSize, " 点",
-         " 止盈距离:", MathAbs(takeProfit - entryPrice) / tickSize, " 点");
+   Print("  止损距离:", DoubleToString(MathAbs(entryPrice - stopLoss) / tickSize, 0), " 点",
+         " 止盈距离:", DoubleToString(MathAbs(takeProfit - entryPrice) / tickSize, 0), " 点");
    Print("  手数:", lots, 
-         " 预期盈利: $", expectedProfit,
-         " 预期亏损: $", CalculatePotentialLoss(lots, entryPrice, stopLoss));
+         " 预期盈利: $", DoubleToString(expectedProfit, 2),
+         " 预期亏损: $", DoubleToString(CalculatePotentialLoss(lots, entryPrice, stopLoss), 2));
    
    // return; // 暂时不执行下单
 
