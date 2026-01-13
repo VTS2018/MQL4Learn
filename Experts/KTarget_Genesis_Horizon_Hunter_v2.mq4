@@ -262,9 +262,11 @@ void CheckKeyLevelHits()
    double currentAsk = Ask;
    double currentBid = Bid;
    
-   // 基于点差计算缓冲区（适用不同品种）
+   // 基于点差计算缓冲区（适用不同品种），添加最小缓冲保护
    double spread = currentAsk - currentBid;
-   double bufferPrice = spread * 0.5;  // 点差的一半
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double minBuffer = 3 * tickSize;  // 最小缓冲：3个tick，防止点差为0时失效
+   double bufferPrice = MathMax(spread * 0.5, minBuffer);
    
    for(int i = 0; i < ArraySize(g_keyLevels); i++)
    {
