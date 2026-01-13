@@ -912,7 +912,7 @@ void UpdateKeyLevelLabel(KeyLevel &level)
    if(barOffset > firstBar - 5) barOffset = firstBar - 5;
    
    datetime timePos = Time[barOffset];
-   double priceOffset = 0.3;  // 距离画线的偏移量（美元）
+   double priceOffset = 0.5;  // 距离画线的偏移量（美元）
    
    double textPrice;
    if(lineAbovePrice)
@@ -946,7 +946,7 @@ void UpdateKeyLevelLabel(KeyLevel &level)
       if(MathAbs(currentBid - levelPrice) > 5.0)
          labelColor = clrGray;  // 远离的淡化
       else
-         labelColor = clrGold;  // 靠近的高亮
+         labelColor = clrMediumBlue;  // 靠近的高亮
    }
    ObjectSetInteger(0, labelName, OBJPROP_COLOR, labelColor);
 }
@@ -1005,7 +1005,7 @@ string FormatKeyLevelInfo(KeyLevel &level)
 void CleanupKeyLevelLabels()
 {
    string prefix = "EA_KeyLevel_Info_";
-   int total = ObjectsTotal(0);
+   int total = ObjectsTotal(0, -1, -1);  // 获取主窗口所有类型的对象
    
    for(int i = total - 1; i >= 0; i--)
    {
