@@ -56,6 +56,11 @@ input bool     InpCheckHistory   = false;   // 检查历史订单 (Check History
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
 
+//--- 可视化参数
+input bool     InpShowKeyLevelInfo = true;   // 显示关键位信息 (Show KeyLevel Info)
+input int      InpLabelUpdateSeconds = 3;    // 标签更新间隔秒数 (Label Update Interval)
+input color    InpLabelColor = clrDodgerBlue; // 标签颜色 (Label Color)
+
 //--- 全局变量
 struct KeyLevel
 {
@@ -71,6 +76,7 @@ struct KeyLevel
 
 KeyLevel g_keyLevels[];     // 存储所有关键位
 datetime g_lastScanTime;    // 最后扫描时间
+datetime g_lastLabelUpdateTime = 0;  // 最后标签更新时间
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -105,6 +111,7 @@ void OnDeinit(const int reason)
    Print("=== KTarget Genesis Horizon Hunter 停止 ===");
    // 清理显示对象
    CleanupDisplayObjects();
+   CleanupKeyLevelLabels();
 }
 
 //+------------------------------------------------------------------+
@@ -127,6 +134,13 @@ void OnTick()
    
    // 更新界面显示
    UpdateDisplay();
+   
+   // 更新关键位标签（节流更新）
+   if(InpShowKeyLevelInfo && TimeCurrent() - g_lastLabelUpdateTime >= InpLabelUpdateSeconds)
+   {
+      UpdateAllKeyLevelLabels();
+      g_lastLabelUpdateTime = TimeCurrent();
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -861,4 +875,146 @@ void DetectbasicInfo()
    Print("  MODE_MINLOT: ", minLot);
    Print("  账户货币: ", AccountCurrency());
    Print("========================");
+}
+
+//+------------------------------------------------------------------+
+//| 更新所有关键位标签
+//+------------------------------------------------------------------+
+void UpdateAllKeyLevelLabels()
+{
+   for(int i = 0; i < ArraySize(g_keyLevels); i++)
+   {
+      // 检查画线是否仍然存在
+      if(ObjectFind(0, g_keyLevels[i].objectName) < 0)
+         continue;
+      
+      UpdateKeyLevelLabel(g_keyLevels[i]);
+   }
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 更新单个关键位标签
+//+------------------------------------------------------------------+
+void UpdateKeyLevelLabel(KeyLevel &level)
+{
+   double currentBid = Bid;
+   double levelPrice = level.price;
+   
+   // 判断画线相对现价的位置
+   bool lineAbovePrice = (levelPrice > currentBid);
+   
+   // 计算显示位置
+   int firstBar = WindowFirstVisibleBar();
+   int barOffset = (int)(firstBar * 0.15);  // 屏幕左侧15%位置
+   if(barOffset < 5) barOffset = 5;
+   if(barOffset > firstBar - 5) barOffset = firstBar - 5;
+   
+   datetime timePos = Time[barOffset];
+   double priceOffset = 0.3;  // 距离画线的偏移量（美元）
+   
+   double textPrice;
+   if(lineAbovePrice)
+      textPrice = levelPrice - priceOffset;  // 画线下方
+   else
+      textPrice = levelPrice + priceOffset;  // 画线上方
+   
+   // 创建或更新文本对象
+   string labelName = "EA_KeyLevel_Info_" + level.objectName;
+   string displayText = FormatKeyLevelInfo(level);
+   
+   if(ObjectFind(0, labelName) < 0)
+   {
+      // 创建新对象
+      ObjectCreate(0, labelName, OBJ_TEXT, 0, timePos, textPrice);
+      ObjectSetString(0, labelName, OBJPROP_FONT, "Arial");
+      ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 8);
+      ObjectSetInteger(0, labelName, OBJPROP_COLOR, InpLabelColor);
+      ObjectSetInteger(0, labelName, OBJPROP_ANCHOR, ANCHOR_LEFT);
+   }
+   
+   // 更新内容和位置
+   ObjectSetString(0, labelName, OBJPROP_TEXT, displayText);
+   ObjectMove(0, labelName, 0, timePos, textPrice);
+   
+   // 根据交易状态调整颜色
+   color labelColor = InpLabelColor;
+   if(level.tradeCount > 0)
+   {
+      // 已交易过的关键位用不同颜色
+      if(MathAbs(currentBid - levelPrice) > 5.0)
+         labelColor = clrGray;  // 远离的淡化
+      else
+         labelColor = clrGold;  // 靠近的高亮
+   }
+   ObjectSetInteger(0, labelName, OBJPROP_COLOR, labelColor);
+}
+
+//+------------------------------------------------------------------+
+//| 格式化关键位信息
+//+------------------------------------------------------------------+
+string FormatKeyLevelInfo(KeyLevel &level)
+{
+   string info = "";
+   
+   // 1. 交易次数
+   info += "[" + IntegerToString(level.tradeCount) + "次] ";
+   
+   // 2. 交易方向
+   if(level.lastTradeDirection == 1)
+      info += "↓买 ";
+   else if(level.lastTradeDirection == -1)
+      info += "↑卖 ";
+   else
+      info += "- ";
+   
+   // 3. 价格位置
+   info += "| 位:";
+   if(level.lastPricePosition == 1)
+      info += "上 ";
+   else if(level.lastPricePosition == -1)
+      info += "下 ";
+   else
+      info += "中 ";
+   
+   // 4. 时间差
+   if(level.lastCheckTime > 0)
+   {
+      int secondsAgo = (int)(TimeCurrent() - level.lastCheckTime);
+      if(secondsAgo < 60)
+         info += "| " + IntegerToString(secondsAgo) + "s前";
+      else if(secondsAgo < 3600)
+         info += "| " + IntegerToString(secondsAgo/60) + "m前";
+      else if(secondsAgo < 86400)
+         info += "| " + IntegerToString(secondsAgo/3600) + "h前";
+      else
+         info += "| " + IntegerToString(secondsAgo/86400) + "d前";
+   }
+   else
+   {
+      info += "| 未检测";
+   }
+   
+   return info;
+}
+
+//+------------------------------------------------------------------+
+//| 清理关键位标签
+//+------------------------------------------------------------------+
+void CleanupKeyLevelLabels()
+{
+   string prefix = "EA_KeyLevel_Info_";
+   int total = ObjectsTotal(0);
+   
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string name = ObjectName(0, i);
+      if(StringFind(name, prefix) == 0)
+      {
+         ObjectDelete(0, name);
+      }
+   }
+   
+   ChartRedraw();
 }
