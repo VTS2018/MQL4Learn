@@ -701,10 +701,10 @@ void UpdateDisplay()
 {
    // 使用OBJ_LABEL对象显示信息，避免与指标的Comment()冲突
    string prefix = "EA_Display_";
-   int x = 10;        // 左边距
-   int y_start = 20;  // 起始Y坐标
+   int x = 150;        // 右边距（从右边缘向左的像素距离）
+   int y_start = 140;  // 起始Y坐标（修改此值可调整距离顶部的位置，数值越大越靠下）
    int y_gap = 18;    // 行间距
-   color text_color = clrWhite;
+   color text_color = clrBlack;  // 字体颜色：黑色
    int font_size = 9;
    string font_name = "Consolas";
    
@@ -738,7 +738,7 @@ void CreateLabel(string name, int x, int y, string text, color clr, int size, st
    {
       // 创建新对象
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);  // 右上角锚点
       ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
       ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
       ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
