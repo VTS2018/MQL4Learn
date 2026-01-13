@@ -32,7 +32,7 @@ input bool     InpUseMoneyMgmt   = false;   // 启用资金管理 (Use Money Man
 //--- 交易参数
 input double   InpATRMultiplier  = 1.5;     // 止损ATR倍数 (SL ATR Multiplier)
 input int      InpATRPeriod      = 14;      // ATR周期 (ATR Period)
-input int      InpPriceBuffer    = 1000;       // 价格触发缓冲点数 (Price Buffer in Points)
+//input int      InpPriceBuffer    = 1000;       // 价格触发缓冲点数 (Price Buffer in Points)
 
 //--- 止盈设置
 input string   __TakeProfit__ = "=== Take Profit Settings ===";
@@ -92,7 +92,7 @@ int OnInit()
    else
       Print("目标盈利: $", InpTargetProfit);
    Print("ATR倍数: ", InpATRMultiplier);
-   
+   DetectbasicInfo();
    return(INIT_SUCCEEDED);
 }
 
@@ -709,6 +709,7 @@ string ErrorDescription(int errorCode)
       default:  return "错误代码: " + IntegerToString(errorCode);
    }
 }
+
 //+------------------------------------------------------------------+
 // 辅助函数
 double CalculatePotentialLoss(double lots, double entry, double sl)
@@ -716,4 +717,25 @@ double CalculatePotentialLoss(double lots, double entry, double sl)
    double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
    double points = MathAbs(entry - sl) / Point;
    return points * tickValue * lots;
+}
+
+//+------------------------------------------------------------------+
+void DetectbasicInfo()
+{
+   // 在计算止盈后添加：
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
+   double contractSize = MarketInfo(Symbol(), MODE_LOTSIZE);
+   double minLot = MarketInfo(Symbol(), MODE_MINLOT);
+
+   Print("=== 探测品种的基本信息 ===");
+   Print("=== ", Symbol(), " 市场信息 ===");
+   Print("  Point: ", Point);
+   Print("  Point: ", Point, " | Digits: ", Digits);
+   Print("  MODE_TICKSIZE: ", tickSize);
+   Print("  MODE_TICKVALUE: ", tickValue);
+   Print("  MODE_LOTSIZE: ", contractSize);
+   Print("  MODE_MINLOT: ", minLot);
+   Print("  账户货币: ", AccountCurrency());
+   Print("========================");
 }
