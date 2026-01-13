@@ -46,8 +46,8 @@ input double   InpPriceDistance  = 2.0;     // 止盈价格距离 (TP Price Dist
 
 //--- 追踪减仓参数
 input bool     InpEnableTrailing = true;    // 启用追踪减仓 (Enable Trailing)
-input double   InpTrailStart     = 1.0;     // 追踪启动盈利 (Trail Start in $)
-input double   InpTrailStep      = 0.5;     // 追踪步进 (Trail Step in $)
+input double   InpTrailStart     = 1.0;     // 追踪启动距离 (Trail Start Distance in $)
+input double   InpTrailStep      = 0.5;     // 追踪步进距离 (Trail Step Distance in $)
 
 //--- 过滤参数
 input bool     InpOnlyCurrentTF  = false;   // 仅当前周期线条 (Only Current Timeframe)
@@ -568,21 +568,28 @@ void ManageOpenTrades()
       if(OrderMagicNumber() != InpMagicNumber)
          continue;
       
-      // 计算当前盈利
-      double currentProfit = OrderProfit() + OrderSwap() + OrderCommission();
+      // 计算价格距离（浮动盈利距离）
+      double entryPrice = OrderOpenPrice();
+      double currentPrice = (OrderType() == OP_BUY) ? Bid : Ask;
+      double priceDistance = 0;
       
-      // 检查是否达到追踪启动条件
-      if(currentProfit >= InpTrailStart)
+      if(OrderType() == OP_BUY)
+         priceDistance = currentPrice - entryPrice;  // 买单：当前价 - 入场价
+      else if(OrderType() == OP_SELL)
+         priceDistance = entryPrice - currentPrice;  // 卖单：入场价 - 当前价
+      
+      // 检查是否达到追踪启动条件（价格移动距离）
+      if(priceDistance >= InpTrailStart)
       {
-         TrailStop(OrderTicket(), currentProfit);
+         TrailStop(OrderTicket(), priceDistance);
       }
    }
 }
 
 //+------------------------------------------------------------------+
-//| 追踪止损
+//| 追踪止损（纯价格距离模式）
 //+------------------------------------------------------------------+
-void TrailStop(int ticket, double currentProfit)
+void TrailStop(int ticket, double priceDistance)
 {
    if(!OrderSelect(ticket, SELECT_BY_TICKET))
       return;
@@ -592,31 +599,39 @@ void TrailStop(int ticket, double currentProfit)
    
    if(OrderType() == OP_BUY)
    {
-      // 买单：止损向上追踪
-      double trailPrice = Bid - (InpTrailStep / MarketInfo(Symbol(), MODE_TICKVALUE) * Point);
+      // 买单：止损向上追踪，保持InpTrailStep的价格距离
+      double trailPrice = Bid - InpTrailStep;
       
+      // 只有当新止损高于当前止损时才修改（向上追踪）
       if(trailPrice > currentSL || currentSL == 0)
       {
          newSL = NormalizeDouble(trailPrice, Digits);
          
          if(OrderModify(ticket, OrderOpenPrice(), newSL, OrderTakeProfit(), 0, clrBlue))
          {
-            Print("【追踪止损】订单:", ticket, " 新止损:", newSL);
+            Print("【追踪止损】订单:", ticket, 
+                  " 新止损:", newSL,
+                  " 价格距离:", DoubleToString(priceDistance, 2),
+                  " 追踪距离:", DoubleToString(Bid - newSL, 2));
          }
       }
    }
    else if(OrderType() == OP_SELL)
    {
-      // 卖单：止损向下追踪
-      double trailPrice = Ask + (InpTrailStep / MarketInfo(Symbol(), MODE_TICKVALUE) * Point);
+      // 卖单：止损向下追踪，保持InpTrailStep的价格距离
+      double trailPrice = Ask + InpTrailStep;
       
+      // 只有当新止损低于当前止损时才修改（向下追踪）
       if(trailPrice < currentSL || currentSL == 0)
       {
          newSL = NormalizeDouble(trailPrice, Digits);
          
          if(OrderModify(ticket, OrderOpenPrice(), newSL, OrderTakeProfit(), 0, clrRed))
          {
-            Print("【追踪止损】订单:", ticket, " 新止损:", newSL);
+            Print("【追踪止损】订单:", ticket, 
+                  " 新止损:", newSL,
+                  " 价格距离:", DoubleToString(priceDistance, 2),
+                  " 追踪距离:", DoubleToString(newSL - Ask, 2));
          }
       }
    }
