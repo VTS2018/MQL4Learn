@@ -103,7 +103,8 @@ int OnInit()
 void OnDeinit(const int reason)
 {
    Print("=== KTarget Genesis Horizon Hunter 停止 ===");
-   Comment("");
+   // 清理显示对象
+   CleanupDisplayObjects();
 }
 
 //+------------------------------------------------------------------+
@@ -694,18 +695,83 @@ void TrailStop(int ticket, double priceDistance)
 }
 
 //+------------------------------------------------------------------+
-//| 更新界面显示
+//| 更新界面显示（使用OBJ_LABEL替代Comment避免冲突）
 //+------------------------------------------------------------------+
 void UpdateDisplay()
 {
-   string info = "";
-   info += "=== KTarget Genesis Horizon Hunter ===\n";
-   info += "扫描关键位: " + IntegerToString(ArraySize(g_keyLevels)) + "\n";
-   info += "持仓订单: " + IntegerToString(CountMyOrders()) + "\n";
-   info += "账户余额: " + DoubleToString(AccountBalance(), 2) + " " + AccountCurrency() + "\n";
-   info += "当前盈亏: " + DoubleToString(GetTotalProfit(), 2) + " " + AccountCurrency() + "\n";
+   // 使用OBJ_LABEL对象显示信息，避免与指标的Comment()冲突
+   string prefix = "EA_Display_";
+   int x = 10;        // 左边距
+   int y_start = 20;  // 起始Y坐标
+   int y_gap = 18;    // 行间距
+   color text_color = clrWhite;
+   int font_size = 9;
+   string font_name = "Consolas";
    
-   Comment(info);
+   // 标题
+   CreateLabel(prefix + "Title", x, y_start, "=== KT GHH EA ===", text_color, font_size + 1, font_name);
+   
+   // 信息行
+   int y = y_start + y_gap + 5;
+   CreateLabel(prefix + "KeyLevels", x, y, "关键位: " + IntegerToString(ArraySize(g_keyLevels)), text_color, font_size, font_name);
+   
+   y += y_gap;
+   CreateLabel(prefix + "Orders", x, y, "持仓: " + IntegerToString(CountMyOrders()), text_color, font_size, font_name);
+   
+   y += y_gap;
+   double profit = GetTotalProfit();
+   color profit_color = (profit >= 0) ? clrLime : clrRed;
+   CreateLabel(prefix + "Profit", x, y, "盈亏: " + DoubleToString(profit, 2) + " " + AccountCurrency(), profit_color, font_size, font_name);
+   
+   y += y_gap;
+   CreateLabel(prefix + "Balance", x, y, "余额: " + DoubleToString(AccountBalance(), 2) + " " + AccountCurrency(), text_color, font_size, font_name);
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 创建或更新Label对象
+//+------------------------------------------------------------------+
+void CreateLabel(string name, int x, int y, string text, color clr, int size, string font)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      // 创建新对象
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+      ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+      ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
+      ObjectSetString(0, name, OBJPROP_FONT, font);
+      ObjectSetString(0, name, OBJPROP_TEXT, text);
+   }
+   else
+   {
+      // 更新现有对象
+      ObjectSetString(0, name, OBJPROP_TEXT, text);
+      ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 清理显示对象
+//+------------------------------------------------------------------+
+void CleanupDisplayObjects()
+{
+   string prefix = "EA_Display_";
+   int total = ObjectsTotal(0, 0, OBJ_LABEL);
+   
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string name = ObjectName(0, i, 0, OBJ_LABEL);
+      if(StringFind(name, prefix) == 0)
+      {
+         ObjectDelete(0, name);
+      }
+   }
+   
+   ChartRedraw();
 }
 
 //+------------------------------------------------------------------+
