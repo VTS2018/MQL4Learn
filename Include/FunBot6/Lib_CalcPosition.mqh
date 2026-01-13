@@ -95,7 +95,7 @@ double CalculateLots_ByContract(double entry_price, double sl_price, double risk
 }
 
 //+------------------------------------------------------------------+
-//| 方法2：基于 TickValue 的通用计算 (推荐用于 EA)                   |
+//| ✅ 方法2：基于 TickValue 的通用计算 (推荐用于 EA)                   |
 //+------------------------------------------------------------------+
 double CalculateLots_ByTickValue(double entry_price, double sl_price, double risk_money)
 {

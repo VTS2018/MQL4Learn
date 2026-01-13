@@ -296,7 +296,8 @@ void CheckKeyLevelHits()
 bool HasPositionAtLevel(double price, double spread)
 {
    // 动态容差：至少是点差的1.5倍，确保不同品种都能正确检测
-   double tolerance = MathMax(spread * 1.5, 10 * Point);
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double tolerance = MathMax(spread * 1.5, 10 * tickSize);
    
    for(int i = OrdersTotal() - 1; i >= 0; i--)
    {
@@ -323,7 +324,8 @@ bool HasPositionAtLevel(double price, double spread)
 bool HasTradedAtLevel(double price, double spread, string objectName)
 {
    // 动态容差：至少是点差的1.5倍，确保不同品种都能正确检测
-   double tolerance = MathMax(spread * 1.5, 10 * Point);
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double tolerance = MathMax(spread * 1.5, 10 * tickSize);
    
    // 遍历历史订单
    for(int i = OrdersHistoryTotal() - 1; i >= 0; i--)
@@ -376,14 +378,15 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
    double takeProfit = CalculateTakeProfit(orderType, entryPrice, lots);
 
    // 详细日志输出
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
    Print("【触发信号】", level.objectName, 
          " 价格:", level.price, 
          " 方向:", (hitFromAbove ? "从上方触达→买入" : "从下方触达→卖出"));
    Print("  入场:", entryPrice, 
          " 止损:", stopLoss, 
          " 止盈:", takeProfit);
-   Print("  止损距离:", MathAbs(entryPrice - stopLoss) / Point, " 点",
-         " 止盈距离:", MathAbs(takeProfit - entryPrice) / Point, " 点");
+   Print("  止损距离:", MathAbs(entryPrice - stopLoss) / tickSize, " 点",
+         " 止盈距离:", MathAbs(takeProfit - entryPrice) / tickSize, " 点");
    Print("  手数:", lots, 
          " 预期盈利: $", InpTargetProfit,
          " 预期亏损: $", CalculatePotentialLoss(lots, entryPrice, stopLoss));
@@ -486,12 +489,12 @@ double CalculateTakeProfit(int orderType, double entryPrice, double lots)
       if(tickValue <= 0) tickValue = 1.0;  // 容错处理
       
       double pointsNeeded = InpTargetProfit / (tickValue * lots);
-      priceDistance = pointsNeeded * Point;
+      priceDistance = pointsNeeded * tickSize;
       
       if(orderType == OP_BUY)
-         tp = entryPrice + (pointsNeeded * Point);
+         tp = entryPrice + (pointsNeeded * tickSize);
       else if(orderType == OP_SELL)
-         tp = entryPrice - (pointsNeeded * Point);
+         tp = entryPrice - (pointsNeeded * tickSize);
    }
    
    // 调试输出
@@ -506,7 +509,7 @@ double CalculateTakeProfit(int orderType, double entryPrice, double lots)
    if(InpTPMode == TP_MODE_PRICE_DISTANCE)
    {
       Print("  配置价格距离: $", InpPriceDistance);
-      double expectedProfit = priceDistance / Point * tickValue * lots;
+      double expectedProfit = priceDistance / tickSize * tickValue * lots;
       Print("  预期账户盈利: $", expectedProfit);
    }
    else
@@ -517,7 +520,7 @@ double CalculateTakeProfit(int orderType, double entryPrice, double lots)
    }
    
    Print("  止盈价格: ", tp);
-   Print("  止盈距离: $", priceDistance, " (", priceDistance/Point, " 点)");
+   Print("  止盈距离: $", priceDistance, " (", priceDistance/tickSize, " 点)");
    Print("========================");
    
    return NormalizeDouble(tp, Digits);
@@ -715,7 +718,8 @@ string ErrorDescription(int errorCode)
 double CalculatePotentialLoss(double lots, double entry, double sl)
 {
    double tickValue = MarketInfo(Symbol(), MODE_TICKVALUE);
-   double points = MathAbs(entry - sl) / Point;
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double points = MathAbs(entry - sl) / tickSize;
    return points * tickValue * lots;
 }
 
