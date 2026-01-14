@@ -886,7 +886,15 @@ void UpdateAllKeyLevelLabels()
    {
       // 检查画线是否仍然存在
       if(ObjectFind(0, g_keyLevels[i].objectName) < 0)
+      {
+         // 画线已被删除，清理对应的标签
+         string labelName = "EA_KeyLevel_Info_" + g_keyLevels[i].objectName;
+         if(ObjectFind(0, labelName) >= 0)
+         {
+            ObjectDelete(0, labelName);
+         }
          continue;
+      }
       
       UpdateKeyLevelLabel(g_keyLevels[i]);
    }
