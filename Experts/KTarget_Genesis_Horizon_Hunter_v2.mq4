@@ -236,7 +236,14 @@ void AddKeyLevel(string objName, double price, int tf, bool isHLine)
    g_keyLevels[size].lastCheckTime = 0;
    g_keyLevels[size].tradeCount = 0;
    g_keyLevels[size].lastTradeDirection = 0;  // 初始化为未交易
-   g_keyLevels[size].lastPricePosition = 0;   // 初始化为未知状态（区域内）
+   
+   // 初始化价格位置状态（关键修复：扫描时就确定当前位置）
+   double currentBid = Bid;
+   double spread = Ask - currentBid;
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   double minBuffer = 3 * tickSize;
+   double bufferPrice = MathMax(spread * 0.5, minBuffer);
+   g_keyLevels[size].lastPricePosition = GetPricePosition(currentBid, price, bufferPrice);
 }
 
 //+------------------------------------------------------------------+
@@ -333,14 +340,15 @@ void CheckKeyLevelHits()
          bool isHitFromAbove = hitFromAbove;
          ExecuteReverseTrade(g_keyLevels[i], isHitFromAbove);
          
-         // 5. 更新状态
+         // 5. 更新状态（关键修复：只在交易后更新位置，防止快速穿越污染状态）
          g_keyLevels[i].lastCheckTime = TimeCurrent();
          g_keyLevels[i].tradeCount++;
          g_keyLevels[i].lastTradeDirection = currentDirection;  // 记录交易方向
+         g_keyLevels[i].lastPricePosition = currentPosition;    // 交易后才更新位置
       }
       
-      // 更新价格位置状态（每次都更新，以便追踪价格变化）
-      g_keyLevels[i].lastPricePosition = currentPosition;
+      // 关键修复：删除每次tick都更新的代码，防止快速穿越时状态被污染
+      // 旧代码: g_keyLevels[i].lastPricePosition = currentPosition;
    }
 }
 
@@ -734,7 +742,7 @@ void UpdateDisplay()
    
    y += y_gap;
    double profit = GetTotalProfit();
-   color profit_color = (profit >= 0) ? clrLime : clrRed;
+   color profit_color = (profit >= 0) ? clrDarkBlue : clrRed;
    CreateLabel(prefix + "Profit", x, y, "盈亏: " + DoubleToString(profit, 2) + " " + AccountCurrency(), profit_color, font_size, font_name);
    
    y += y_gap;
