@@ -25,8 +25,8 @@ enum ENUM_TP_MODE
 //+------------------------------------------------------------------+
 
 //--- 资金管理参数
-input double   InpFixedLots      = 0.5;     // 固定手数 (Fixed Lots)
-input double   InpAccountSize    = 10000;   // 账户基准资金 (Account Base Size)
+input double   InpFixedLots      = 0.01;     // 固定手数 (Fixed Lots)
+input double   InpAccountSize    = 100;   // 账户基准资金 (Account Base Size)
 input bool     InpUseMoneyMgmt   = false;   // 启用资金管理 (Use Money Management)
 
 //--- 交易参数
@@ -51,7 +51,7 @@ input double   InpTrailStep      = 0.5;     // 追踪步进距离 (Trail Step Di
 
 //--- 过滤参数
 input bool     InpOnlyCurrentTF  = false;   // 仅当前周期线条 (Only Current Timeframe)
-input int      InpCooldownSeconds = 60;     // 冷却时间(秒) (Cooldown Seconds)
+input int      InpCooldownSeconds = 3600;     // 冷却时间(秒) (Cooldown Seconds)
 input bool     InpCheckHistory   = false;   // 检查历史订单 (Check History Orders)
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
