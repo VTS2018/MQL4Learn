@@ -310,45 +310,44 @@ void CheckKeyLevelHits()
          // 1. 防止同一位置短时间内重复开单（冷却期）
          if(TimeCurrent() - g_keyLevels[i].lastCheckTime < InpCooldownSeconds)
          {
-            g_keyLevels[i].lastPricePosition = currentPosition;  // 更新位置状态
-            continue;
+            continue;  // 冷却期内不更新状态，保持原方向
          }
          
          // 2. 方向检查：防止同方向重复开单
          int currentDirection = hitFromAbove ? 1 : -1;  // 1=从上触达, -1=从下触达
          if(g_keyLevels[i].lastTradeDirection == currentDirection)
          {
-            g_keyLevels[i].lastPricePosition = currentPosition;  // 更新位置状态
-            continue;  // 同方向已交易过，跳过
+            continue;  // 同方向已交易过，跳过（不更新状态）
          }
          
          // 3. 检查该位置是否已有持仓（动态容差）
          if(HasPositionAtLevel(levelPrice, spread))
          {
-            g_keyLevels[i].lastPricePosition = currentPosition;  // 更新位置状态
-            continue;
+            continue;  // 已有持仓，跳过（不更新状态）
          }
          
          // 3.5. 检查历史订单（可选，防止EA重启后重复开仓）
          if(InpCheckHistory && HasTradedAtLevel(levelPrice, spread, g_keyLevels[i].objectName))
          {
-            g_keyLevels[i].lastPricePosition = currentPosition;  // 更新位置状态
-            continue;
+            continue;  // 历史已交易，跳过（不更新状态）
          }
          
          // 4. 执行反向交易
          bool isHitFromAbove = hitFromAbove;
          ExecuteReverseTrade(g_keyLevels[i], isHitFromAbove);
          
-         // 5. 更新状态（关键修复：只在交易后更新位置，防止快速穿越污染状态）
+         // 5. 更新状态（关键：交易后不更新lastPricePosition，保持触达前的方向）
          g_keyLevels[i].lastCheckTime = TimeCurrent();
          g_keyLevels[i].tradeCount++;
          g_keyLevels[i].lastTradeDirection = currentDirection;  // 记录交易方向
-         g_keyLevels[i].lastPricePosition = currentPosition;    // 交易后才更新位置
+         // 不更新 lastPricePosition，保持触达前的位置（-1或1）
       }
       
-      // 关键修复：删除每次tick都更新的代码，防止快速穿越时状态被污染
-      // 旧代码: g_keyLevels[i].lastPricePosition = currentPosition;
+      // 关键修复：只在价格明确离开区域时更新位置，避免快速穿越污染和状态丢失
+      if(currentPosition != 0)
+      {
+         g_keyLevels[i].lastPricePosition = currentPosition;
+      }
    }
 }
 
