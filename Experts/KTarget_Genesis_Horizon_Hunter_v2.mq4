@@ -56,6 +56,9 @@ input bool     InpCheckHistory   = false;   // 检查历史订单 (Check History
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
 
+//--- 方向锁定模式
+input bool     InpUseLockDirection = false;  // 启用方向锁定模式 (Use Direction Lock Mode)
+
 //--- 可视化参数
 input bool     InpShowKeyLevelInfo = true;   // 显示关键位信息 (Show KeyLevel Info)
 input int      InpLabelUpdateSeconds = 3;    // 标签更新间隔秒数 (Label Update Interval)
@@ -72,6 +75,7 @@ struct KeyLevel
    int      tradeCount;     // 该位置的交易次数
    int      lastTradeDirection; // 最后交易方向: 0=未交易, 1=从上触达(买入), -1=从下触达(卖出)
    int      lastPricePosition;  // 上次价格位置: -1=下方, 0=区域内, 1=上方
+   int      lockedDirection;    // 锁定的交易方向: 0=未锁定, 1=锁定BUY, -1=锁定SELL
 };
 
 KeyLevel g_keyLevels[];     // 存储所有关键位
@@ -92,6 +96,7 @@ int OnInit()
    
    Print("=== KTarget Genesis Horizon Hunter 启动 ===");
    Print("扫描到 ", ArraySize(g_keyLevels), " 个关键位置");
+   Print("方向锁定模式: ", (InpUseLockDirection ? "已启用" : "未启用"));
    Print("固定手数: ", InpFixedLots);
    Print("止盈模式: ", (InpTPMode == TP_MODE_PRICE_DISTANCE ? "固定价格距离" : "账户盈利金额"));
    if(InpTPMode == TP_MODE_PRICE_DISTANCE)
@@ -159,6 +164,7 @@ void ScanKeyLevels()
       oldLevels[i].tradeCount = g_keyLevels[i].tradeCount;
       oldLevels[i].lastTradeDirection = g_keyLevels[i].lastTradeDirection;
       oldLevels[i].lastPricePosition = g_keyLevels[i].lastPricePosition;
+      oldLevels[i].lockedDirection = g_keyLevels[i].lockedDirection;  // 恢复锁定方向
    }
    
    // 清空并重新扫描
@@ -202,6 +208,7 @@ void ScanKeyLevels()
    // 恢复旧状态（根据对象名称匹配）
    for(int i = 0; i < ArraySize(g_keyLevels); i++)
    {
+      bool foundOld = false;
       for(int j = 0; j < oldSize; j++)
       {
          if(g_keyLevels[i].objectName == oldLevels[j].objectName)
@@ -211,7 +218,38 @@ void ScanKeyLevels()
             g_keyLevels[i].tradeCount = oldLevels[j].tradeCount;
             g_keyLevels[i].lastTradeDirection = oldLevels[j].lastTradeDirection;
             g_keyLevels[i].lastPricePosition = oldLevels[j].lastPricePosition;
+            g_keyLevels[i].lockedDirection = oldLevels[j].lockedDirection;  // 恢复锁定方向
+            foundOld = true;
             break;
+         }
+      }
+      
+      // 如果是新关键位且启用了锁定模式，进行首次锁定
+      if(!foundOld && InpUseLockDirection)
+      {
+         double currentBid = Bid;
+         double levelPrice = g_keyLevels[i].price;
+         
+         if(currentBid < levelPrice)
+         {
+            // 现价在关键位下方 → 关键位是阻力位 → 锁定为SELL
+            g_keyLevels[i].lockedDirection = -1;
+            Print("【首次锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                  " 现价:", currentBid, " → 锁定为SELL(阻力位)");
+         }
+         else if(currentBid > levelPrice)
+         {
+            // 现价在关键位上方 → 关键位是支撑位 → 锁定为BUY
+            g_keyLevels[i].lockedDirection = 1;
+            Print("【首次锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                  " 现价:", currentBid, " → 锁定为BUY(支撑位)");
+         }
+         else
+         {
+            // 现价正好在关键位区域内，暂不锁定
+            g_keyLevels[i].lockedDirection = 0;
+            Print("【首次扫描】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                  " 现价:", currentBid, " → 在区域内，等待离开后锁定");
          }
       }
    }
@@ -236,6 +274,7 @@ void AddKeyLevel(string objName, double price, int tf, bool isHLine)
    g_keyLevels[size].lastCheckTime = 0;
    g_keyLevels[size].tradeCount = 0;
    g_keyLevels[size].lastTradeDirection = 0;  // 初始化为未交易
+   g_keyLevels[size].lockedDirection = 0;     // 初始化为未锁定，等待ScanKeyLevels中处理
    
    // 初始化价格位置状态（关键修复：扫描时就确定当前位置）
    double currentBid = Bid;
@@ -425,8 +464,23 @@ void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
    //       " 方向:", (hitFromAbove ? "从上方触达" : "从下方触达"));
    // return; // 暂时不执行下单
 
-   // 确定交易方向（反向）
-   int orderType = hitFromAbove ? OP_BUY : OP_SELL;
+   // 确定交易方向
+   int orderType;
+   
+   if(InpUseLockDirection && level.lockedDirection != 0)
+   {
+      // 方向锁定模式：使用锁定的方向
+      orderType = (level.lockedDirection == 1) ? OP_BUY : OP_SELL;
+      Print("【使用锁定方向】", level.objectName, " 锁定方向:", 
+            (level.lockedDirection == 1 ? "BUY" : "SELL"), 
+            " 触达方向:", (hitFromAbove ? "从上" : "从下"));
+   }
+   else
+   {
+      // 原有逻辑：反向交易
+      orderType = hitFromAbove ? OP_BUY : OP_SELL;
+   }
+   
    double entryPrice = (orderType == OP_BUY) ? Ask : Bid;
    
    // 计算止损
@@ -972,6 +1026,15 @@ void UpdateKeyLevelLabel(KeyLevel &level)
 string FormatKeyLevelInfo(KeyLevel &level)
 {
    string info = "";
+   
+   // 0. 锁定状态（如果启用）
+   if(InpUseLockDirection && level.lockedDirection != 0)
+   {
+      if(level.lockedDirection == 1)
+         info += "[L↑] ";  // 锁定BUY
+      else
+         info += "[L↓] ";  // 锁定SELL
+   }
    
    // 1. 交易次数
    info += "[" + IntegerToString(level.tradeCount) + "次] ";
