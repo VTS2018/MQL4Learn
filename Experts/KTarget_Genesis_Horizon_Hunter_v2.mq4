@@ -71,11 +71,11 @@ struct KeyLevel
    double   price;          // 价格
    int      timeframe;      // 周期
    bool     isHLine;        // 是否水平线（false=射线）
-   datetime lastCheckTime;  // 最后检查时间
-   int      tradeCount;     // 该位置的交易次数
-   int      lastTradeDirection; // 最后交易方向: 0=未交易, 1=从上触达(买入), -1=从下触达(卖出)
-   int      lastPricePosition;  // 上次价格位置: -1=下方, 0=区域内, 1=上方
-   int      lockedDirection;    // 锁定的交易方向: 0=未锁定, 1=锁定BUY, -1=锁定SELL
+   datetime lastCheckTime;  // 【时间】最后检查时间
+   int      tradeCount;     // 【次数】该位置的交易次数
+   int      lastTradeDirection; // 【方向】最后交易方向: 0=未交易, 1=从上触达(买入), -1=从下触达(卖出)
+   int      lastPricePosition;  // 【位置】上次价格位置: -1=下方, 0=区域内, 1=上方
+   int      lockedDirection;    // 【锁定】锁定的交易方向: 0=未锁定, 1=锁定BUY, -1=锁定SELL
 };
 
 KeyLevel g_keyLevels[];     // 存储所有关键位
