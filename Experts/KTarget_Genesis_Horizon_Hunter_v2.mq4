@@ -625,7 +625,7 @@ double CalculateTakeProfit(int orderType, double entryPrice, double lots)
       else if(orderType == OP_SELL)
          tp = entryPrice - (pointsNeeded * tickSize);
    }
-   
+   /*
    // 调试输出
    Print("=== 止盈计算详情 ===");
    Print("  品种: ", Symbol(), " | 账户货币: ", AccountCurrency());
@@ -651,7 +651,7 @@ double CalculateTakeProfit(int orderType, double entryPrice, double lots)
    Print("  止盈价格: ", tp);
    Print("  止盈距离: $", priceDistance, " (", priceDistance/tickSize, " 点)");
    Print("========================");
-   
+   */
    return NormalizeDouble(tp, Digits);
 }
 
