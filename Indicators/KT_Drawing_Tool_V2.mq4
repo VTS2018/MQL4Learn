@@ -62,9 +62,15 @@ int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
 string btnName1 = "Btn_Draw_HLine";
 string btnName2 = "Btn_Draw_Ray";
 string btnName3 = "Btn_Clean_Current";
+string btnName4 = "Btn_Clean_All";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
+
+// [新增] 清除全部按钮的确认状态
+bool cleanAllConfirmed = false;
+uint cleanAllConfirmTime = 0;
+const uint CONFIRM_TIMEOUT = 10000; // 10秒超时
 
 // [新增] 存储对象对关系：记录每个画线对象及其关联的标记对象
 string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名 
@@ -78,6 +84,7 @@ int OnInit()
    CreateButton(btnName1, "Line (H)", 150, 20, 80, 25, BtnBgColor, BtnTxtColor);
    CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
    CreateButton(btnName3, "Clean",     330, 20, 80, 25, BtnBgColor, BtnTxtColor);
+   CreateButton(btnName4, "Clean All", 420, 20, 80, 25, BtnBgColor, BtnTxtColor);
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -102,6 +109,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName1);
    ObjectDelete(0, btnName2);
    ObjectDelete(0, btnName3);
+   ObjectDelete(0, btnName4);
    // Comment("");
   }
 
@@ -159,6 +167,38 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          CleanCurrentPeriodObjects(); // 执行清理
          PlaySound("ok.wav");
          ChartRedraw();
+        }
+      
+      // [新增] 处理清除全部按钮点击
+      if(sparam == btnName4)
+        {
+         ObjectSetInteger(0, btnName4, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         uint currentTime = GetTickCount();
+         
+         // 检查是否在确认时间窗口内
+         if(cleanAllConfirmed && (currentTime - cleanAllConfirmTime < CONFIRM_TIMEOUT))
+         {
+            // 第二次点击，执行删除
+            CleanAllObjects();
+            cleanAllConfirmed = false; // 重置确认状态
+            // 恢复按钮颜色
+            ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, BtnBgColor);
+            ChartRedraw();
+         }
+         else
+         {
+            // 第一次点击，要求确认
+            cleanAllConfirmed = true;
+            cleanAllConfirmTime = currentTime;
+            
+            // 改变按钮颜色为红色警告
+            ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, clrCrimson);
+            
+            Alert(" 警告：将删除所有画线！\n\n请再次点击 [Clean All] 按钮以确认删除\n(", CONFIRM_TIMEOUT/1000, "秒内有效)");
+            PlaySound("alert.wav");
+            ChartRedraw();
+         }
         }
      }
 
@@ -424,6 +464,15 @@ int CalculateVisibilityFlags(int currentPeriod, ENUM_VISIBILITY_MODE mode)
 void OnTimer()
 {
    CheckAndCleanOrphanedObjects();
+   
+   // [新增] 检查Clean All确认超时
+   if(cleanAllConfirmed && (GetTickCount() - cleanAllConfirmTime >= CONFIRM_TIMEOUT))
+   {
+      cleanAllConfirmed = false;
+      // 恢复按钮颜色
+      ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, BtnBgColor);
+      ChartRedraw();
+   }
 }
 
 //+------------------------------------------------------------------+
@@ -664,5 +713,72 @@ void CleanCurrentPeriodObjects()
    else
    {
       Print("当前周期 [", currentTF, "] 没有可清理的对象");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 清除所有由本工具创建的对象
+//+------------------------------------------------------------------+
+void CleanAllObjects()
+{
+   int total = ObjectsTotal(0, 0, -1);
+   int deleteCount = 0;
+   
+   // 从后向前遍历，避免删除后索引变化
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是由本工具创建的对象（以 "Draw_" 开头）
+      if(StringFind(objName, "Draw_") == 0)
+      {
+         int objType = (int)ObjectGetInteger(0, objName, OBJPROP_TYPE);
+         
+         // 只删除水平线和射线
+         if(objType == OBJ_HLINE || objType == OBJ_TREND)
+         {
+            // 提取uniqueID，删除关联的标记和价格标签
+            string parts[];
+            int count = StringSplit(objName, '_', parts);
+            
+            if(count >= 3)
+            {
+               string tfStr = parts[1];
+               string uniqueID = parts[2];
+               
+               // 删除关联的标记对象
+               string markName = "Mark_" + tfStr + "_" + uniqueID;
+               if(ObjectFind(0, markName) >= 0)
+               {
+                  ObjectDelete(0, markName);
+               }
+               
+               // 删除关联的价格标签（射线）
+               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+               if(ObjectFind(0, priceLabelName) >= 0)
+               {
+                  ObjectDelete(0, priceLabelName);
+               }
+            }
+            
+            // 删除主对象
+            ObjectDelete(0, objName);
+            deleteCount++;
+         }
+      }
+   }
+   
+   // 清空关联数组
+   ArrayResize(g_drawnObjects, 0);
+   
+   if(deleteCount > 0)
+   {
+      Print("已清除所有画线对象: ", deleteCount, " 个");
+      PlaySound("ok.wav");
+      ChartRedraw();
+   }
+   else
+   {
+      Print("没有可清除的对象");
    }
 }
