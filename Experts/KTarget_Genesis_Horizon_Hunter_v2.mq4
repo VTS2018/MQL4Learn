@@ -107,7 +107,7 @@ int OnInit()
    Print("ATR倍数: ", InpATRMultiplier);
    Print("---");
    if(InpMaxTradeTF > 0)
-      Print("⚠ 开仓周期限制: 仅允许 ", GetTimeframeString(InpMaxTradeTF), " 及以下周期");
+      Print(" 开仓周期限制: 仅允许 ", GetTimeframeString(InpMaxTradeTF), " 及以下周期");
    else
       Print("✓ 开仓周期限制: 未启用（所有周期均可开仓）");
    Print("---");
