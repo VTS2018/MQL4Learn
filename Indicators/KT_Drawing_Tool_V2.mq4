@@ -61,6 +61,7 @@ input color Color_MN1  = clrDarkViolet;   // MN1 Timeframe Color
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
 string btnName1 = "Btn_Draw_HLine";
 string btnName2 = "Btn_Draw_Ray";
+string btnName3 = "Btn_Clean_Current";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
@@ -76,6 +77,7 @@ int OnInit()
    // 创建UI按钮
    CreateButton(btnName1, "Line (H)", 150, 20, 80, 25, BtnBgColor, BtnTxtColor);
    CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
+   CreateButton(btnName3, "Clean",     330, 20, 80, 25, BtnBgColor, BtnTxtColor);
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -99,6 +101,7 @@ void OnDeinit(const int reason)
    EventKillTimer();  // 关闭定时器
    ObjectDelete(0, btnName1);
    ObjectDelete(0, btnName2);
+   ObjectDelete(0, btnName3);
    // Comment("");
   }
 
@@ -146,6 +149,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          ChartSetInteger(0, CHART_MOUSE_SCROLL, false);
          // Comment("【进入画图模式】\n请点击K线，将自动吸附 开/高/低/收 价格...");
          PlaySound("tick.wav");
+         ChartRedraw();
+        }
+      
+      // [新增] 处理清理按钮点击
+      if(sparam == btnName3)
+        {
+         ObjectSetInteger(0, btnName3, OBJPROP_STATE, false); // 立即弹起按钮
+         CleanCurrentPeriodObjects(); // 执行清理
+         PlaySound("ok.wav");
          ChartRedraw();
         }
      }
@@ -577,5 +589,80 @@ void UpdateRayEndpoints()
    {
       Print("更新射线终点: 共更新 ", updateCount, " 条射线到最新K线");
       ChartRedraw(0);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 清理当前周期的水平线和射线对象
+//+------------------------------------------------------------------+
+void CleanCurrentPeriodObjects()
+{
+   string currentTF = GetPeriodName(Period());
+   string prefix = "Draw_" + currentTF + "_";
+   
+   int total = ObjectsTotal(0, 0, -1);
+   int deleteCount = 0;
+   
+   // 从后向前遍历，避免删除后索引变化
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是当前周期的绘图对象
+      if(StringFind(objName, prefix) == 0)
+      {
+         int objType = (int)ObjectGetInteger(0, objName, OBJPROP_TYPE);
+         
+         // 只删除水平线和射线（趋势线）
+         if(objType == OBJ_HLINE || objType == OBJ_TREND)
+         {
+            // 提取uniqueID，删除关联的标记和价格标签
+            string parts[];
+            int count = StringSplit(objName, '_', parts);
+            
+            if(count >= 3)
+            {
+               string tfStr = parts[1];
+               string uniqueID = parts[2];
+               
+               // 删除关联的标记对象
+               string markName = "Mark_" + tfStr + "_" + uniqueID;
+               if(ObjectFind(0, markName) >= 0)
+               {
+                  ObjectDelete(0, markName);
+               }
+               
+               // 删除关联的价格标签（射线）
+               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+               if(ObjectFind(0, priceLabelName) >= 0)
+               {
+                  ObjectDelete(0, priceLabelName);
+               }
+               
+               // 从数组中移除关联记录
+               int arraySize = ArraySize(g_drawnObjects) / 2;
+               for(int j = arraySize - 1; j >= 0; j--)
+               {
+                  if(g_drawnObjects[j][0] == objName)
+                  {
+                     RemoveObjectPair(j);
+                  }
+               }
+            }
+            
+            // 删除主对象
+            ObjectDelete(0, objName);
+            deleteCount++;
+         }
+      }
+   }
+   
+   if(deleteCount > 0)
+   {
+      Print("已清理当前周期 [", currentTF, "] 的绘图对象: ", deleteCount, " 个");
+   }
+   else
+   {
+      Print("当前周期 [", currentTF, "] 没有可清理的对象");
    }
 }
