@@ -80,11 +80,11 @@ string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   // 创建UI按钮
-   CreateButton(btnName1, "Line (H)", 150, 20, 80, 25, BtnBgColor, BtnTxtColor);
-   CreateButton(btnName2, "Ray (R)",   240, 20, 80, 25, BtnBgColor, BtnTxtColor);
-   CreateButton(btnName3, "Clean",     330, 20, 80, 25, BtnBgColor, BtnTxtColor);
-   CreateButton(btnName4, "Clean All", 420, 20, 80, 25, BtnBgColor, BtnTxtColor);
+   // 创建UI按钮 (调整顺序：危险操作放最左，常用功能放右侧)
+   CreateButton(btnName4, "Clean All", 150, 20, 80, 25, clrMaroon,    BtnTxtColor); // 深红色警告
+   CreateButton(btnName3, "Clean",     240, 20, 80, 25, clrDarkOrange, BtnTxtColor); // 橙色提示
+   CreateButton(btnName1, "Line (H)",  330, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
+   CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -182,8 +182,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // 第二次点击，执行删除
             CleanAllObjects();
             cleanAllConfirmed = false; // 重置确认状态
-            // 恢复按钮颜色
-            ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, BtnBgColor);
+            // 恢复按钮颜色为深红色
+            ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, clrMaroon);
             ChartRedraw();
          }
          else
@@ -469,8 +469,8 @@ void OnTimer()
    if(cleanAllConfirmed && (GetTickCount() - cleanAllConfirmTime >= CONFIRM_TIMEOUT))
    {
       cleanAllConfirmed = false;
-      // 恢复按钮颜色
-      ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, BtnBgColor);
+      // 恢复按钮颜色为深红色
+      ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, clrMaroon);
       ChartRedraw();
    }
 }
