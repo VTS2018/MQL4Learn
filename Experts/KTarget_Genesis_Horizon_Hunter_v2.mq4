@@ -53,6 +53,7 @@ input double   InpTrailStep      = 0.5;     // 追踪步进距离 (Trail Step Di
 input bool     InpOnlyCurrentTF  = false;   // 仅当前周期线条 (Only Current Timeframe)
 input int      InpCooldownSeconds = 3600;     // 冷却时间(秒) (Cooldown Seconds)
 input bool     InpCheckHistory   = false;   // 检查历史订单 (Check History Orders)
+input int      InpMaxTradeTF     = PERIOD_M5;  // 最大允许开仓周期 (Max Trade Timeframe, 0=不限制)
 input int      InpMagicNumber    = 88888;   // EA魔术编号 (Magic Number)
 input string   InpTradeComment   = "KT_GHH"; // 交易注释 (Trade Comment)
 
@@ -104,6 +105,12 @@ int OnInit()
    else
       Print("目标盈利: $", InpTargetProfit);
    Print("ATR倍数: ", InpATRMultiplier);
+   Print("---");
+   if(InpMaxTradeTF > 0)
+      Print("⚠ 开仓周期限制: 仅允许 ", GetTimeframeString(InpMaxTradeTF), " 及以下周期");
+   else
+      Print("✓ 开仓周期限制: 未启用（所有周期均可开仓）");
+   Print("---");
    DetectbasicInfo();
    return(INIT_SUCCEEDED);
 }
@@ -303,6 +310,26 @@ int GetTimeframeFromString(string tfStr)
 }
 
 //+------------------------------------------------------------------+
+//| 周期转字符串（用于日志输出）
+//+------------------------------------------------------------------+
+string GetTimeframeString(int tf)
+{
+   switch(tf)
+   {
+      case PERIOD_M1:  return "M1";
+      case PERIOD_M5:  return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_M30: return "M30";
+      case PERIOD_H1:  return "H1";
+      case PERIOD_H4:  return "H4";
+      case PERIOD_D1:  return "D1";
+      case PERIOD_W1:  return "W1";
+      case PERIOD_MN1: return "MN";
+      default: return "TF" + IntegerToString(tf);
+   }
+}
+
+//+------------------------------------------------------------------+
 //| 判断价格相对关键位的位置
 //+------------------------------------------------------------------+
 int GetPricePosition(double bidPrice, double levelPrice, double buffer)
@@ -458,6 +485,15 @@ bool HasTradedAtLevel(double price, double spread, string objectName)
 //+------------------------------------------------------------------+
 void ExecuteReverseTrade(KeyLevel &level, bool hitFromAbove)
 {
+   // 周期限制检查（如果设置了限制）
+   if(InpMaxTradeTF > 0 && Period() > InpMaxTradeTF)
+   {
+      Print("【开仓拒绝】", level.objectName, 
+            " - 当前周期(", GetTimeframeString(Period()), 
+            ") 超出允许范围(最大:", GetTimeframeString(InpMaxTradeTF), ")");
+      return;
+   }
+   
    // 先只打印，不实际下单
    // Print("【触发信号】", level.objectName, 
    //       " 价格:", level.price, 
