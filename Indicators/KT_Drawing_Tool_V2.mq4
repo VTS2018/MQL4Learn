@@ -63,6 +63,7 @@ string btnName1 = "Btn_Draw_HLine";
 string btnName2 = "Btn_Draw_Ray";
 string btnName3 = "Btn_Clean_Current";
 string btnName4 = "Btn_Clean_All";
+string btnName5 = "Btn_Deselect_All";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
@@ -85,6 +86,7 @@ int OnInit()
    CreateButton(btnName3, "Clean",     240, 20, 80, 25, clrDarkOrange, BtnTxtColor); // 橙色提示
    CreateButton(btnName1, "Line (H)",  330, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
+   CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -110,6 +112,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName2);
    ObjectDelete(0, btnName3);
    ObjectDelete(0, btnName4);
+   ObjectDelete(0, btnName5);
    // Comment("");
   }
 
@@ -199,6 +202,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             PlaySound("alert.wav");
             ChartRedraw();
          }
+        }
+      
+      // [新增] 处理取消选中按钮点击
+      if(sparam == btnName5)
+        {
+         ObjectSetInteger(0, btnName5, OBJPROP_STATE, false); // 立即弹起按钮
+         DeselectAllLines(); // 执行取消选中
+         PlaySound("tick.wav");
+         ChartRedraw();
         }
      }
 
@@ -781,4 +793,49 @@ void CleanAllObjects()
    {
       Print("没有可清除的对象");
    }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 取消所有水平线和射线的选中状态
+//+------------------------------------------------------------------+
+void DeselectAllLines()
+{
+   int total = ObjectsTotal(0, 0, -1);
+   int deselectCount = 0;
+   
+   for(int i = 0; i < total; i++)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是由本工具创建的对象（以 "Draw_" 开头）
+      if(StringFind(objName, "Draw_") == 0)
+      {
+         int objType = (int)ObjectGetInteger(0, objName, OBJPROP_TYPE);
+         
+         // 只处理水平线和射线
+         if(objType == OBJ_HLINE || objType == OBJ_TREND)
+         {
+            // 检查是否处于选中状态
+            bool isSelected = (bool)ObjectGetInteger(0, objName, OBJPROP_SELECTED);
+            
+            if(isSelected)
+            {
+               // 取消选中
+               ObjectSetInteger(0, objName, OBJPROP_SELECTED, false);
+               deselectCount++;
+            }
+         }
+      }
+   }
+   
+   if(deselectCount > 0)
+   {
+      Print("已取消选中 ", deselectCount, " 个对象");
+   }
+   else
+   {
+      Print("没有处于选中状态的对象");
+   }
+   
+   ChartRedraw();
 }
