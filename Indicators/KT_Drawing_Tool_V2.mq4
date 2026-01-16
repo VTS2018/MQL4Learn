@@ -237,8 +237,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
                ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
-               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, true);
-               
+               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
+               ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
                // [新增] 记录对象对关系
                RecordObjectPair(objName, markName);
               }
@@ -276,8 +276,8 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
                ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
-               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, true);
-               
+               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
+               ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
                // [新增] 记录对象对关系（射线+标记+价格标签）
                RecordObjectPair(objName, markName);
                RecordObjectPair(objName, priceLabelName); // 价格标签也关联到射线
