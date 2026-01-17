@@ -64,9 +64,13 @@ string btnName2 = "Btn_Draw_Ray";
 string btnName3 = "Btn_Clean_Current";
 string btnName4 = "Btn_Clean_All";
 string btnName5 = "Btn_Deselect_All";
+string btnName6 = "Btn_Toggle_Mode";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
+
+// [新增] 绘图模式控制
+bool isPermanentMode = false;  // false=临时模式(Draw_), true=保持模式(Keep_)
 
 // [新增] 清除全部按钮的确认状态
 bool cleanAllConfirmed = false;
@@ -87,6 +91,7 @@ int OnInit()
    CreateButton(btnName1, "Line (H)",  330, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
+   CreateButton(btnName6, "Temp",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -113,6 +118,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName3);
    ObjectDelete(0, btnName4);
    ObjectDelete(0, btnName5);
+   ObjectDelete(0, btnName6);
    // Comment("");
   }
 
@@ -212,6 +218,33 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PlaySound("tick.wav");
          ChartRedraw();
         }
+      
+      // [新增] 处理模式切换按钮点击
+      if(sparam == btnName6)
+        {
+         ObjectSetInteger(0, btnName6, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         // 切换模式
+         isPermanentMode = !isPermanentMode;
+         
+         if(isPermanentMode)
+         {
+            // 切换到保持模式
+            ObjectSetString(0, btnName6, OBJPROP_TEXT, "Keep");
+            ObjectSetInteger(0, btnName6, OBJPROP_BGCOLOR, clrDarkGreen);
+            Alert(" 已切换到【保持模式】\n画线将永久保留，不会被工具清理");
+         }
+         else
+         {
+            // 切换回临时模式
+            ObjectSetString(0, btnName6, OBJPROP_TEXT, "Temp");
+            ObjectSetInteger(0, btnName6, OBJPROP_BGCOLOR, clrGray);
+            Alert(" 已切换到【临时模式】\n画线可被工具按钮清理");
+         }
+         
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
      }
 
    // =================================================================
@@ -261,7 +294,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             string tfStr = GetPeriodName(Period());
             // [修改] 生成唯一ID，用于关联线条和标记
             string uniqueID = IntegerToString(GetTickCount());
-            string objName = "Draw_" + tfStr + "_" + uniqueID;
+            // [新增] 根据模式动态生成对象前缀
+            string prefix = isPermanentMode ? "Keep_" : "Draw_";
+            string objName = prefix + tfStr + "_" + uniqueID;
 
             // --- [新增] 自动匹配周期颜色 ---
             color finalColor;
@@ -294,8 +329,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                bool isBullish = (close > open); // 判断阳线/阴线
                double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
                datetime time1 = iTime(NULL, 0, barIndex);
-               // [修改] 使用相同的uniqueID，建立名称关联
-               string markName = "Mark_" + tfStr + "_" + uniqueID;
+               // [修改] 使用相同的uniqueID，建立名称关联，根据模式使用不同前缀
+               string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
+               string markName = markPrefix + tfStr + "_" + uniqueID;
                
                ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
@@ -322,8 +358,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
                
                // [新增功能] 在图表右侧价格轴显示射线价格标签
-               // [修改] 使用uniqueID建立关联
-               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+               // [修改] 使用uniqueID建立关联，根据模式使用不同前缀
+               string labelPrefix = isPermanentMode ? "KeepLabel_" : "PriceLabel_";
+               string priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
                ObjectCreate(0, priceLabelName, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, finalPrice);
                ObjectSetInteger(0, priceLabelName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, priceLabelName, OBJPROP_WIDTH, 1);
@@ -333,8 +370,9 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                // [新增功能] 在磁吸的K线上绘制Check标记
                bool isBullish = (close > open); // 判断阳线/阴线
                double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
-               // [修改] 使用相同的uniqueID
-               string markName = "Mark_" + tfStr + "_" + uniqueID;
+               // [修改] 使用相同的uniqueID，根据模式使用不同前缀
+               string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
+               string markName = markPrefix + tfStr + "_" + uniqueID;
                
                ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
                ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
@@ -551,44 +589,59 @@ void RebuildObjectPairs()
    ArrayResize(g_drawnObjects, 0);
    
    int total = ObjectsTotal(0, 0, -1);
+   int drawCount = 0;  // Draw对象计数
+   int keepCount = 0;  // Keep对象计数
    
    for(int i = 0; i < total; i++)
    {
       string objName = ObjectName(0, i, 0, -1);
       
-      // 只处理以 "Draw_" 开头的线条对象
-      if(StringFind(objName, "Draw_") == 0)
+      // 检测对象前缀类型
+      bool isDrawObject = (StringFind(objName, "Draw_") == 0);
+      bool isKeepObject = (StringFind(objName, "Keep_") == 0);
+      
+      // 处理以 "Draw_" 或 "Keep_" 开头的线条对象
+      if(isDrawObject || isKeepObject)
       {
          // 提取对象名称中的周期和uniqueID
-         // 格式: "Draw_H1_1234567890"
+         // 格式: "Draw_H1_1234567890" 或 "Keep_H1_1234567890"
          string parts[];
          int count = StringSplit(objName, '_', parts);
          
          if(count >= 3)
          {
+            string prefix = parts[0];   // "Draw" 或 "Keep"
             string tfStr = parts[1];    // "H1"
             string uniqueID = parts[2]; // "1234567890"
             
+            // 根据前缀确定关联对象的名称格式
+            string markPrefix = (prefix == "Draw") ? "Mark_" : "KeepMark_";
+            string labelPrefix = (prefix == "Draw") ? "PriceLabel_" : "KeepLabel_";
+            
             // 查找对应的标记对象
-            string markName = "Mark_" + tfStr + "_" + uniqueID;
+            string markName = markPrefix + tfStr + "_" + uniqueID;
             if(ObjectFind(0, markName) >= 0)
             {
                RecordObjectPair(objName, markName);
             }
             
             // 查找对应的价格标签对象（如果是射线）
-            string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
+            string priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
             if(ObjectFind(0, priceLabelName) >= 0)
             {
                RecordObjectPair(objName, priceLabelName);
             }
+            
+            // 统计计数
+            if(isDrawObject) drawCount++;
+            else keepCount++;
          }
       }
    }
    
    // 输出日志（可选，用于调试）
    int pairCount = ArraySize(g_drawnObjects) / 2;
-   Print("重建对象关联: 找到 ", pairCount, " 对关联对象");
+   Print("重建对象关联: 找到 ", drawCount, " 个Draw对象, ", keepCount, " 个Keep对象, 共 ", pairCount, " 对关联");
 }
 
 //+------------------------------------------------------------------+
