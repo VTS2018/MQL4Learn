@@ -66,6 +66,7 @@ string btnName4 = "Btn_Clean_All";
 string btnName5 = "Btn_Deselect_All";
 string btnName6 = "Btn_Toggle_Mode";
 string btnName7 = "Btn_Toggle_Magnet";
+string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
@@ -73,6 +74,7 @@ uint lastBtnClickTime = 0;
 // [新增] 绘图模式控制
 bool isPermanentMode = false;  // false=临时模式(Draw_), true=保持模式(Keep_)
 bool isMagneticMode = true;    // true=启用磁吸, false=禁用磁吸（直接使用点击价格）
+int stopOrderMode = 0;         // 0=关闭, 1=BUY stop, 2=SELL stop
 
 // [新增] 清除全部按钮的确认状态
 bool cleanAllConfirmed = false;
@@ -95,6 +97,7 @@ int OnInit()
    CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
    CreateButton(btnName6, "Temp",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
    CreateButton(btnName7, "Magnet",    690, 20, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
+   CreateButton(btnName8, "Normal",    780, 20, 80, 25, clrGray,      BtnTxtColor); // Stop模式
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -122,6 +125,8 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName4);
    ObjectDelete(0, btnName5);
    ObjectDelete(0, btnName6);
+   ObjectDelete(0, btnName7);
+   ObjectDelete(0, btnName8);  // 删除Stop模式按钮
    // Comment("");
   }
 
@@ -275,6 +280,37 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PlaySound("tick.wav");
          ChartRedraw();
         }
+      
+      // [新增] 处理Stop模式按钮点击
+      if(sparam == btnName8)
+        {
+         ObjectSetInteger(0, btnName8, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         // 循环切换模式：Normal → BUY stop → SELL stop → Normal
+         stopOrderMode = (stopOrderMode + 1) % 3;
+         
+         switch(stopOrderMode)
+         {
+            case 0:  // Normal模式
+               ObjectSetString(0, btnName8, OBJPROP_TEXT, "Normal");
+               ObjectSetInteger(0, btnName8, OBJPROP_BGCOLOR, clrGray);
+               Alert(" 已切换到【普通模式】\n画线不带止损挂单标记");
+               break;
+            case 1:  // BUY stop模式
+               ObjectSetString(0, btnName8, OBJPROP_TEXT, "BUY↑");
+               ObjectSetInteger(0, btnName8, OBJPROP_BGCOLOR, clrGreen);
+               Alert(" 已切换到【BUY stop模式】\n画线将自动标记为 [BUY stop]\n价格回调到此位置时做多");
+               break;
+            case 2:  // SELL stop模式
+               ObjectSetString(0, btnName8, OBJPROP_TEXT, "SELL↓");
+               ObjectSetInteger(0, btnName8, OBJPROP_BGCOLOR, clrRed);
+               Alert(" 已切换到【SELL stop模式】\n画线将自动标记为 [SELL stop]\n价格回调到此位置时做空");
+               break;
+         }
+         
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
      }
 
    // =================================================================
@@ -363,6 +399,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
                ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
                
+               // ⭐[新增] 根据Stop模式自动设置画线描述
+               if(stopOrderMode == 1)
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop]");
+               else if(stopOrderMode == 2)
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop]");
+               
                // [新增功能] 在磁吸的K线上绘制Check标记（仅在磁吸模式下）
                if(isMagneticMode)
                {
@@ -397,6 +439,12 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                // [新增] 应用周期可见性设置
                int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
                ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
+               
+               // ⭐[新增] 根据Stop模式自动设置画线描述
+               if(stopOrderMode == 1)
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop]");
+               else if(stopOrderMode == 2)
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop]");
                
                // [新增功能] 在图表右侧价格轴显示射线价格标签
                // [修改] 使用uniqueID建立关联，根据模式使用不同前缀
