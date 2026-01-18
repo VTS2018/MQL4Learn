@@ -111,6 +111,14 @@ int OnInit()
    else
       Print("✓ 开仓周期限制: 未启用（所有周期均可开仓）");
    Print("---");
+   Print("   手动锁定方向：在画线描述中添加标记（优先级从高到低）");
+   Print("   [BUY stop]  → 回调做多（最高优先级）");
+   Print("   [SELL stop] → 回调做空（最高优先级）");
+   Print("   [L↑] 或 [BUY]  → 强制锁定为买入");
+   Print("   [L↓] 或 [SELL] → 强制锁定为卖出");
+   Print("   无标记 → 自动判断（根据价格位置）");
+   Print("   标签显示: [M↑]=手动锁定 [L↑]=自动锁定");
+   Print("---");
    DetectbasicInfo();
    return(INIT_SUCCEEDED);
 }
@@ -234,30 +242,51 @@ void ScanKeyLevels()
       // 如果是新关键位且启用了锁定模式，进行首次锁定
       if(!foundOld && InpUseLockDirection)
       {
-         double currentBid = Bid;
-         double levelPrice = g_keyLevels[i].price;
-         
-         if(currentBid < levelPrice)
+         // ⭐关键修改：检查是否已有手动锁定（来自画线描述标记）
+         if(g_keyLevels[i].lockedDirection != 0)
          {
-            // 现价在关键位下方 → 关键位是阻力位 → 锁定为SELL
-            g_keyLevels[i].lockedDirection = -1;
-            Print("【首次锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
-                  " 现价:", currentBid, " → 锁定为SELL(阻力位)");
-         }
-         else if(currentBid > levelPrice)
-         {
-            // 现价在关键位上方 → 关键位是支撑位 → 锁定为BUY
-            g_keyLevels[i].lockedDirection = 1;
-            Print("【首次锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
-                  " 现价:", currentBid, " → 锁定为BUY(支撑位)");
+            // 已有手动锁定，跳过自动判断
+            string lockType = (g_keyLevels[i].lockedDirection == 1) ? "BUY" : "SELL";
+            Print("【手动锁定】", g_keyLevels[i].objectName, 
+                  " 价格:", g_keyLevels[i].price,
+                  " → 锁定为", lockType, " (来自画线描述标记)");
          }
          else
          {
-            // 现价正好在关键位区域内，暂不锁定
-            g_keyLevels[i].lockedDirection = 0;
-            Print("【首次扫描】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
-                  " 现价:", currentBid, " → 在区域内，等待离开后锁定");
+            // 没有手动锁定，执行自动判断逻辑
+            double currentBid = Bid;
+            double levelPrice = g_keyLevels[i].price;
+            
+            if(currentBid < levelPrice)
+            {
+               // 现价在关键位下方 → 关键位是阻力位 → 锁定为SELL
+               g_keyLevels[i].lockedDirection = -1;
+               Print("【自动锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                     " 现价:", currentBid, " → 锁定为SELL(阻力位)");
+            }
+            else if(currentBid > levelPrice)
+            {
+               // 现价在关键位上方 → 关键位是支撑位 → 锁定为BUY
+               g_keyLevels[i].lockedDirection = 1;
+               Print("【自动锁定】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                     " 现价:", currentBid, " → 锁定为BUY(支撑位)");
+            }
+            else
+            {
+               // 现价正好在关键位区域内，暂不锁定
+               g_keyLevels[i].lockedDirection = 0;
+               Print("【首次扫描】", g_keyLevels[i].objectName, " 价格:", levelPrice, 
+                     " 现价:", currentBid, " → 在区域内，等待离开后锁定");
+            }
          }
+      }
+      // ⭐新增：即使未启用锁定模式，也要保留手动锁定
+      else if(!foundOld && g_keyLevels[i].lockedDirection != 0)
+      {
+         string lockType = (g_keyLevels[i].lockedDirection == 1) ? "BUY" : "SELL";
+         Print("【手动锁定】", g_keyLevels[i].objectName, 
+               " 价格:", g_keyLevels[i].price,
+               " → 强制锁定为", lockType, " (锁定模式已关闭，但保留手动设置)");
       }
    }
 }
@@ -281,7 +310,25 @@ void AddKeyLevel(string objName, double price, int tf, bool isHLine)
    g_keyLevels[size].lastCheckTime = 0;
    g_keyLevels[size].tradeCount = 0;
    g_keyLevels[size].lastTradeDirection = 0;  // 初始化为未交易
-   g_keyLevels[size].lockedDirection = 0;     // 初始化为未锁定，等待ScanKeyLevels中处理
+   
+   // ⭐核心新增：解析画线描述中的锁定标记（优先级系统）
+   string objText = ObjectGetString(0, objName, OBJPROP_TEXT);
+   string objTextUpper = objText;
+   StringToUpper(objTextUpper);  // 转大写，不区分大小写
+   int manualLock = 0;  // 0=未锁定, 1=BUY, -1=SELL
+   
+   // 优先级1：检查 BUY stop / SELL stop（最高优先级）
+   if(StringFind(objTextUpper, "[BUY STOP]") >= 0)
+      manualLock = 1;
+   else if(StringFind(objTextUpper, "[SELL STOP]") >= 0)
+      manualLock = -1;
+   // 优先级2：检查现有标记
+   else if(StringFind(objText, "[L↑]") >= 0 || StringFind(objTextUpper, "[BUY]") >= 0)
+      manualLock = 1;
+   else if(StringFind(objText, "[L↓]") >= 0 || StringFind(objTextUpper, "[SELL]") >= 0)
+      manualLock = -1;
+   
+   g_keyLevels[size].lockedDirection = manualLock;  // 使用解析结果
    
    // 初始化价格位置状态（关键修复：扫描时就确定当前位置）
    double currentBid = Bid;
@@ -1063,13 +1110,25 @@ string FormatKeyLevelInfo(KeyLevel &level)
 {
    string info = "";
    
-   // 0. 锁定状态（如果启用）
-   if(InpUseLockDirection && level.lockedDirection != 0)
+   // 0. 锁定状态（区分手动/自动）
+   if(level.lockedDirection != 0)
    {
+      // 检查是否是手动锁定（从画线描述中读取）
+      string objText = ObjectGetString(0, level.objectName, OBJPROP_TEXT);
+      string objTextUpper = objText;
+      StringToUpper(objTextUpper);
+      
+      bool isManualLock = (StringFind(objTextUpper, "[BUY STOP]") >= 0 || 
+                          StringFind(objTextUpper, "[SELL STOP]") >= 0 ||
+                          StringFind(objText, "[L↑]") >= 0 || 
+                          StringFind(objText, "[L↓]") >= 0 ||
+                          StringFind(objTextUpper, "[BUY]") >= 0 || 
+                          StringFind(objTextUpper, "[SELL]") >= 0);
+      
       if(level.lockedDirection == 1)
-         info += "[L↑] ";  // 锁定BUY
+         info += (isManualLock ? "[M↑] " : "[L↑] ");  // M=手动, L=自动
       else
-         info += "[L↓] ";  // 锁定SELL
+         info += (isManualLock ? "[M↓] " : "[L↓] ");
    }
    
    // 1. 交易次数
