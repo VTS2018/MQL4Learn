@@ -82,6 +82,8 @@ struct KeyLevel
 KeyLevel g_keyLevels[];     // 存储所有关键位
 datetime g_lastScanTime;    // 最后扫描时间
 datetime g_lastLabelUpdateTime = 0;  // 最后标签更新时间
+double g_yesterdayBalance = 0;       // 昨日账户余额
+int g_currentDay = 0;                // 当前日期（用于检测日期变化）
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -91,6 +93,22 @@ int OnInit()
    // 初始化全局变量
    ArrayResize(g_keyLevels, 0);
    g_lastScanTime = 0;
+   
+   // 从全局变量读取昨日余额（持久化存储，避免重启丢失）
+   string gvName = "KT_GHH_YesterdayBalance_" + IntegerToString(AccountNumber());
+   if(GlobalVariableCheck(gvName))
+   {
+      g_yesterdayBalance = GlobalVariableGet(gvName);
+      Print("【恢复数据】从全局变量读取昨日余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+   }
+   else
+   {
+      // 首次运行，使用当前余额并保存到全局变量
+      g_yesterdayBalance = AccountBalance();
+      GlobalVariableSet(gvName, g_yesterdayBalance);
+      Print("【首次初始化】昨日余额设置为: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+   }
+   g_currentDay = TimeDay(TimeCurrent());
    
    // 扫描图表上的关键位
    ScanKeyLevels();
@@ -139,6 +157,23 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // 检查日期变化，更新昨日余额
+   int currentDay = TimeDay(TimeCurrent());
+   if(currentDay != g_currentDay)
+   {
+      g_yesterdayBalance = AccountBalance();
+      g_currentDay = currentDay;
+      
+      // 保存到全局变量（持久化）
+      string gvName = "KT_GHH_YesterdayBalance_" + IntegerToString(AccountNumber());
+      GlobalVariableSet(gvName, g_yesterdayBalance);
+      
+      Print("=== 日期变化 ===");
+      Print("新的昨日余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+      Print("今日盈利目标: ", DoubleToString(g_yesterdayBalance * 0.1, 2), " ", AccountCurrency());
+      Print("已保存到全局变量: ", gvName);
+   }
+   
    // 每10秒重新扫描一次关键位（防止新画的线）
    if(TimeCurrent() - g_lastScanTime > 10)
    {
@@ -859,7 +894,7 @@ void UpdateDisplay()
 {
    // 使用OBJ_LABEL对象显示信息，避免与指标的Comment()冲突
    string prefix = "EA_Display_";
-   int x = 150;        // 右边距（从右边缘向左的像素距离）
+   int x = 160;        // 右边距（从右边缘向左的像素距离）
    int y_start = 140;  // 起始Y坐标（修改此值可调整距离顶部的位置，数值越大越靠下）
    int y_gap = 18;    // 行间距
    color text_color = clrBlack;  // 字体颜色：黑色
@@ -884,6 +919,16 @@ void UpdateDisplay()
    y += y_gap;
    CreateLabel(prefix + "Balance", x, y, "余额: " + DoubleToString(AccountBalance(), 2) + " " + AccountCurrency(), text_color, font_size, font_name);
    
+   y += y_gap;
+   CreateLabel(prefix + "YesterdayBalance", x, y, "昨日: " + DoubleToString(g_yesterdayBalance, 2) + " " + AccountCurrency(), text_color, font_size, font_name);
+   
+   y += y_gap;
+   double todayTarget = g_yesterdayBalance * 0.1;
+   double todayProgress = AccountBalance() - g_yesterdayBalance;
+   color target_color = (todayProgress >= todayTarget) ? clrGreen : clrOrangeRed;
+   string targetText = "今日目标: " + DoubleToString(todayTarget, 2) + " (" + DoubleToString(todayProgress, 2) + ")";
+   CreateLabel(prefix + "TodayTarget", x, y, targetText, target_color, font_size, font_name);
+   
    ChartRedraw();
 }
 
@@ -903,6 +948,8 @@ void CreateLabel(string name, int x, int y, string text, color clr, int size, st
       ObjectSetInteger(0, name, OBJPROP_FONTSIZE, size);
       ObjectSetString(0, name, OBJPROP_FONT, font);
       ObjectSetString(0, name, OBJPROP_TEXT, text);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
    }
    else
    {
