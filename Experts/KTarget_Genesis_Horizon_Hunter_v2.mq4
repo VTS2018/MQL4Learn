@@ -894,7 +894,7 @@ void UpdateDisplay()
 {
    // 使用OBJ_LABEL对象显示信息，避免与指标的Comment()冲突
    string prefix = "EA_Display_";
-   int x = 160;        // 右边距（从右边缘向左的像素距离）
+   int x = 220;        // 右边距（从右边缘向左的像素距离）
    int y_start = 140;  // 起始Y坐标（修改此值可调整距离顶部的位置，数值越大越靠下）
    int y_gap = 18;    // 行间距
    color text_color = clrBlack;  // 字体颜色：黑色
@@ -928,6 +928,36 @@ void UpdateDisplay()
    color target_color = (todayProgress >= todayTarget) ? clrGreen : clrOrangeRed;
    string targetText = "今日目标: " + DoubleToString(todayTarget, 2) + " (" + DoubleToString(todayProgress, 2) + ")";
    CreateLabel(prefix + "TodayTarget", x, y, targetText, target_color, font_size, font_name);
+   
+   // 计算潜在风险（买入和卖出两个方向）
+   double lots = CalculateLotSize();
+   double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
+   
+   // 买入方向
+   y += y_gap;
+   double buyEntry = Ask;
+   double buySL = CalculateStopLoss(OP_BUY, 0);
+   double buyTP = CalculateTakeProfit(OP_BUY, buyEntry, lots);
+   double buyLoss = CalculatePotentialLoss(lots, buyEntry, buySL);
+   double buySLDistance = MathAbs(buyEntry - buySL);
+   double buyTPDistance = MathAbs(buyTP - buyEntry);
+   double buyRR = (buySLDistance > 0) ? (buyTPDistance / buySLDistance) : 0;
+   int buySLPoints = (int)(buySLDistance / tickSize);
+   string buyText = "买: 亏$" + DoubleToString(buyLoss, 2) + " R:" + DoubleToString(buyRR, 1) + " 距" + IntegerToString(buySLPoints) + "点";
+   CreateLabel(prefix + "BuyRisk", x, y, buyText, clrCrimson, font_size, font_name);
+   
+   // 卖出方向
+   y += y_gap;
+   double sellEntry = Bid;
+   double sellSL = CalculateStopLoss(OP_SELL, 0);
+   double sellTP = CalculateTakeProfit(OP_SELL, sellEntry, lots);
+   double sellLoss = CalculatePotentialLoss(lots, sellEntry, sellSL);
+   double sellSLDistance = MathAbs(sellSL - sellEntry);
+   double sellTPDistance = MathAbs(sellEntry - sellTP);
+   double sellRR = (sellSLDistance > 0) ? (sellTPDistance / sellSLDistance) : 0;
+   int sellSLPoints = (int)(sellSLDistance / tickSize);
+   string sellText = "卖: 亏$" + DoubleToString(sellLoss, 2) + " R:" + DoubleToString(sellRR, 1) + " 距" + IntegerToString(sellSLPoints) + "点";
+   CreateLabel(prefix + "SellRisk", x, y, sellText, clrCrimson, font_size, font_name);
    
    ChartRedraw();
 }
