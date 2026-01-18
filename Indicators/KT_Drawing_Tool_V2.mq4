@@ -65,12 +65,14 @@ string btnName3 = "Btn_Clean_Current";
 string btnName4 = "Btn_Clean_All";
 string btnName5 = "Btn_Deselect_All";
 string btnName6 = "Btn_Toggle_Mode";
+string btnName7 = "Btn_Toggle_Magnet";
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
 
 // [新增] 绘图模式控制
 bool isPermanentMode = false;  // false=临时模式(Draw_), true=保持模式(Keep_)
+bool isMagneticMode = true;    // true=启用磁吸, false=禁用磁吸（直接使用点击价格）
 
 // [新增] 清除全部按钮的确认状态
 bool cleanAllConfirmed = false;
@@ -92,6 +94,7 @@ int OnInit()
    CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
    CreateButton(btnName6, "Temp",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
+   CreateButton(btnName7, "Magnet",    690, 20, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -245,6 +248,33 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PlaySound("tick.wav");
          ChartRedraw();
         }
+      
+      // [新增] 处理磁吸切换按钮点击
+      if(sparam == btnName7)
+        {
+         ObjectSetInteger(0, btnName7, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         // 切换磁吸模式
+         isMagneticMode = !isMagneticMode;
+         
+         if(isMagneticMode)
+         {
+            // 启用磁吸
+            ObjectSetString(0, btnName7, OBJPROP_TEXT, "Magnet");
+            ObjectSetInteger(0, btnName7, OBJPROP_BGCOLOR, clrGreen);
+            Alert(" 磁吸功能已开启\n画线将自动吸附到最近的OHLC价格");
+         }
+         else
+         {
+            // 禁用磁吸
+            ObjectSetString(0, btnName7, OBJPROP_TEXT, "Direct");
+            ObjectSetInteger(0, btnName7, OBJPROP_BGCOLOR, clrGray);
+            Alert(" 磁吸功能已关闭\n画线将直接使用鼠标点击价格");
+         }
+         
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
      }
 
    // =================================================================
@@ -267,26 +297,34 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             // 核心功能升级：全能磁吸逻辑 (OHLC Adsorption)
             // -------------------------------------------------------------
             int barIndex = iBarShift(NULL, 0, dt); // 找到点击位置对应的K线索引
+            double finalPrice;
             
-            // 1. 获取该K线的四个价格
+            // 获取K线的OHLC数据（用于磁吸计算和Check标记判断）
             double high  = iHigh(NULL, 0, barIndex);
             double low   = iLow(NULL, 0, barIndex);
             double open  = iOpen(NULL, 0, barIndex);
             double close = iClose(NULL, 0, barIndex);
             
-            // 2. 计算鼠标点击位置与这四个价格的距离
-            double distH = MathAbs(price - high);
-            double distL = MathAbs(price - low);
-            double distO = MathAbs(price - open);
-            double distC = MathAbs(price - close);
-            
-            // 3. 找出距离最近的那个价格
-            double finalPrice = high;      // 默认先假设 High 最近
-            double minDist    = distH;     // 记录最小距离
-            
-            if(distL < minDist) { minDist = distL; finalPrice = low;   }
-            if(distO < minDist) { minDist = distO; finalPrice = open;  }
-            if(distC < minDist) { minDist = distC; finalPrice = close; }
+            if(isMagneticMode) // 启用磁吸
+            {
+               // 计算鼠标点击位置与这四个价格的距离
+               double distH = MathAbs(price - high);
+               double distL = MathAbs(price - low);
+               double distO = MathAbs(price - open);
+               double distC = MathAbs(price - close);
+               
+               // 找出距离最近的那个价格
+               finalPrice = high;      // 默认先假设 High 最近
+               double minDist = distH; // 记录最小距离
+               
+               if(distL < minDist) { minDist = distL; finalPrice = low;   }
+               if(distO < minDist) { minDist = distO; finalPrice = open;  }
+               if(distC < minDist) { minDist = distC; finalPrice = close; }
+            }
+            else // 禁用磁吸，直接使用鼠标点击价格
+            {
+               finalPrice = price; // 直接使用鼠标点击位置的价格
+            }
             
             // -------------------------------------------------------------
             // 执行画图
@@ -325,22 +363,25 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
                ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, visibilityFlags);
                
-               // [新增功能] 在磁吸的K线上绘制Check标记
-               bool isBullish = (close > open); // 判断阳线/阴线
-               double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
-               datetime time1 = iTime(NULL, 0, barIndex);
-               // [修改] 使用相同的uniqueID，建立名称关联，根据模式使用不同前缀
-               string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
-               string markName = markPrefix + tfStr + "_" + uniqueID;
-               
-               ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
-               ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
-               ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
-               ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
-               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
-               ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
-               // [新增] 记录对象对关系
-               RecordObjectPair(objName, markName);
+               // [新增功能] 在磁吸的K线上绘制Check标记（仅在磁吸模式下）
+               if(isMagneticMode)
+               {
+                  bool isBullish = (close > open); // 判断阳线/阴线
+                  double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
+                  datetime time1 = iTime(NULL, 0, barIndex);
+                  // [修改] 使用相同的uniqueID，建立名称关联，根据模式使用不同前缀
+                  string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
+                  string markName = markPrefix + tfStr + "_" + uniqueID;
+                  
+                  ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
+                  ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
+                  ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
+                  ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
+                  ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
+                  ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
+                  // [新增] 记录对象对关系
+                  RecordObjectPair(objName, markName);
+               }
               }
             else if(drawingState == 2) // 画射线
               {
@@ -366,23 +407,27 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, priceLabelName, OBJPROP_WIDTH, 1);
                ObjectSetInteger(0, priceLabelName, OBJPROP_SELECTABLE, false); // 不可选中，避免干扰
                ObjectSetInteger(0, priceLabelName, OBJPROP_HIDDEN, true); // 在对象列表中隐藏
+               // 价格标签关联到射线
+               RecordObjectPair(objName, priceLabelName);
                
-               // [新增功能] 在磁吸的K线上绘制Check标记
-               bool isBullish = (close > open); // 判断阳线/阴线
-               double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
-               // [修改] 使用相同的uniqueID，根据模式使用不同前缀
-               string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
-               string markName = markPrefix + tfStr + "_" + uniqueID;
-               
-               ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
-               ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
-               ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
-               ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
-               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
-               ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
-               // [新增] 记录对象对关系（射线+标记+价格标签）
-               RecordObjectPair(objName, markName);
-               RecordObjectPair(objName, priceLabelName); // 价格标签也关联到射线
+               // [新增功能] 在磁吸的K线上绘制Check标记（仅在磁吸模式下）
+               if(isMagneticMode)
+               {
+                  bool isBullish = (close > open); // 判断阳线/阴线
+                  double markPrice = isBullish ? (high + 5 * Point) : (low - 5 * Point); // 阳线标记在最高价上方，阴线在最低价下方
+                  // [修改] 使用相同的uniqueID，根据模式使用不同前缀
+                  string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
+                  string markName = markPrefix + tfStr + "_" + uniqueID;
+                  
+                  ObjectCreate(0, markName, OBJ_ARROW_CHECK, 0, time1, markPrice);
+                  ObjectSetInteger(0, markName, OBJPROP_COLOR, finalColor);
+                  ObjectSetInteger(0, markName, OBJPROP_WIDTH, 2);
+                  ObjectSetInteger(0, markName, OBJPROP_ANCHOR, isBullish ? ANCHOR_BOTTOM : ANCHOR_TOP); // 阳线锚点在下，阴线锚点在上
+                  ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
+                  ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
+                  // [新增] 记录对象对关系
+                  RecordObjectPair(objName, markName);
+               }
               }
             
             ChartRedraw();
