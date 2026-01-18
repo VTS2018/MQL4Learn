@@ -1028,6 +1028,7 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
         // 设置周期可见性 (同矩形)
         ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, GetTimeframeFlag(_Period));
         ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
     }
 }
 
@@ -1367,7 +1368,7 @@ void UpdateATRDisplay()
          ObjectSetString(0, obj_name, OBJPROP_FONT, "Consolas"); // 等宽字体
          ObjectSetInteger(0, obj_name, OBJPROP_BACK, false);
          ObjectSetInteger(0, obj_name, OBJPROP_SELECTABLE, false);
-         ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, false);
+         ObjectSetInteger(0, obj_name, OBJPROP_HIDDEN, true);
       }
       
       // 更新位置和文本
@@ -1389,7 +1390,7 @@ void UpdateATRDisplay()
       ObjectSetInteger(0, buy_sl_name, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, buy_sl_name, OBJPROP_BACK, false);
       ObjectSetInteger(0, buy_sl_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, buy_sl_name, OBJPROP_HIDDEN, false);
+      ObjectSetInteger(0, buy_sl_name, OBJPROP_HIDDEN, true);
    }
    else
    {
@@ -1408,7 +1409,7 @@ void UpdateATRDisplay()
       ObjectSetInteger(0, sell_sl_name, OBJPROP_WIDTH, 2);
       ObjectSetInteger(0, sell_sl_name, OBJPROP_BACK, false);
       ObjectSetInteger(0, sell_sl_name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, sell_sl_name, OBJPROP_HIDDEN, false);
+      ObjectSetInteger(0, sell_sl_name, OBJPROP_HIDDEN, true);
    }
    else
    {
