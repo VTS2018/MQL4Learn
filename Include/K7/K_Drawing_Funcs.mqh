@@ -412,15 +412,15 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
         "0.786 PullBack %$", // k=6 (0.786)
         "0.880 PullBack %$",
 
-        "TP11-%$",
+        "TP1-1.618-%$",
         "1MAX-%$",
         "1MAX-%$",
 
-        "TP21-%$",
+        "TP2-2.618-%$",
         "2MAX-%$",
         "2MAX-%$",
 
-        "TP31-%$",
+        "TP3-4.236-%$",
         "3MAX-%$",
         "3MAX-%$",
 
