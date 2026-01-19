@@ -755,38 +755,49 @@ void UpdateRayEndpoints()
    }
    
    int updateCount = 0;
+   int drawCount = 0;  // Draw射线计数
+   int keepCount = 0;  // Keep射线计数
    
    for(int i = 0; i < total; i++)
    {
       string objName = ObjectName(0, i, 0, -1);
       
-      // 处理射线对象（以 "Draw_" 开头的 OBJ_TREND）
-      if(StringFind(objName, "Draw_") == 0)
+      // 检测对象前缀类型
+      bool isDrawObject = (StringFind(objName, "Draw_") == 0);
+      bool isKeepObject = (StringFind(objName, "Keep_") == 0);
+      
+      // 处理射线对象（以 "Draw_" 或 "Keep_" 开头的 OBJ_TREND）
+      if((isDrawObject || isKeepObject) && ObjectGetInteger(0, objName, OBJPROP_TYPE) == OBJ_TREND)
       {
-         if(ObjectGetInteger(0, objName, OBJPROP_TYPE) == OBJ_TREND)
+         // 获取射线的价格
+         double price = ObjectGetDouble(0, objName, OBJPROP_PRICE, 0);
+         
+         // 更新射线的第二个时间点到当前K线
+         ObjectSetInteger(0, objName, OBJPROP_TIME, 1, currentTime);
+         ObjectSetDouble(0, objName, OBJPROP_PRICE, 1, price);
+         updateCount++;
+         
+         // 统计计数
+         if(isDrawObject) drawCount++;
+         else keepCount++;
+         
+         // 同时更新对应的价格标签位置
+         string parts[];
+         int count = StringSplit(objName, '_', parts);
+         if(count >= 3)
          {
-            // 获取射线的价格
-            double price = ObjectGetDouble(0, objName, OBJPROP_PRICE, 0);
+            string prefix = parts[0];   // "Draw" 或 "Keep"
+            string tfStr = parts[1];
+            string uniqueID = parts[2];
             
-            // 更新射线的第二个时间点到当前K线
-            ObjectSetInteger(0, objName, OBJPROP_TIME, 1, currentTime);
-            ObjectSetDouble(0, objName, OBJPROP_PRICE, 1, price);
-            updateCount++;
+            // 根据前缀确定价格标签名称
+            string labelPrefix = (prefix == "Draw") ? "PriceLabel_" : "KeepLabel_";
+            string priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
             
-            // 同时更新对应的价格标签位置
-            string parts[];
-            int count = StringSplit(objName, '_', parts);
-            if(count >= 3)
+            if(ObjectFind(0, priceLabelName) >= 0)
             {
-               string tfStr = parts[1];
-               string uniqueID = parts[2];
-               string priceLabelName = "PriceLabel_" + tfStr + "_" + uniqueID;
-               
-               if(ObjectFind(0, priceLabelName) >= 0)
-               {
-                  ObjectSetInteger(0, priceLabelName, OBJPROP_TIME, 0, currentTime);
-                  ObjectSetDouble(0, priceLabelName, OBJPROP_PRICE, 0, price);
-               }
+               ObjectSetInteger(0, priceLabelName, OBJPROP_TIME, 0, currentTime);
+               ObjectSetDouble(0, priceLabelName, OBJPROP_PRICE, 0, price);
             }
          }
       }
@@ -794,7 +805,7 @@ void UpdateRayEndpoints()
    
    if(updateCount > 0)
    {
-      Print("更新射线终点: 共更新 ", updateCount, " 条射线到最新K线");
+      Print("更新射线终点: 共更新 ", updateCount, " 条射线 (Draw:", drawCount, " Keep:", keepCount, ") 到最新K线");
       ChartRedraw(0);
    }
 }
