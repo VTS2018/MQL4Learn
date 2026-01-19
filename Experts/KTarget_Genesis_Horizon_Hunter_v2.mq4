@@ -1211,6 +1211,21 @@ string FormatKeyLevelInfo(KeyLevel &level)
    // 1. 交易次数
    info += "[" + IntegerToString(level.tradeCount) + "次] ";
    
+   // 1.5. 周期显示
+   if(level.isHLine)
+   {
+      // 水平线：全周期可见
+      info += "[全周期] ";
+   }
+   else
+   {
+      // 射线：显示特定周期
+      if(level.timeframe > 0)
+         info += "[" + GetTimeframeString(level.timeframe) + "] ";
+      else
+         info += "[未知] ";  // 容错处理
+   }
+   
    // 2. 交易方向
    if(level.lastTradeDirection == 1)
       info += "↓买 ";
