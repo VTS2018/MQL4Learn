@@ -95,7 +95,7 @@ int OnInit()
    CreateButton(btnName1, "Line (H)",  330, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
-   CreateButton(btnName6, "Temp",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
+   CreateButton(btnName6, "KeyLevel",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
    CreateButton(btnName7, "Magnet",    690, 20, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
    CreateButton(btnName8, "Normal",    780, 20, 80, 25, clrGray,      BtnTxtColor); // Stop模式
 
@@ -244,10 +244,10 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          }
          else
          {
-            // 切换回临时模式
-            ObjectSetString(0, btnName6, OBJPROP_TEXT, "Temp");
+            // 切换回关键位模式
+            ObjectSetString(0, btnName6, OBJPROP_TEXT, "KeyLevel");
             ObjectSetInteger(0, btnName6, OBJPROP_BGCOLOR, clrGray);
-            Alert(" 已切换到【临时模式】\n画线可被工具按钮清理");
+            Alert(" 已切换到【关键位模式】\n画线可被工具按钮清理");
          }
          
          PlaySound("tick.wav");
