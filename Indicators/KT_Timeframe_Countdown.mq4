@@ -20,7 +20,7 @@ input color    InpTextColor = clrLightGray; // 文本颜色
 input color    InpWarningColor = clrOrange; // 警告颜色 (<10秒)
 input color    InpNewBarColor = clrLime;  // 新K线颜色
 input int      InpFontSize = 9;           // 字体大小
-input bool     InpEnableAlert = true;     // 启用新K线提醒
+input bool     InpEnableAlert = false;     // 启用新K线提醒
 input int      InpWarningSeconds = 10;    // 警告秒数阈值
 
 //+------------------------------------------------------------------+
