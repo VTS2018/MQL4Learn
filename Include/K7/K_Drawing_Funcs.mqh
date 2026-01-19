@@ -777,6 +777,7 @@ void ExecuteDrawFiboRects(int target_index, int P2_index, bool is_bullish, const
             ObjectSetInteger(0, name, OBJPROP_FILL, true);
             ObjectSetInteger(0, name, OBJPROP_BACK, true);
             ObjectSetInteger(0, name, OBJPROP_SELECTABLE, true);
+            ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
 
             // 设置周期可见性
             int tf_flag = GetTimeframeFlag(_Period);
@@ -865,6 +866,7 @@ void DrawFiboHighlightText(string text_name, string text_content, datetime ancho
         
         // 确保文本对象不可选中
         ObjectSetInteger(0, text_name, OBJPROP_SELECTABLE, true);
+        ObjectSetInteger(0, text_name, OBJPROP_HIDDEN, true);
     }
 }
 

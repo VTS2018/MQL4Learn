@@ -953,8 +953,11 @@ void DeselectAllLines()
    {
       string objName = ObjectName(0, i, 0, -1);
       
-      // 检查是否是由本工具创建的对象（以 "Draw_" 开头）
-      if(StringFind(objName, "Draw_") == 0)
+      // 检查是否是由本工具创建的对象（以 "Draw_" 或 "Keep_" 开头）
+      bool isDrawObject = (StringFind(objName, "Draw_") == 0);
+      bool isKeepObject = (StringFind(objName, "Keep_") == 0);
+      
+      if(isDrawObject || isKeepObject)
       {
          int objType = (int)ObjectGetInteger(0, objName, OBJPROP_TYPE);
          
