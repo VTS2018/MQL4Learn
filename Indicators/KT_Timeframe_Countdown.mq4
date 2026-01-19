@@ -76,9 +76,13 @@ int OnInit()
    // 创建显示对象
    CreateDisplayObjects();
    
+   // 启动1秒定时器（确保倒计时流畅更新）
+   EventSetTimer(1);
+   
    Print("=== KT 多周期倒计时指标启动 ===");
    Print("监控周期: M1, M5, M15, M30, H1, H4");
    Print("新K线提醒: ", (InpEnableAlert ? "已启用" : "未启用"));
+   Print("定时器: 1秒刷新");
    
    return(INIT_SUCCEEDED);
 }
@@ -88,9 +92,24 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   // 停止定时器
+   EventKillTimer();
+   
    // 清理所有显示对象
    CleanupDisplayObjects();
    Print("=== KT 多周期倒计时指标停止 ===");
+}
+
+//+------------------------------------------------------------------+
+//| Timer event (每秒触发)                                           |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // 更新所有周期的倒计时
+   UpdateAllCountdowns();
+   
+   // 更新显示
+   UpdateDisplay();
 }
 
 //+------------------------------------------------------------------+
@@ -107,12 +126,7 @@ int OnCalculate(const int rates_total,
                 const long &volume[],
                 const int &spread[])
 {
-   // 更新所有周期的倒计时
-   UpdateAllCountdowns();
-   
-   // 更新显示
-   UpdateDisplay();
-   
+   // OnTimer负责更新，这里仅返回（满足指标系统要求）
    return(rates_total);
 }
 
