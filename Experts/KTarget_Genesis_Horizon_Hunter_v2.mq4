@@ -65,6 +65,9 @@ input bool     InpShowKeyLevelInfo = true;   // 显示关键位信息 (Show KeyL
 input int      InpLabelUpdateSeconds = 3;    // 标签更新间隔秒数 (Label Update Interval)
 input color    InpLabelColor = clrDodgerBlue; // 标签颜色 (Label Color)
 
+//--- 时区设置
+input int      InpTimezoneOffset = 8;        // 时区偏移（东八区=8）(Timezone Offset GMT+)
+
 //--- 全局变量
 struct KeyLevel
 {
@@ -94,21 +97,8 @@ int OnInit()
    ArrayResize(g_keyLevels, 0);
    g_lastScanTime = 0;
    
-   // 从全局变量读取昨日余额（持久化存储，避免重启丢失）
-   string gvName = "KT_GHH_YesterdayBalance_" + IntegerToString(AccountNumber());
-   if(GlobalVariableCheck(gvName))
-   {
-      g_yesterdayBalance = GlobalVariableGet(gvName);
-      Print("【恢复数据】从全局变量读取昨日余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
-   }
-   else
-   {
-      // 首次运行，使用当前余额并保存到全局变量
-      g_yesterdayBalance = AccountBalance();
-      GlobalVariableSet(gvName, g_yesterdayBalance);
-      Print("【首次初始化】昨日余额设置为: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
-   }
-   g_currentDay = TimeDay(TimeCurrent());
+   // 初始化昨日余额和时区信息
+   InitializeYesterdayBalance();
    
    // 扫描图表上的关键位
    ScanKeyLevels();
@@ -157,21 +147,27 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // 检查日期变化，更新昨日余额
-   int currentDay = TimeDay(TimeCurrent());
+   // 检查日期变化，更新昨日余额（使用东八区时间）
+   datetime chinaTime = GetChinaTime();
+   int currentDay = TimeDay(chinaTime);
+   
    if(currentDay != g_currentDay)
    {
       g_yesterdayBalance = AccountBalance();
       g_currentDay = currentDay;
       
-      // 保存到全局变量（持久化）
+      // 保存到全局变量（持久化）- 同时保存余额和日期
       string gvName = "KT_GHH_YesterdayBalance_" + IntegerToString(AccountNumber());
+      string gvDateName = "KT_GHH_LastUpdateDate_" + IntegerToString(AccountNumber());
       GlobalVariableSet(gvName, g_yesterdayBalance);
+      GlobalVariableSet(gvDateName, currentDay);
       
-      Print("=== 日期变化 ===");
+      Print("=== 日期变化 (东八区) ===");
+      Print("服务器时间: ", TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
+      Print("东八区时间: ", TimeToString(chinaTime, TIME_DATE|TIME_SECONDS));
       Print("新的昨日余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
       Print("今日盈利目标: ", DoubleToString(g_yesterdayBalance * 0.1, 2), " ", AccountCurrency());
-      Print("已保存到全局变量: ", gvName);
+      Print("已保存到全局变量: ", gvName, " + 日期: ", gvDateName);
    }
    
    // 每10秒重新扫描一次关键位（防止新画的线）
@@ -1075,6 +1071,102 @@ double CalculatePotentialLoss(double lots, double entry, double sl)
    double tickSize = MarketInfo(Symbol(), MODE_TICKSIZE);
    double points = MathAbs(entry - sl) / tickSize;
    return points * tickValue * lots;
+}
+
+//+------------------------------------------------------------------+
+//| 初始化昨日余额和日期检测
+//+------------------------------------------------------------------+
+void InitializeYesterdayBalance()
+{
+   // 使用东八区时间获取当前日期
+   datetime chinaTime = GetChinaTime();
+   int todayDate = TimeDay(chinaTime);
+   
+   // 从全局变量读取昨日余额和最后更新日期（持久化存储，避免重启丢失）
+   string gvName = "KT_GHH_YesterdayBalance_" + IntegerToString(AccountNumber());
+   string gvDateName = "KT_GHH_LastUpdateDate_" + IntegerToString(AccountNumber());
+   
+   if(GlobalVariableCheck(gvName) && GlobalVariableCheck(gvDateName))
+   {
+      g_yesterdayBalance = GlobalVariableGet(gvName);
+      int lastUpdateDate = (int)GlobalVariableGet(gvDateName);
+      
+      Print("【恢复数据】从全局变量读取昨日余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+      Print("【恢复数据】最后更新日期: ", lastUpdateDate, " 当前日期: ", todayDate);
+      
+      // 关键修复：检查日期是否过期（跨天检测）
+      if(lastUpdateDate != todayDate)
+      {
+         Print("【检测到跨天】上次更新: ", lastUpdateDate, "日 → 当前: ", todayDate, "日");
+         
+         // 如果刚好是相邻的一天（昨天更新的），余额值有效，只需更新日期
+         // 如果跨了多天，则需要使用当前余额作为新的基准
+         int daysDiff = todayDate - lastUpdateDate;
+         if(daysDiff < 0) daysDiff += 31;  // 处理跨月情况
+         
+         if(daysDiff == 1)
+         {
+            // 正常情况：昨天更新的，保留余额值
+            Print("【正常跨天】昨日余额保持: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+         }
+         else
+         {
+            // 跨了多天：使用当前余额作为基准
+            g_yesterdayBalance = AccountBalance();
+            Print("【跨多天重置】跨越", daysDiff, "天，昨日余额重置为当前余额: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+         }
+         
+         // 更新保存日期为今天
+         GlobalVariableSet(gvDateName, todayDate);
+      }
+      else
+      {
+         Print("【同一天】无需更新昨日余额");
+      }
+   }
+   else
+   {
+      // 首次运行，使用当前余额并保存到全局变量
+      g_yesterdayBalance = AccountBalance();
+      GlobalVariableSet(gvName, g_yesterdayBalance);
+      GlobalVariableSet(gvDateName, todayDate);
+      Print("【首次初始化】昨日余额设置为: ", DoubleToString(g_yesterdayBalance, 2), " ", AccountCurrency());
+      Print("【首次初始化】保存日期: ", todayDate);
+   }
+   
+   // 设置当前日期（用于OnTick中的日期变化检测）
+   g_currentDay = todayDate;
+   
+   Print("【时区信息】服务器时间: ", TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
+   Print("【时区信息】东八区时间: ", TimeToString(chinaTime, TIME_DATE|TIME_SECONDS));
+   Print("【时区信息】当前日期: ", g_currentDay);
+}
+
+//+------------------------------------------------------------------+
+//| 获取东八区时间（中国时间）
+//+------------------------------------------------------------------+
+datetime GetChinaTime()
+{
+   // 调试输出（首次调用时）
+   static bool firstCall = true;
+   if(firstCall)
+   {
+      Print("=== 时区调试信息 ===");
+      Print("  服务器时间: ", TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
+      Print("  GMT标准时间: ", TimeToString(TimeGMT(), TIME_DATE|TIME_SECONDS));
+      Print("  目标时区: GMT+", InpTimezoneOffset);
+      
+      datetime calculatedTime = TimeGMT() + (InpTimezoneOffset * 3600);
+      Print("  计算的目标时区时间: ", TimeToString(calculatedTime, TIME_DATE|TIME_SECONDS));
+      Print("==================");
+      firstCall = false;
+   }
+   
+   // 最可靠的方法：直接使用GMT标准时间 + 时区偏移
+   // 不依赖TimeGMTOffset()（可能受夏令时等因素影响）
+   datetime targetTime = TimeGMT() + (InpTimezoneOffset * 3600);
+   
+   return targetTime;
 }
 
 //+------------------------------------------------------------------+
