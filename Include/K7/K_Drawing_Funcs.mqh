@@ -979,14 +979,12 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
     // 1. 计算点数 (Points)
     // 涨: 收盘 - 止损; 跌: 止损 - 收盘
     double diff = is_bullish ? (confirm_price - sl_price) : (sl_price - confirm_price);
-    int points = (int)(diff / Point); 
+    double tick_size = MarketInfo(Symbol(), MODE_TICKSIZE);
+    int points = (int)(diff / tick_size); 
 
     // 2. 计算标准手止损金额（美元）
-    // 公式: 止损金额 = 点数 × Point × 合约大小
-    double contract_size = MarketInfo(Symbol(), MODE_LOTSIZE); // 获取合约大小（标准手）
+    // 公式: 止损金额 = 点数 × 每点价值
     double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE);  // 获取每点价值
-    
-    // 止损金额 = 点数 × 每点价值
     double loss_amount = points * tick_value;
     
     // 四舍五入到整数美元
@@ -1001,11 +999,26 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
     string time_id = GetBarTimeID(target_index); // 使用锚点时间作为唯一标识
     string name = g_object_prefix + "SigTxt_" + (is_bullish ? "B_" : "S_") + time_id;
 
-    // 4. 确定绘制坐标
+    // 5. 确定绘制坐标
     datetime time = Time[signal_index]; // X轴：画在信号确认的那根K线上
-    double price = sl_price;            // Y轴：画在止损价格线上 (矩形的底/顶)
+    
+    // Y轴：在止损价格线附近，但需要偏移避免与价格线重叠
+    // 计算偏移量（约为字体高度的距离，使用 tick_size 的倍数）
+    double price_offset = tick_size * 5; // 向外偏移5个tick，避免文本与价格线重叠
+    double price;
+    
+    if (is_bullish)
+    {
+        // 看涨：矩形在上方，文字在下方 -> 价格向下偏移（减）
+        price = sl_price - price_offset;
+    }
+    else
+    {
+        // 看跌：矩形在下方，文字在上方 -> 价格向上偏移（加）
+        price = sl_price + price_offset;
+    }
 
-    // 5. 创建或更新对象
+    // 6. 创建或更新对象
     if (ObjectFind(0, name) != -1) ObjectDelete(0, name);
 
     if (ObjectCreate(0, name, OBJ_TEXT, 0, time, price))
@@ -1015,15 +1028,15 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
         ObjectSetString(0, name, OBJPROP_FONT, "Arial");
         ObjectSetInteger(0, name, OBJPROP_COLOR, is_bullish ? clrGreen : clrRed); // 涨绿跌红
         
-        // 6. 设置锚点 (关键：让字刚好在矩形外面)
+        // 7. 设置锚点 (关键：让字刚好在矩形外面)
         if (is_bullish)
         {
-            // 看涨矩形在上方，字画在底下 -> 文本的"Top"锚定在价格线上
+            // 看涨矩形在上方，字画在底下 -> 文本的"Top"锚定在偏移后的价格，文本向下延伸
             ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_TOP); 
         }
         else
         {
-            // 看跌矩形在下方，字画在顶上 -> 文本的"Bottom"锚定在价格线上
+            // 看跌矩形在下方，字画在顶上 -> 文本的"Top"锚定在偏移后的价格（已向上偏移），文本向下延伸
             ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_TOP);
         }
 
