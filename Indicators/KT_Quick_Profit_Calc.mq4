@@ -243,15 +243,20 @@ void UpdateCalculation(datetime end_time, double end_price, int x, int y)
    
    // 2. 计算数据
    double distance_price = MathAbs(end_price - Start_Price);
-   double points = distance_price / Point; // 距离点数
    
-   // 获取当前品种 1手跳动1个Point的价值 (这是核心，自动适配所有品种)
+   // 获取当前品种的最小价格变动 (TickSize)
+   double tick_size = MarketInfo(Symbol(), MODE_TICKSIZE);
+   if(tick_size <= 0) tick_size = Point; // 备用：如果获取失败，使用Point
+   
+   // 使用 TickSize 计算实际点数（而不是用 Point）
+   double points = distance_price / tick_size;
+   
+   // 获取当前品种 1手跳动1个TickSize的价值 (这是核心，自动适配所有品种)
    double tick_value = MarketInfo(Symbol(), MODE_TICKVALUE);
    if (tick_value <= 0)
    {
       // 备用方案：使用合约大小和最小变动来计算
       double contract_size = MarketInfo(Symbol(), MODE_LOTSIZE);      // 合约大小 (标准手)
-      double tick_size = MarketInfo(Symbol(), MODE_TICKSIZE);         // 最小价格变动
 
       if(contract_size > 0 && tick_size > 0)
       {
