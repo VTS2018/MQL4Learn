@@ -68,6 +68,7 @@ string btnName5 = "Btn_Deselect_All";
 string btnName6 = "Btn_Toggle_Mode";
 string btnName7 = "Btn_Toggle_Magnet";
 string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
+string btnName9 = "Btn_Pinbar_Mode"; // [新增] Pinbar标注按钮
 
 // [新增] 菜单折叠状态
 bool isMenuExpanded = false;  // false=折叠, true=展开
@@ -79,6 +80,7 @@ uint lastBtnClickTime = 0;
 bool isPermanentMode = true;   // false=临时模式(Draw_), true=保持模式(Keep_) [默认Keep模式]
 bool isMagneticMode = true;    // true=启用磁吸, false=禁用磁吸（直接使用点击价格）
 int stopOrderMode = 0;         // 0=关闭, 1=BUY stop, 2=SELL stop
+bool isPinbarMode = false;     // [新增] Pinbar标注模式
 
 // [新增] 清除全部按钮的确认状态
 bool cleanAllConfirmed = false;
@@ -105,6 +107,7 @@ int OnInit()
    CreateButton(btnName6, "Keep",      150, -1000, 80, 25, clrDarkGreen, BtnTxtColor); // 模式切换（默认Keep）
    CreateButton(btnName7, "Magnet",    150, -1000, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
    CreateButton(btnName8, "Normal",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Stop模式
+   CreateButton(btnName9, "Pinbar",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Pinbar标注
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -135,6 +138,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName6);
    ObjectDelete(0, btnName7);
    ObjectDelete(0, btnName8);  // 删除Stop模式按钮
+   ObjectDelete(0, btnName9);  // 删除Pinbar按钮
    // Comment("");
   }
 
@@ -176,6 +180,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName6, true, 200);  // KeyLevel
             SetButtonVisibility(btnName7, true, 230);  // Magnet
             SetButtonVisibility(btnName8, true, 260);  // Normal
+            SetButtonVisibility(btnName9, true, 290);  // Pinbar
          }
          else
          {
@@ -190,6 +195,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName6, false, 0);
             SetButtonVisibility(btnName7, false, 0);
             SetButtonVisibility(btnName8, false, 0);
+            SetButtonVisibility(btnName9, false, 0);
          }
          
          PlaySound("tick.wav");
@@ -360,6 +366,33 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PlaySound("tick.wav");
          ChartRedraw();
         }
+      
+      // [新增] 处理Pinbar模式按钮点击
+      if(sparam == btnName9)
+        {
+         ObjectSetInteger(0, btnName9, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         // 切换Pinbar模式
+         isPinbarMode = !isPinbarMode;
+         
+         if(isPinbarMode)
+         {
+            // 启用Pinbar模式
+            ObjectSetString(0, btnName9, OBJPROP_TEXT, "Pinbar [ON]");
+            ObjectSetInteger(0, btnName9, OBJPROP_BGCOLOR, clrDarkViolet);
+            //Alert(" Pinbar标注模式已开启\n点击K线将自动识别Pinbar并画0.5/0.618位");
+         }
+         else
+         {
+            // 关闭Pinbar模式
+            ObjectSetString(0, btnName9, OBJPROP_TEXT, "Pinbar");
+            ObjectSetInteger(0, btnName9, OBJPROP_BGCOLOR, clrGray);
+            //Alert(" Pinbar标注模式已关闭");
+         }
+         
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
      }
 
    // =================================================================
@@ -412,7 +445,165 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             }
             
             // -------------------------------------------------------------
-            // 执行画图
+            // [新增] Pinbar模式检测与处理
+            // -------------------------------------------------------------
+            if(isPinbarMode)
+            {
+               // 递进检测：先尝试严格标准，再尝试宽松标准
+               int pinbarType = IsPinbar(barIndex);
+               if(pinbarType == 0)  // 严格检测失败，尝试宽松检测
+               {
+                  pinbarType = IsPinbarV2(barIndex);
+               }
+               
+               if(pinbarType == 0)
+               {
+                  // 不是Pinbar，提示并退出
+                  Alert(" 这不是一个标准Pinbar！\n请选择具有明显长影线的K线");
+                  PlaySound("timeout.wav");
+                  // 重置状态
+                  drawingState = 0;
+                  ObjectSetInteger(0, btnName1, OBJPROP_STATE, false);
+                  ObjectSetInteger(0, btnName2, OBJPROP_STATE, false);
+                  ChartSetInteger(0, CHART_MOUSE_SCROLL, true);
+                  ChartRedraw();
+                  return;
+               }
+               
+               // 是Pinbar，计算0.5和0.618位置
+               double level50, level618;
+               string pinbarTypeStr;
+               color levelColor;
+               
+               if(pinbarType == 1)  // 看涨Pinbar（长下影线，从高到低回撤）
+               {
+                  double range = high - low;
+                  // 斐波0%=最高价, 100%=最低价
+                  level50  = high - range * 0.5;    // 50%回撤（在上方）
+                  level618 = high - range * 0.618;  // 61.8%回撤（在下方）
+                  pinbarTypeStr = "[Bull Pin]";
+                  levelColor = clrGreen;
+               }
+               else  // 看跌Pinbar (pinbarType == 2)（长上影线，从低到高回撤）
+               {
+                  double range = high - low;
+                  // 斐波0%=最低价, 100%=最高价
+                  level50  = low + range * 0.5;     // 50%回撤（在下方）
+                  level618 = low + range * 0.618;   // 61.8%回撤（在上方）
+                  pinbarTypeStr = "[Bear Pin]";
+                  levelColor = clrRed;
+               }
+               
+               // 画两条线（0.5和0.618）
+               string tfStr = GetPeriodName(Period());
+               string uniqueID = IntegerToString(GetTickCount());
+               string prefix = isPermanentMode ? "Keep_" : "Draw_";
+               
+               // 第一条线：0.5位
+               string objName50 = prefix + tfStr + "_Pin50_" + uniqueID;
+               // 第二条线：0.618位
+               string objName618 = prefix + tfStr + "_Pin618_" + uniqueID;
+               
+               // 应用周期可见性设置
+               int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
+               
+               if(drawingState == 1)  // 画水平线
+               {
+                  // 创建0.5线
+                  ObjectCreate(0, objName50, OBJ_HLINE, 0, 0, level50);
+                  ObjectSetInteger(0, objName50, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, objName50, OBJPROP_WIDTH, LineWidth);
+                  ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);  // 虚线
+                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
+                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
+                  
+                  // 创建0.618线
+                  ObjectCreate(0, objName618, OBJ_HLINE, 0, 0, level618);
+                  ObjectSetInteger(0, objName618, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
+                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
+                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
+               }
+               else if(drawingState == 2)  // 画射线
+               {
+                  datetime time1 = iTime(NULL, 0, barIndex);
+                  datetime currentTime = iTime(Symbol(), Period(), 0);
+                  
+                  // 创建0.5射线
+                  ObjectCreate(0, objName50, OBJ_TREND, 0, time1, level50, currentTime, level50);
+                  ObjectSetInteger(0, objName50, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, objName50, OBJPROP_WIDTH, LineWidth);
+                  ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);
+                  ObjectSetInteger(0, objName50, OBJPROP_RAY_RIGHT, false);
+                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
+                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
+                  
+                  // 创建0.618射线
+                  ObjectCreate(0, objName618, OBJ_TREND, 0, time1, level618, currentTime, level618);
+                  ObjectSetInteger(0, objName618, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
+                  ObjectSetInteger(0, objName618, OBJPROP_RAY_RIGHT, false);
+                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
+                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
+                  
+                  // 创建价格标签
+                  string labelPrefix = isPermanentMode ? "KeepLabel_" : "PriceLabel_";
+                  string priceLabel50 = labelPrefix + tfStr + "_Pin50_" + uniqueID;
+                  string priceLabel618 = labelPrefix + tfStr + "_Pin618_" + uniqueID;
+                  
+                  ObjectCreate(0, priceLabel50, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, level50);
+                  ObjectSetInteger(0, priceLabel50, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, priceLabel50, OBJPROP_WIDTH, 1);
+                  ObjectSetInteger(0, priceLabel50, OBJPROP_SELECTABLE, false);
+                  ObjectSetInteger(0, priceLabel50, OBJPROP_HIDDEN, true);
+                  RecordObjectPair(objName50, priceLabel50);
+                  
+                  ObjectCreate(0, priceLabel618, OBJ_ARROW_RIGHT_PRICE, 0, currentTime, level618);
+                  ObjectSetInteger(0, priceLabel618, OBJPROP_COLOR, levelColor);
+                  ObjectSetInteger(0, priceLabel618, OBJPROP_WIDTH, 1);
+                  ObjectSetInteger(0, priceLabel618, OBJPROP_SELECTABLE, false);
+                  ObjectSetInteger(0, priceLabel618, OBJPROP_HIDDEN, true);
+                  RecordObjectPair(objName618, priceLabel618);
+               }
+               /*
+               // 在Pinbar的尾部画标记（长影线端）
+               datetime time1 = iTime(NULL, 0, barIndex);
+               double markPrice = (pinbarType == 1) ? low : high;
+               
+               string markPrefix = isPermanentMode ? "KeepMark_" : "Mark_";
+               string markName = markPrefix + tfStr + "_PinMark_" + uniqueID;
+               
+               int arrowCode = (pinbarType == 1) ? 233 : 234;  // 233=向上箭头, 234=向下箭头
+               ObjectCreate(0, markName, OBJ_ARROW, 0, time1, markPrice);
+               ObjectSetInteger(0, markName, OBJPROP_ARROWCODE, arrowCode);
+               ObjectSetInteger(0, markName, OBJPROP_COLOR, levelColor);
+               ObjectSetInteger(0, markName, OBJPROP_WIDTH, 3);
+               ObjectSetInteger(0, markName, OBJPROP_SELECTABLE, false);
+               ObjectSetInteger(0, markName, OBJPROP_HIDDEN, true);
+               RecordObjectPair(objName50, markName);
+               */
+               PlaySound("ok.wav");
+               //Alert(" Pinbar识别成功！\n类型：", pinbarTypeStr, "\n已画0.5和0.618位");
+               
+               // 重置状态
+               isPinbarMode = false;  // 自动关闭Pinbar模式
+               ObjectSetString(0, btnName9, OBJPROP_TEXT, "Pinbar");
+               ObjectSetInteger(0, btnName9, OBJPROP_BGCOLOR, clrGray);
+               
+               drawingState = 0;
+               ObjectSetInteger(0, btnName1, OBJPROP_STATE, false);
+               ObjectSetInteger(0, btnName2, OBJPROP_STATE, false);
+               ChartSetInteger(0, CHART_MOUSE_SCROLL, true);
+               ChartRedraw();
+               return;  // 跳过常规画线逻辑
+            }
+            
+            // -------------------------------------------------------------
+            // 执行画图（常规模式）
             // -------------------------------------------------------------
             string tfStr = GetPeriodName(Period());
             // [修改] 生成唯一ID，用于关联线条和标记
@@ -1064,4 +1255,96 @@ void SetButtonVisibility(string btnName, bool visible, int yPos)
       // 隐藏按钮：移动到屏幕外
       ObjectSetInteger(0, btnName, OBJPROP_YDISTANCE, -1000);
    }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 判断K线是否为Pinbar，返回类型：0=不是, 1=看涨, 2=看跌
+//+------------------------------------------------------------------+
+int IsPinbar(int barIndex)
+{
+   double high  = iHigh(NULL, 0, barIndex);
+   double low   = iLow(NULL, 0, barIndex);
+   double open  = iOpen(NULL, 0, barIndex);
+   double close = iClose(NULL, 0, barIndex);
+   
+   // 计算K线各部分尺寸
+   double totalRange = high - low;
+   if(totalRange == 0) return 0;  // 防止除零
+   
+   double bodyHigh = MathMax(open, close);
+   double bodyLow  = MathMin(open, close);
+   double bodySize = bodyHigh - bodyLow;
+   
+   double upperWick = high - bodyHigh;  // 上影线
+   double lowerWick = bodyLow - low;    // 下影线
+   
+   // 计算比例
+   double bodyPercent = bodySize / totalRange * 100;
+   double upperWickPercent = upperWick / totalRange * 100;
+   double lowerWickPercent = lowerWick / totalRange * 100;
+   
+   // 判断看涨Pinbar（长下影线）
+   if(lowerWickPercent >= 60 &&          // 下影线至少60%
+      bodyPercent <= 30 &&                // 实体小于30%
+      upperWickPercent <= 20 &&           // 上影线小于20%
+      bodyLow >= low + totalRange * 0.7)  // 实体在上端
+   {
+      return 1;  // 看涨Pinbar
+   }
+   
+   // 判断看跌Pinbar（长上影线）
+   if(upperWickPercent >= 60 &&          // 上影线至少60%
+      bodyPercent <= 30 &&                // 实体小于30%
+      lowerWickPercent <= 20 &&           // 下影线小于20%
+      bodyHigh <= high - totalRange * 0.7) // 实体在下端
+   {
+      return 2;  // 看跌Pinbar
+   }
+   
+   return 0;  // 不是Pinbar
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 判断K线是否为Pinbar（宽松版本），返回类型：0=不是, 1=看涨, 2=看跌
+//+------------------------------------------------------------------+
+int IsPinbarV2(int barIndex)
+{
+   double high  = iHigh(NULL, 0, barIndex);
+   double low   = iLow(NULL, 0, barIndex);
+   double open  = iOpen(NULL, 0, barIndex);
+   double close = iClose(NULL, 0, barIndex);
+   
+   // 计算K线各部分尺寸
+   double totalRange = high - low;
+   if(totalRange == 0) return 0;  // 防止除零
+   
+   double bodyHigh = MathMax(open, close);
+   double bodyLow  = MathMin(open, close);
+   double bodySize = bodyHigh - bodyLow;
+   
+   double upperWick = high - bodyHigh;  // 上影线
+   double lowerWick = bodyLow - low;    // 下影线
+   
+   // 计算比例
+   double bodyPercent = bodySize / totalRange * 100;
+   double upperWickPercent = upperWick / totalRange * 100;
+   double lowerWickPercent = lowerWick / totalRange * 100;
+   
+   // 宽松标准：影线 > 2/3 (66.7%), 实体 < 1/3 (33.3%)
+   
+   // 判断看涨Pinbar（长下影线）
+   // 下影线超过整根K线的2/3，且实体小于1/3
+   if(lowerWickPercent > 60 && bodyPercent < 33.3)
+   {
+      return 1;  // 看涨Pinbar（宽松版）
+   }
+   
+   // 判断看跌Pinbar（长上影线）
+   // 上影线超过整根K线的2/3，且实体小于1/3
+   if(upperWickPercent > 60 && bodyPercent < 33.3)
+   {
+      return 2;  // 看跌Pinbar（宽松版）
+   }
+   
+   return 0;  // 不是Pinbar
 }
