@@ -76,7 +76,7 @@ bool isMenuExpanded = false;  // false=折叠, true=展开
 uint lastBtnClickTime = 0;
 
 // [新增] 绘图模式控制
-bool isPermanentMode = false;  // false=临时模式(Draw_), true=保持模式(Keep_)
+bool isPermanentMode = true;   // false=临时模式(Draw_), true=保持模式(Keep_) [默认Keep模式]
 bool isMagneticMode = true;    // true=启用磁吸, false=禁用磁吸（直接使用点击价格）
 int stopOrderMode = 0;         // 0=关闭, 1=BUY stop, 2=SELL stop
 
@@ -102,7 +102,7 @@ int OnInit()
    CreateButton(btnName1, "Line (H)",  150, -1000, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName2, "Ray (R)",   150, -1000, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
    CreateButton(btnName5, "Unselect",  150, -1000, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
-   CreateButton(btnName6, "KeyLevel",  150, -1000, 80, 25, clrGray,      BtnTxtColor); // 模式切换
+   CreateButton(btnName6, "Keep",      150, -1000, 80, 25, clrDarkGreen, BtnTxtColor); // 模式切换（默认Keep）
    CreateButton(btnName7, "Magnet",    150, -1000, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
    CreateButton(btnName8, "Normal",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Stop模式
 
