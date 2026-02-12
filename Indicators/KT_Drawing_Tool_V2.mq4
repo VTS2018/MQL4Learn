@@ -59,6 +59,7 @@ input color Color_MN1  = clrDarkViolet;   // MN1 Timeframe Color
 
 //--- 内部变量
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
+string btnName_MainMenu = "Btn_MainMenu";  // [新增] 主控菜单按钮
 string btnName1 = "Btn_Draw_HLine";
 string btnName2 = "Btn_Draw_Ray";
 string btnName3 = "Btn_Clean_Current";
@@ -67,6 +68,9 @@ string btnName5 = "Btn_Deselect_All";
 string btnName6 = "Btn_Toggle_Mode";
 string btnName7 = "Btn_Toggle_Magnet";
 string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
+
+// [新增] 菜单折叠状态
+bool isMenuExpanded = false;  // false=折叠, true=展开
 
 // [全局变量] 记录最后一次点击按钮的时间 (用于防误触)
 uint lastBtnClickTime = 0;
@@ -89,15 +93,18 @@ string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名
 //+------------------------------------------------------------------+
 int OnInit()
   {
-   // 创建UI按钮 (调整顺序：危险操作放最左，常用功能放右侧)
-   CreateButton(btnName4, "Clean All", 150, 20, 80, 25, clrMaroon,    BtnTxtColor); // 深红色警告
-   CreateButton(btnName3, "Clean",     240, 20, 80, 25, clrDarkOrange, BtnTxtColor); // 橙色提示
-   CreateButton(btnName1, "Line (H)",  330, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
-   CreateButton(btnName2, "Ray (R)",   420, 20, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
-   CreateButton(btnName5, "Unselect",  510, 20, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
-   CreateButton(btnName6, "KeyLevel",      600, 20, 80, 25, clrGray,      BtnTxtColor); // 模式切换
-   CreateButton(btnName7, "Magnet",    690, 20, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
-   CreateButton(btnName8, "Normal",    780, 20, 80, 25, clrGray,      BtnTxtColor); // Stop模式
+   // [新增] 创建主控菜单按钮 (折叠时仅显示此按钮)
+   CreateButton(btnName_MainMenu, "Menu", 150, 20, 80, 25, clrDodgerBlue, BtnTxtColor);
+   
+   // 创建UI按钮 (垂直排列，初始隐藏在屏幕外)
+   CreateButton(btnName4, "Clean All", 150, -1000, 80, 25, clrMaroon,    BtnTxtColor); // 深红色警告
+   CreateButton(btnName3, "Clean",     150, -1000, 80, 25, clrDarkOrange, BtnTxtColor); // 橙色提示
+   CreateButton(btnName1, "Line (H)",  150, -1000, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
+   CreateButton(btnName2, "Ray (R)",   150, -1000, 80, 25, BtnBgColor,    BtnTxtColor); // 灰色常规
+   CreateButton(btnName5, "Unselect",  150, -1000, 80, 25, clrDarkSlateGray, BtnTxtColor); // 深灰色辅助
+   CreateButton(btnName6, "KeyLevel",  150, -1000, 80, 25, clrGray,      BtnTxtColor); // 模式切换
+   CreateButton(btnName7, "Magnet",    150, -1000, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
+   CreateButton(btnName8, "Normal",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Stop模式
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -119,6 +126,7 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    EventKillTimer();  // 关闭定时器
+   ObjectDelete(0, btnName_MainMenu);  // [新增] 删除主控按钮
    ObjectDelete(0, btnName1);
    ObjectDelete(0, btnName2);
    ObjectDelete(0, btnName3);
@@ -147,6 +155,47 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
    // =================================================================
    if(id == CHARTEVENT_OBJECT_CLICK)
      {
+      // [新增] 处理主控菜单按钮点击
+      if(sparam == btnName_MainMenu)
+        {
+         ObjectSetInteger(0, btnName_MainMenu, OBJPROP_STATE, false); // 立即弹起按钮
+         
+         // 切换菜单展开状态
+         isMenuExpanded = !isMenuExpanded;
+         
+         if(isMenuExpanded)
+         {
+            // 展开菜单：显示所有功能按钮
+            ObjectSetString(0, btnName_MainMenu, OBJPROP_TEXT, "Menu [^]");
+            ObjectSetInteger(0, btnName_MainMenu, OBJPROP_BGCOLOR, clrDarkOrange);
+            SetButtonVisibility(btnName4, true, 50);   // Clean All
+            SetButtonVisibility(btnName3, true, 80);   // Clean
+            SetButtonVisibility(btnName1, true, 110);  // Line (H)
+            SetButtonVisibility(btnName2, true, 140);  // Ray (R)
+            SetButtonVisibility(btnName5, true, 170);  // Unselect
+            SetButtonVisibility(btnName6, true, 200);  // KeyLevel
+            SetButtonVisibility(btnName7, true, 230);  // Magnet
+            SetButtonVisibility(btnName8, true, 260);  // Normal
+         }
+         else
+         {
+            // 折叠菜单：隐藏所有功能按钮
+            ObjectSetString(0, btnName_MainMenu, OBJPROP_TEXT, "Menu");
+            ObjectSetInteger(0, btnName_MainMenu, OBJPROP_BGCOLOR, clrDodgerBlue);
+            SetButtonVisibility(btnName4, false, 0);
+            SetButtonVisibility(btnName3, false, 0);
+            SetButtonVisibility(btnName1, false, 0);
+            SetButtonVisibility(btnName2, false, 0);
+            SetButtonVisibility(btnName5, false, 0);
+            SetButtonVisibility(btnName6, false, 0);
+            SetButtonVisibility(btnName7, false, 0);
+            SetButtonVisibility(btnName8, false, 0);
+         }
+         
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
+      
       if(sparam == btnName1 || sparam == btnName2)
         {
          // [UI优化] 让按钮立刻“弹起”，取消按下的凹陷效果。修改以后一点按下去的效果都没了
@@ -998,4 +1047,21 @@ void DeselectAllLines()
    }
    
    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 辅助函数：显示/隐藏按钮
+//+------------------------------------------------------------------+
+void SetButtonVisibility(string btnName, bool visible, int yPos)
+{
+   if(visible)
+   {
+      // 显示按钮：恢复到指定的Y坐标位置
+      ObjectSetInteger(0, btnName, OBJPROP_YDISTANCE, yPos);
+   }
+   else
+   {
+      // 隐藏按钮：移动到屏幕外
+      ObjectSetInteger(0, btnName, OBJPROP_YDISTANCE, -1000);
+   }
 }
