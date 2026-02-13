@@ -473,7 +473,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                // 是Pinbar，计算0.5和0.618位置
                double level50, level618;
                string pinbarTypeStr;
-               color levelColor;
                
                if(pinbarType == 1)  // 看涨Pinbar（长下影线，从高到低回撤）
                {
@@ -482,7 +481,6 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   level50  = high - range * 0.5;    // 50%回撤（在上方）
                   level618 = high - range * 0.618;  // 61.8%回撤（在下方）
                   pinbarTypeStr = "[Bull Pin]";
-                  levelColor = clrGreen;
                }
                else  // 看跌Pinbar (pinbarType == 2)（长上影线，从低到高回撤）
                {
@@ -491,7 +489,21 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   level50  = low + range * 0.5;     // 50%回撤（在下方）
                   level618 = low + range * 0.618;   // 61.8%回撤（在上方）
                   pinbarTypeStr = "[Bear Pin]";
-                  levelColor = clrRed;
+               }
+               
+               // [新增] 自动匹配周期颜色（与常规模式保持一致）
+               color levelColor;
+               int p = Period();
+               
+               if      (p == PERIOD_H1)  levelColor = Color_H1;
+               else if (p == PERIOD_H4)  levelColor = Color_H4;
+               else if (p == PERIOD_D1)  levelColor = Color_D1;
+               else if (p == PERIOD_W1)  levelColor = Color_W1;
+               else if (p == PERIOD_MN1) levelColor = Color_MN1;
+               else
+               {
+                  // 如果不是特定周期，使用默认设置 (区分水平线和射线)
+                  levelColor = (drawingState == 1) ? ColorHLine : ColorRay;
                }
                
                // 画两条线（0.5和0.618）
@@ -938,6 +950,7 @@ void RebuildObjectPairs()
       {
          // 提取对象名称中的周期和uniqueID
          // 格式: "Draw_H1_1234567890" 或 "Keep_H1_1234567890"
+         // Pinbar格式: "Keep_H1_Pin50_1234567890" 或 "Keep_H1_Pin618_1234567890"
          string parts[];
          int count = StringSplit(objName, '_', parts);
          
@@ -945,21 +958,43 @@ void RebuildObjectPairs()
          {
             string prefix = parts[0];   // "Draw" 或 "Keep"
             string tfStr = parts[1];    // "H1"
-            string uniqueID = parts[2]; // "1234567890"
             
             // 根据前缀确定关联对象的名称格式
             string markPrefix = (prefix == "Draw") ? "Mark_" : "KeepMark_";
             string labelPrefix = (prefix == "Draw") ? "PriceLabel_" : "KeepLabel_";
             
+            // [修复] 检查是否为Pinbar对象（4段式命名）
+            bool isPinbarObj = (count >= 4 && (parts[2] == "Pin50" || parts[2] == "Pin618"));
+            
+            string markName, priceLabelName;
+            
+            if(isPinbarObj)
+            {
+               // Pinbar对象：Keep_H1_Pin50_12345
+               // 构建标签名：KeepLabel_H1_Pin50_12345
+               string pinType = parts[2];  // "Pin50" 或 "Pin618"
+               string uniqueID = parts[3]; // "12345"
+               
+               markName = markPrefix + tfStr + "_" + pinType + "_" + uniqueID;
+               priceLabelName = labelPrefix + tfStr + "_" + pinType + "_" + uniqueID;
+            }
+            else
+            {
+               // 普通对象：Keep_H1_12345
+               // 构建标签名：KeepLabel_H1_12345
+               string uniqueID = parts[2]; // "12345"
+               
+               markName = markPrefix + tfStr + "_" + uniqueID;
+               priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
+            }
+            
             // 查找对应的标记对象
-            string markName = markPrefix + tfStr + "_" + uniqueID;
             if(ObjectFind(0, markName) >= 0)
             {
                RecordObjectPair(objName, markName);
             }
             
             // 查找对应的价格标签对象（如果是射线）
-            string priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
             if(ObjectFind(0, priceLabelName) >= 0)
             {
                RecordObjectPair(objName, priceLabelName);
@@ -1028,11 +1063,28 @@ void UpdateRayEndpoints()
          {
             string prefix = parts[0];   // "Draw" 或 "Keep"
             string tfStr = parts[1];
-            string uniqueID = parts[2];
             
             // 根据前缀确定价格标签名称
             string labelPrefix = (prefix == "Draw") ? "PriceLabel_" : "KeepLabel_";
-            string priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
+            
+            // [修复] 检查是否为Pinbar对象（4段式命名）
+            bool isPinbarObj = (count >= 4 && (parts[2] == "Pin50" || parts[2] == "Pin618"));
+            
+            string priceLabelName;
+            
+            if(isPinbarObj)
+            {
+               // Pinbar对象：Keep_H1_Pin50_12345 → KeepLabel_H1_Pin50_12345
+               string pinType = parts[2];  // "Pin50" 或 "Pin618"
+               string uniqueID = parts[3]; // "12345"
+               priceLabelName = labelPrefix + tfStr + "_" + pinType + "_" + uniqueID;
+            }
+            else
+            {
+               // 普通对象：Keep_H1_12345 → KeepLabel_H1_12345
+               string uniqueID = parts[2]; // "12345"
+               priceLabelName = labelPrefix + tfStr + "_" + uniqueID;
+            }
             
             if(ObjectFind(0, priceLabelName) >= 0)
             {
