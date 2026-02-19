@@ -69,6 +69,7 @@ string btnName6 = "Btn_Toggle_Mode";
 string btnName7 = "Btn_Toggle_Magnet";
 string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
 string btnName9 = "Btn_Pinbar_Mode"; // [新增] Pinbar标注按钮
+string btnName10 = "Btn_Force_Clear"; // [新增] 强制清除按钮
 
 // [新增] 菜单折叠状态
 bool isMenuExpanded = false;  // false=折叠, true=展开
@@ -108,6 +109,7 @@ int OnInit()
    CreateButton(btnName7, "Magnet",    150, -1000, 80, 25, clrGreen,     BtnTxtColor); // 磁吸切换
    CreateButton(btnName8, "Normal",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Stop模式
    CreateButton(btnName9, "Pinbar",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Pinbar标注
+   CreateButton(btnName10, "Force Clear", 150, -1000, 80, 25, clrCrimson, BtnTxtColor); // 强制清除
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -139,6 +141,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName7);
    ObjectDelete(0, btnName8);  // 删除Stop模式按钮
    ObjectDelete(0, btnName9);  // 删除Pinbar按钮
+   ObjectDelete(0, btnName10); // 删除强制清除按钮
    // Comment("");
   }
 
@@ -181,6 +184,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName7, true, 230);  // Magnet
             SetButtonVisibility(btnName8, true, 260);  // Normal
             SetButtonVisibility(btnName9, true, 290);  // Pinbar
+            SetButtonVisibility(btnName10, true, 320); // Force Clear
          }
          else
          {
@@ -196,6 +200,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName7, false, 0);
             SetButtonVisibility(btnName8, false, 0);
             SetButtonVisibility(btnName9, false, 0);
+            SetButtonVisibility(btnName10, false, 0);
          }
          
          PlaySound("tick.wav");
@@ -391,6 +396,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          }
          
          PlaySound("tick.wav");
+         ChartRedraw();
+        }
+      
+      // [新增] 处理强制清除按钮点击
+      if(sparam == btnName10)
+        {
+         ObjectSetInteger(0, btnName10, OBJPROP_STATE, false); // 立即弹起按钮
+         ForceCleanAllObjects(); // 强制清除所有对象
+         PlaySound("ok.wav");
          ChartRedraw();
         }
      }
@@ -1399,4 +1413,28 @@ int IsPinbarV2(int barIndex)
    }
    
    return 0;  // 不是Pinbar
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 强制清除主图表所有绘图对象（无需确认）
+//+------------------------------------------------------------------+
+void ForceCleanAllObjects()
+{
+   // 删除主图表上所有绘图对象
+   // chart_id = 0 (当前图表)
+   // sub_window = -1 (所有窗口)
+   // type = -1 (所有类型对象)
+   int total_deleted = ObjectsDeleteAll(0, -1, -1);
+   
+   // 清空关联数组
+   ArrayResize(g_drawnObjects, 0);
+   
+   // 强制刷新图表
+   ChartRedraw(0);
+   
+   // 打印日志
+   if(total_deleted > 0)
+      Print("[强制清除] 成功删除 ", total_deleted, " 个绘图对象（包含所有类型）");
+   else
+      Print("[强制清除] 图表上没有可删除的对象");
 }
