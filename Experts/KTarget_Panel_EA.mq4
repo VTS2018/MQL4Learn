@@ -98,6 +98,13 @@ bool COrdersPanel::CreateControls(void)
 //--- COrdersPanel 刷新订单数据
 void COrdersPanel::RefreshOrders(void)
 {
+   // 判断是否为贵金属（显示价格差）或外汇（显示pips）
+   bool isMetals = (StringFind(_Symbol, "XAU") >= 0 || StringFind(_Symbol, "XAG") >= 0 ||
+                    StringFind(_Symbol, "GOLD") >= 0 || StringFind(_Symbol, "SILVER") >= 0);
+   
+   // 根据报价位数动态计算 pip 单位（支持4位和5位报价）
+   double pointsPerPip = (_Digits == 5 || _Digits == 3) ? 10.0 : 1.0;
+   
    int      serverGMT = (int)((TimeCurrent() - TimeGMT()) / 3600);
    int      bjOffset  = (8 - serverGMT) * 3600;
    datetime bjNow     = (datetime)(TimeCurrent() + bjOffset);
@@ -127,7 +134,7 @@ void COrdersPanel::RefreshOrders(void)
       double   diff   = (OrderType() == OP_BUY) ?
                            exitPx - OrderOpenPrice() :
                            OrderOpenPrice() - exitPx;
-      double   pts    = diff / (_Point * 10.0);  // pips
+      double   pts    = isMetals ? diff : diff / (_Point * pointsPerPip);  // 贵金属显示价格差，外汇显示pips
       int      dSec   = (int)(TimeCurrent() - OrderOpenTime());
       string   durStr;
       if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
@@ -160,7 +167,7 @@ void COrdersPanel::RefreshOrders(void)
       double   diff   = (OrderType() == OP_BUY) ?
                            OrderClosePrice() - OrderOpenPrice() :
                            OrderOpenPrice() - OrderClosePrice();
-      double   pts    = diff / (_Point * 10.0);  // pips
+      double   pts    = isMetals ? diff : diff / (_Point * pointsPerPip);  // 贵金属显示价格差，外汇显示pips
       int      dSec   = (int)(OrderCloseTime() - OrderOpenTime());
       string   durStr;
       if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
