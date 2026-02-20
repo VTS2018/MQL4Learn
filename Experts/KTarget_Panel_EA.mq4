@@ -77,7 +77,7 @@ bool COrdersPanel::CreateControls(void)
       return(false);
    m_lblHdr.Font("Courier New");
    m_lblHdr.FontSize(8);
-   m_lblHdr.Text(" 时间    T Lots Open      SL        Exit      P/L     Pips  Dur");
+   m_lblHdr.Text(" 时间    T Lots Open     SL       Exit     P/L    Pips  Dur   ");
    if(!Add(m_lblHdr)) return(false);
 
    // 数据行：仅创建本次实际需要的行数（m_maxRows），每行 17px
@@ -130,18 +130,18 @@ void COrdersPanel::RefreshOrders(void)
       double   pts    = diff / (_Point * 10.0);  // pips
       int      dSec   = (int)(TimeCurrent() - OrderOpenTime());
       string   durStr;
-      if(dSec < 60)              durStr = IntegerToString(dSec) + "s";
-      else if(dSec < 3600)       durStr = StringFormat("%dm%02ds",     dSec/60,   dSec%60);
+      if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
+      else if(dSec < 3600)       durStr = StringFormat("%dm%02d", dSec/60, dSec%60) + "s";
       else                       durStr = StringFormat("%dh%02dm",     dSec/3600, (dSec%3600)/60);
       string   slStr  = (OrderStopLoss() > 0) ?
                            DoubleToString(OrderStopLoss(), _Digits) : "---";
 
-      rowTexts[count++] = StringFormat("*%s %s %4.2f %-10s%-10s%-10s%+8.2f %+7.1f %s",
+      rowTexts[count++] = StringFormat("*%s %s %4.2f %-9s%-9s%-9s%+7.2f %+6.1f ",
          tStr, typ, OrderLots(),
          DoubleToString(OrderOpenPrice(), _Digits),
          slStr,
          DoubleToString(exitPx, _Digits),
-         prof, pts, durStr);
+         prof, pts) + durStr;
    }
 
    // --- 2. 历史订单（今日北京时间内已关闭）---
@@ -163,18 +163,18 @@ void COrdersPanel::RefreshOrders(void)
       double   pts    = diff / (_Point * 10.0);  // pips
       int      dSec   = (int)(OrderCloseTime() - OrderOpenTime());
       string   durStr;
-      if(dSec < 60)              durStr = IntegerToString(dSec) + "s";
-      else if(dSec < 3600)       durStr = StringFormat("%dm%02ds",     dSec/60,   dSec%60);
+      if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
+      else if(dSec < 3600)       durStr = StringFormat("%dm%02d", dSec/60, dSec%60) + "s";
       else                       durStr = StringFormat("%dh%02dm",     dSec/3600, (dSec%3600)/60);
       string   slStr  = (OrderStopLoss() > 0) ?
                            DoubleToString(OrderStopLoss(), _Digits) : "---";
 
-      rowTexts[count++] = StringFormat(" %s %s %4.2f %-10s%-10s%-10s%+8.2f %+7.1f %s",
+      rowTexts[count++] = StringFormat(" %s %s %4.2f %-9s%-9s%-9s%+7.2f %+6.1f ",
          tStr, typ, OrderLots(),
          DoubleToString(OrderOpenPrice(), _Digits),
          slStr,
          DoubleToString(OrderClosePrice(), _Digits),
-         prof, pts, durStr);
+         prof, pts) + durStr;
    }
 
    // 更新所有行标签
@@ -1313,7 +1313,7 @@ bool         g_ordersCreated      = false;  // 是否已创建过（Create 只�
 int OnInit()
 {
    // 创建面板
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+692))
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+432))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
@@ -1376,6 +1376,7 @@ void OnChartEvent(const int id,
    // sparam!="0"的鼠标移动（拖拽面板）正常传递
    g_tradePanel.ChartEvent(id,lparam,dparam,sparam);
    */
+
    // 将事件传递给面板处理
    g_tradePanel.ChartEvent(id,lparam,dparam,sparam);
    if(g_ordersCreated && g_ordersPanelVisible)
