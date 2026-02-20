@@ -70,6 +70,7 @@ string btnName7 = "Btn_Toggle_Magnet";
 string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
 string btnName9 = "Btn_Pinbar_Mode"; // [新增] Pinbar标注按钮
 string btnName10 = "Btn_Force_Clear"; // [新增] 强制清除按钮
+string btnName11 = "Btn_Lock_Lines";  // [新增] 锁定线条按钮
 
 // [新增] 菜单折叠状态
 bool isMenuExpanded = false;  // false=折叠, true=展开
@@ -82,6 +83,7 @@ bool isPermanentMode = true;   // false=临时模式(Draw_), true=保持模式(K
 bool isMagneticMode = true;    // true=启用磁吸, false=禁用磁吸（直接使用点击价格）
 int stopOrderMode = 0;         // 0=关闭, 1=BUY stop, 2=SELL stop
 bool isPinbarMode = false;     // [新增] Pinbar标注模式
+bool isLinesLocked = false;    // [新增] 线条锁定状态: false=解锁（可选择）, true=锁定（不可选择）
 
 // [新增] 清除全部按钮的确认状态
 bool cleanAllConfirmed = false;
@@ -110,6 +112,7 @@ int OnInit()
    CreateButton(btnName8, "Normal",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Stop模式
    CreateButton(btnName9, "Pinbar",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Pinbar标注
    CreateButton(btnName10, "Force Clear", 150, -1000, 80, 25, clrCrimson, BtnTxtColor); // 强制清除
+   CreateButton(btnName11, "Unlock",     150, -1000, 80, 25, clrGray,    BtnTxtColor); // 锁定/解锁线条
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -142,6 +145,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName8);  // 删除Stop模式按钮
    ObjectDelete(0, btnName9);  // 删除Pinbar按钮
    ObjectDelete(0, btnName10); // 删除强制清除按钮
+   ObjectDelete(0, btnName11); // 删除锁定线条按钮
    // Comment("");
   }
 
@@ -185,6 +189,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName8, true, 260);  // Normal
             SetButtonVisibility(btnName9, true, 290);  // Pinbar
             SetButtonVisibility(btnName10, true, 320); // Force Clear
+            SetButtonVisibility(btnName11, true, 350); // Lock/Unlock
          }
          else
          {
@@ -201,6 +206,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName8, false, 0);
             SetButtonVisibility(btnName9, false, 0);
             SetButtonVisibility(btnName10, false, 0);
+            SetButtonVisibility(btnName11, false, 0);
          }
          
          PlaySound("tick.wav");
@@ -407,6 +413,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          PlaySound("ok.wav");
          ChartRedraw();
         }
+      
+      // [新增] 处理锁定/解锁按钮点击
+      if(sparam == btnName11)
+        {
+         ObjectSetInteger(0, btnName11, OBJPROP_STATE, false); // 立即弹起按钮
+         ToggleLinesLock(); // 切换锁定状态
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
      }
 
    // =================================================================
@@ -541,7 +556,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName50, OBJPROP_WIDTH, LineWidth);
                   ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);  // 虚线
                   ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
-                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
                   // 创建0.618线
@@ -549,7 +564,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName618, OBJPROP_COLOR, levelColor);
                   ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
                   ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
-                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
                }
                else if(drawingState == 2)  // 画射线
@@ -564,7 +579,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);
                   ObjectSetInteger(0, objName50, OBJPROP_RAY_RIGHT, false);
                   ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
-                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
                   // 创建0.618射线
@@ -573,7 +588,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
                   ObjectSetInteger(0, objName618, OBJPROP_RAY_RIGHT, false);
                   ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
-                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, true);
+                  ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
                   // 创建价格标签
@@ -659,7 +674,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectCreate(0, objName, OBJ_HLINE, 0, 0, finalPrice);
                ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
-               ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
+               ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, !isLinesLocked);
                
                // [新增] 应用周期可见性设置
                int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
@@ -700,7 +715,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                ObjectSetInteger(0, objName, OBJPROP_COLOR, finalColor);
                ObjectSetInteger(0, objName, OBJPROP_WIDTH, LineWidth);
                ObjectSetInteger(0, objName, OBJPROP_RAY_RIGHT, false);
-               ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, true);
+               ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, !isLinesLocked);
                
                // [新增] 应用周期可见性设置
                int visibilityFlags = CalculateVisibilityFlags(Period(), VisibilityMode);
@@ -1303,6 +1318,58 @@ void DeselectAllLines()
       Print("没有处于选中状态的对象");
    }
    
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 切换线条锁定状态（防止误操作）
+//+------------------------------------------------------------------+
+void ToggleLinesLock()
+{
+   // 切换锁定状态
+   isLinesLocked = !isLinesLocked;
+   
+   // 遍历所有对象
+   int total = ObjectsTotal(0, 0, -1);
+   int affectedCount = 0;
+   
+   for(int i = 0; i < total; i++)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是工具创建的线条对象
+      bool isDrawObject = (StringFind(objName, "Draw_") == 0);
+      bool isKeepObject = (StringFind(objName, "Keep_") == 0);
+      
+      if(isDrawObject || isKeepObject)
+      {
+         int objType = (int)ObjectGetInteger(0, objName, OBJPROP_TYPE);
+         
+         // 只处理水平线和射线（不包括辅助标记）
+         if(objType == OBJ_HLINE || objType == OBJ_TREND)
+         {
+            // 设置可选状态（锁定时=false，解锁时=true）
+            ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, !isLinesLocked);
+            affectedCount++;
+         }
+      }
+   }
+   
+   // 更新按钮样式和提示
+   if(isLinesLocked)
+   {
+      ObjectSetString(0, btnName11, OBJPROP_TEXT, "Locked");
+      ObjectSetInteger(0, btnName11, OBJPROP_BGCOLOR, clrGoldenrod);
+      //Alert(" 线条已锁定\n所有射线和水平线无法选择，防止误操作");
+   }
+   else
+   {
+      ObjectSetString(0, btnName11, OBJPROP_TEXT, "Unlock");
+      ObjectSetInteger(0, btnName11, OBJPROP_BGCOLOR, clrGray);
+      //Alert(" 线条已解锁\n可以正常选择和移动线条");
+   }
+   
+   Print("锁定状态切换: ", (isLinesLocked ? "已锁定" : "已解锁"), ", 影响 ", affectedCount, " 个对象");
    ChartRedraw();
 }
 
