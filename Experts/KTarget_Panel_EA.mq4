@@ -17,7 +17,7 @@
 //| 面板参数                                                          |
 //+------------------------------------------------------------------+
 input int    PanelX = 250;            // 面板X坐标
-input int    PanelY = 50;            // 面板Y坐标
+input int    PanelY = 20;            // 面板Y坐标
 input color  PanelColor = clrWhite;  // 面板背景色
 input color  BorderColor = clrNavy;  // 边框颜色
 
@@ -54,7 +54,7 @@ bool COrdersPanel::Create(const long chart, const string name, const int subwin,
 {
    if(!CAppDialog::Create(chart, name, subwin, x1, y1, x2, y2))
       return(false);
-   Caption("今日订单记录");
+   Caption("Daily Orders");
    if(!CreateControls())
       return(false);
    return(true);
@@ -351,7 +351,7 @@ bool CTradePanel::Create(const long chart,const string name,const int subwin,con
       return(false);
       
    // 设置面板标题
-   Caption("交易控制面板");
+   Caption("K-Trade");
       
    // 创建控件
    if(!CreateControls())
