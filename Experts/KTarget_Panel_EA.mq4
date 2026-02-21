@@ -98,9 +98,14 @@ bool COrdersPanel::CreateControls(void)
 //--- COrdersPanel 刷新订单数据
 void COrdersPanel::RefreshOrders(void)
 {
-   // 判断是否为贵金属（显示价格差）或外汇（显示pips）
+   // 判断品种类型
    bool isMetals = (StringFind(_Symbol, "XAU") >= 0 || StringFind(_Symbol, "XAG") >= 0 ||
                     StringFind(_Symbol, "GOLD") >= 0 || StringFind(_Symbol, "SILVER") >= 0);
+   
+   bool isCrypto = (StringFind(_Symbol, "BTC") >= 0 || StringFind(_Symbol, "ETH") >= 0 ||
+                    StringFind(_Symbol, "LTC") >= 0 || StringFind(_Symbol, "XRP") >= 0 ||
+                    StringFind(_Symbol, "BCH") >= 0 || StringFind(_Symbol, "ADA") >= 0 ||
+                    StringFind(_Symbol, "DOT") >= 0 || StringFind(_Symbol, "DOGE") >= 0);
    
    // 根据报价位数动态计算 pip 单位（支持4位和5位报价）
    double pointsPerPip = (_Digits == 5 || _Digits == 3) ? 10.0 : 1.0;
@@ -134,7 +139,7 @@ void COrdersPanel::RefreshOrders(void)
       double   diff   = (OrderType() == OP_BUY) ?
                            exitPx - OrderOpenPrice() :
                            OrderOpenPrice() - exitPx;
-      double   pts    = isMetals ? diff : diff / (_Point * pointsPerPip);  // 贵金属显示价格差，外汇显示pips
+      double   pts    = (isMetals || isCrypto) ? diff : diff / (_Point * pointsPerPip);  // 贵金属/加密货币显示价格差，外汇显示pips
       int      dSec   = (int)(TimeCurrent() - OrderOpenTime());
       string   durStr;
       if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
@@ -167,7 +172,7 @@ void COrdersPanel::RefreshOrders(void)
       double   diff   = (OrderType() == OP_BUY) ?
                            OrderClosePrice() - OrderOpenPrice() :
                            OrderOpenPrice() - OrderClosePrice();
-      double   pts    = isMetals ? diff : diff / (_Point * pointsPerPip);  // 贵金属显示价格差，外汇显示pips
+      double   pts    = (isMetals || isCrypto) ? diff : diff / (_Point * pointsPerPip);  // 贵金属/加密货币显示价格差，外汇显示pips
       int      dSec   = (int)(OrderCloseTime() - OrderOpenTime());
       string   durStr;
       if(dSec < 60)              durStr = StringFormat("%d", dSec) + "s";
@@ -198,6 +203,15 @@ void COrdersPanel::RefreshOrders(void)
 class CTradePanel : public CAppDialog
 {
 private:
+   // === 信息显示容器（模块1之前） ===
+   CEdit            m_edtDailyProfit;      // 今日盈亏容器
+   CButton          m_btnToggleProfit;     // 盈亏容器显示/隐藏按钮
+   bool             m_showProfit;          // 盈亏容器显示状态
+   
+   CEdit            m_edtPositions;        // 持仓价格容器
+   CButton          m_btnTogglePositions;  // 持仓容器显示/隐藏按钮
+   bool             m_showPositions;       // 持仓容器显示状态
+   
    // 模块1: 开仓交易模块控件
    CLabel           m_lblStopLoss;    // 止损标签
    CEdit            m_edtStopLoss;    // 止损输入框
@@ -255,6 +269,7 @@ public:
                    ~CTradePanel();
    virtual bool     Create(const long chart,const string name,const int subwin,const int x1,const int y1,const int x2,const int y2);
    virtual bool     OnEvent(const int id,const long &lparam,const double &dparam,const string &sparam);
+   void             UpdateInfoContainers(void);  // 更新信息容器
    
 protected:
    bool             CreateControls(void);
@@ -279,6 +294,10 @@ protected:
    void             OnClickCloseSymbol(void);
    void             OnClickBreakEven(void);
    void             OnClickViewOrders(void);
+   void             OnClickToggleProfit(void);        // 切换盈亏容器显示
+   void             OnClickTogglePositions(void);     // 切换持仓容器显示
+   double           CalculateDailyProfit(void);       // 计算今日盈亏
+   string           GetCurrentPositions(void);        // 获取当前持仓价格
 };
 
 //+------------------------------------------------------------------+
@@ -324,6 +343,58 @@ bool CTradePanel::CreateControls(void)
    int btnHeight = 25;
    int inputHeight = 22;
    int spacing = 10;
+   
+   //=== 信息容器区域 ===
+   int infoY = y;
+   int btnW = 50;                          // 按钮宽度
+   int gap = 5;                            // 间距
+   int editW = width - btnW - gap;         // 容器宽度
+   int containerH = 35;                    // 容器高度
+   
+   // --- 容器1: 今日盈亏 ---
+   if(!m_edtDailyProfit.Create(m_chart_id, m_name+"DailyProfit", m_subwin,
+                                x, infoY, x+editW, infoY+containerH))
+      return(false);
+   m_edtDailyProfit.Text("[ 已隐藏 ]");
+   m_edtDailyProfit.ReadOnly(true);
+   m_edtDailyProfit.ColorBackground(clrLightGray);
+   m_edtDailyProfit.ColorBorder(clrGray);
+   if(!Add(m_edtDailyProfit)) return(false);
+   
+   // 按钮1（右侧）
+   if(!m_btnToggleProfit.Create(m_chart_id, m_name+"BtnToggleProfit", m_subwin,
+                                 x+editW+gap, infoY, x+width, infoY+containerH))
+      return(false);
+   m_btnToggleProfit.Text("显示");
+   m_btnToggleProfit.ColorBackground(clrLightGray);
+   if(!Add(m_btnToggleProfit)) return(false);
+   
+   m_showProfit = false;  // 初始状态：隐藏
+   
+   // --- 容器2: 持仓价格 ---
+   infoY += containerH + 5;  // 向下移动
+   
+   if(!m_edtPositions.Create(m_chart_id, m_name+"Positions", m_subwin,
+                              x, infoY, x+editW, infoY+containerH))
+      return(false);
+   m_edtPositions.Text("持仓: 加载中...");
+   m_edtPositions.ReadOnly(true);
+   m_edtPositions.ColorBackground(clrAliceBlue);
+   m_edtPositions.ColorBorder(clrDodgerBlue);
+   if(!Add(m_edtPositions)) return(false);
+   
+   // 按钮2（右侧）
+   if(!m_btnTogglePositions.Create(m_chart_id, m_name+"BtnTogglePos", m_subwin,
+                                    x+editW+gap, infoY, x+width, infoY+containerH))
+      return(false);
+   m_btnTogglePositions.Text("隐藏");
+   m_btnTogglePositions.ColorBackground(clrLightGray);
+   if(!Add(m_btnTogglePositions)) return(false);
+   
+   m_showPositions = true;  // 初始状态：显示
+   
+   // === 模块1起始位置向下移动 ===
+   y = infoY + containerH + 15;
    
    //--- 模块1: 开仓交易模块 (三列横排: 止损 | 手数 | 止盈) ---
 
@@ -718,6 +789,10 @@ bool CTradePanel::OnEvent(const int id,const long &lparam,const double &dparam,c
       if(sparam == m_name+"BtnBreakEven")     { OnClickBreakEven();     return(true); }
       // 查看今日订单记录
       if(sparam == m_name+"BtnViewOrders")    { OnClickViewOrders();    return(true); }
+      // 切换盈亏容器显示
+      if(sparam == m_name+"BtnToggleProfit")  { OnClickToggleProfit();  return(true); }
+      // 切换持仓容器显示
+      if(sparam == m_name+"BtnTogglePos")     { OnClickTogglePositions(); return(true); }
    }
    
    return(CAppDialog::OnEvent(id,lparam,dparam,sparam));
@@ -1262,6 +1337,182 @@ void CTradePanel::OnClickViewOrders(void)
 }
 
 //+------------------------------------------------------------------+
+//| 切换盈亏容器显示                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickToggleProfit(void)
+{
+   m_showProfit = !m_showProfit;
+   
+   if(m_showProfit)
+   {
+      UpdateInfoContainers();              // 重新加载数据
+      m_btnToggleProfit.Text("隐藏");
+   }
+   else
+   {
+      m_edtDailyProfit.Text("[ 已隐藏 ]");
+      m_edtDailyProfit.ColorBackground(clrLightGray);
+      m_edtDailyProfit.ColorBorder(clrGray);
+      m_btnToggleProfit.Text("显示");
+   }
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 切换持仓容器显示                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickTogglePositions(void)
+{
+   m_showPositions = !m_showPositions;
+   
+   if(m_showPositions)
+   {
+      UpdateInfoContainers();              // 重新加载数据
+      m_btnTogglePositions.Text("隐藏");
+   }
+   else
+   {
+      m_edtPositions.Text("[ 已隐藏 ]");
+      m_edtPositions.ColorBackground(clrLightGray);
+      m_edtPositions.ColorBorder(clrGray);
+      m_btnTogglePositions.Text("显示");
+   }
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 更新信息容器                                                      |
+//+------------------------------------------------------------------+
+void CTradePanel::UpdateInfoContainers(void)
+{
+   // 更新盈亏容器
+   if(m_showProfit)
+   {
+      double dailyProfit = CalculateDailyProfit();
+      double balance = AccountBalance();
+      double profitPercent = (balance > 0) ? (dailyProfit / balance * 100) : 0;
+      
+      string profitText = StringFormat("今日盈亏: %s¥%.2f (%s%.2f%%)",
+         dailyProfit >= 0 ? "+" : "",
+         dailyProfit,
+         profitPercent >= 0 ? "+" : "",
+         profitPercent);
+      m_edtDailyProfit.Text(profitText);
+      
+      // 动态变色
+      if(dailyProfit >= 0)
+      {
+         m_edtDailyProfit.ColorBackground(clrHoneydew);
+         m_edtDailyProfit.ColorBorder(clrGreen);
+      }
+      else
+      {
+         m_edtDailyProfit.ColorBackground(clrMistyRose);
+         m_edtDailyProfit.ColorBorder(clrRed);
+      }
+   }
+   
+   // 更新持仓容器
+   if(m_showPositions)
+   {
+      string posText = GetCurrentPositions();
+      m_edtPositions.Text(posText);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 计算今日盈亏                                                      |
+//+------------------------------------------------------------------+
+double CTradePanel::CalculateDailyProfit(void)
+{
+   // 计算今日北京时间起始点
+   int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600);
+   int      bjOffset   = (8 - serverGMT) * 3600;
+   datetime bjNow      = (datetime)(TimeCurrent() + bjOffset);
+   datetime bjToday0   = bjNow - (bjNow % 86400);
+   datetime svrToday0  = (datetime)(bjToday0 - bjOffset);
+   
+   double totalProfit = 0;
+   
+   // 统计当前持仓（今日开仓的）
+   for(int i = 0; i < OrdersTotal(); i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != _Symbol) continue;
+      if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
+      if(OrderOpenTime() >= svrToday0)  // 今日开仓
+      {
+         totalProfit += OrderProfit() + OrderSwap() + OrderCommission();
+      }
+   }
+   
+   // 统计今日已平仓订单
+   for(int i = OrdersHistoryTotal()-1; i >= 0; i--)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_HISTORY)) continue;
+      if(OrderSymbol() != _Symbol) continue;
+      if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
+      if(OrderCloseTime() >= svrToday0)  // 今日平仓
+      {
+         totalProfit += OrderProfit() + OrderSwap() + OrderCommission();
+      }
+   }
+   
+   return totalProfit;
+}
+
+//+------------------------------------------------------------------+
+//| 获取当前持仓价格                                                  |
+//+------------------------------------------------------------------+
+string CTradePanel::GetCurrentPositions(void)
+{
+   string buyPrices = "";
+   string sellPrices = "";
+   int buyCount = 0;
+   int sellCount = 0;
+   
+   // 遍历当前持仓
+   for(int i = 0; i < OrdersTotal(); i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != _Symbol) continue;
+      
+      if(OrderType() == OP_BUY)
+      {
+         if(buyCount > 0) buyPrices += ", ";
+         buyPrices += DoubleToString(OrderOpenPrice(), _Digits);
+         buyCount++;
+      }
+      else if(OrderType() == OP_SELL)
+      {
+         if(sellCount > 0) sellPrices += ", ";
+         sellPrices += DoubleToString(OrderOpenPrice(), _Digits);
+         sellCount++;
+      }
+   }
+   
+   // 组装显示文本
+   string result = "持仓: ";
+   if(buyCount == 0 && sellCount == 0)
+   {
+      result += "无持仓";
+   }
+   else
+   {
+      if(buyCount > 0)
+         result += "买" + IntegerToString(buyCount) + " [" + buyPrices + "]";
+      if(buyCount > 0 && sellCount > 0)
+         result += " | ";
+      if(sellCount > 0)
+         result += "卖" + IntegerToString(sellCount) + " [" + sellPrices + "]";
+   }
+   
+   return result;
+}
+
+//+------------------------------------------------------------------+
 //| 手数减少                                                          |
 //+------------------------------------------------------------------+
 void CTradePanel::OnClickLotsDecrease(void)
@@ -1319,8 +1570,8 @@ bool         g_ordersCreated      = false;  // 是否已创建过（Create 只�
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // 创建面板
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+432))
+   // 创建面板（高度从432增加到522，因为增加了两个信息容器）
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+522))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
@@ -1354,7 +1605,13 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // EA主逻辑（如果需要）
+   // 更新信息容器（每次tick刷新数据）
+   static datetime lastUpdate = 0;
+   if(TimeCurrent() != lastUpdate)  // 每秒最多更新一次
+   {
+      g_tradePanel.UpdateInfoContainers();
+      lastUpdate = TimeCurrent();
+   }
 }
 
 //+------------------------------------------------------------------+
