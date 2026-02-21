@@ -1044,6 +1044,9 @@ void DrawSignalInfoText(int target_index, int signal_index, string type_str, dou
         ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, GetTimeframeFlag(_Period));
         ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
         ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+        
+        // ✅ 修复：设置为背景层，防止穿透EA面板
+        ObjectSetInteger(0, name, OBJPROP_BACK, true);
     }
 }
 
