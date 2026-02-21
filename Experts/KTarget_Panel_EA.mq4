@@ -16,7 +16,7 @@
 //+------------------------------------------------------------------+
 //| 面板参数                                                          |
 //+------------------------------------------------------------------+
-input int    PanelX = 50;            // 面板X坐标
+input int    PanelX = 250;            // 面板X坐标
 input int    PanelY = 50;            // 面板Y坐标
 input color  PanelColor = clrWhite;  // 面板背景色
 input color  BorderColor = clrNavy;  // 边框颜色
@@ -260,6 +260,22 @@ private:
    CButton          m_btnCloseSymbol;   // 平当前品种按钮
    CButton          m_btnBreakEven;     // 一键保本按钮
 
+   // 模块5: 自动减仓模块控件
+   CLabel           m_lblScaleOut;         // 模块标题
+   CLabel           m_lblTriggerPts;       // 触发点数标签
+   CEdit            m_edtTriggerPts;       // 触发点数输入框
+   CLabel           m_lblScalePct;         // 减仓比例标签
+   CEdit            m_edtScalePct;         // 减仓比例输入框
+   CLabel           m_lblScaleLots;        // 减仓手数标签
+   CEdit            m_edtScaleLots;        // 减仓手数输入框
+   CButton          m_btnToggleScaleOut;   // 开启/关闭按钮
+   CButton          m_btnSmartCalc;        // 智能计算按钮
+   
+   // 自动减仓状态变量
+   bool             m_scaleOutEnabled;     // 是否启用自动减仓
+   datetime         m_scaledOpenTimes[100];// 已减仓订单的开仓时间
+   int              m_scaledCount;         // 已减仓订单数量
+
    // 模块4: 订单记录模块控件
    CLabel           m_lblMod4;          // 模块4标题
    CButton          m_btnViewOrders;    // 查看今日订单按钮
@@ -270,6 +286,7 @@ public:
    virtual bool     Create(const long chart,const string name,const int subwin,const int x1,const int y1,const int x2,const int y2);
    virtual bool     OnEvent(const int id,const long &lparam,const double &dparam,const string &sparam);
    void             UpdateInfoContainers(void);  // 更新信息容器
+   void             CheckAutoScaleOut(void);     // 检查并执行自动减仓（需要public以便在OnTick中调用）
    
 protected:
    bool             CreateControls(void);
@@ -298,6 +315,13 @@ protected:
    void             OnClickTogglePositions(void);     // 切换持仓容器显示
    double           CalculateDailyProfit(void);       // 计算今日盈亏
    string           GetCurrentPositions(void);        // 获取当前持仓价格
+   
+   // 自动减仓相关方法（内部）
+   void             OnClickToggleScaleOut(void);      // 切换自动减仓开关
+   void             OnClickSmartCalc(void);           // 智能计算保本参数
+   void             ExecuteScaleOut(int ticket, double pct, double lots); // 执行减仓
+   bool             IsOrderScaled(int ticket);        // 检查订单是否已减仓
+   void             CleanupScaledOrders(void);        // 清理已关闭订单记录
 };
 
 //+------------------------------------------------------------------+
@@ -305,6 +329,10 @@ protected:
 //+------------------------------------------------------------------+
 CTradePanel::CTradePanel()
 {
+   // 初始化自动减仓状态
+   m_scaleOutEnabled = false;
+   m_scaledCount = 0;
+   ArrayInitialize(m_scaledOpenTimes, 0);
 }
 
 //+------------------------------------------------------------------+
@@ -707,6 +735,92 @@ bool CTradePanel::CreateControls(void)
    m_btnBreakEven.ColorBackground(clrDarkCyan);
    if(!Add(m_btnBreakEven)) return(false);
 
+   //=== 模块5: 自动减仓 ===
+   y += m3BtnH + 10;
+   
+   // 模块标题
+   if(!m_lblScaleOut.Create(m_chart_id,m_name+"LblScaleOut",m_subwin,x,y,x+width,y+20))
+      return(false);
+   if(!m_lblScaleOut.Text("-- Auto Scale-Out --"))
+      return(false);
+   if(!Add(m_lblScaleOut))
+      return(false);
+   y += 28;
+   
+   // 布局参数
+   int m5BtnH = 25;                           // 控件高度
+   int m5LblW = 35;                           // 标签宽度
+   int m5Gap = 5;                             // 间距
+   int m5Col1W = (width - m5Gap*2) / 3;      // 第一列宽度（触发点数）
+   int m5Col2W = m5Col1W;                     // 第二列宽度（减仓比例）
+   int m5Col3W = width - m5Col1W - m5Col2W - m5Gap*2; // 第三列宽度（减仓手数）
+   int m5Col1X = x;
+   int m5Col2X = m5Col1X + m5Col1W + m5Gap;
+   int m5Col3X = m5Col2X + m5Col2W + m5Gap;
+   int m5EdtW1 = m5Col1W - m5LblW - 3;
+   int m5EdtW2 = m5Col2W - m5LblW - 3;
+   int m5EdtW3 = m5Col3W - m5LblW - 3;
+   
+   // 第一行：[触发:][200]pts | [减仓:][80]% | [或][0.04]lots
+   if(!m_lblTriggerPts.Create(m_chart_id,m_name+"LblTrigPts",m_subwin,
+                               m5Col1X,y,m5Col1X+m5LblW,y+m5BtnH))
+      return(false);
+   if(!m_lblTriggerPts.Text("触发:")) return(false);
+   if(!Add(m_lblTriggerPts)) return(false);
+   
+   if(!m_edtTriggerPts.Create(m_chart_id,m_name+"EdtTrigPts",m_subwin,
+                              m5Col1X+m5LblW+3,y,m5Col1X+m5Col1W,y+m5BtnH))
+      return(false);
+   m_edtTriggerPts.Text("200");
+   m_edtTriggerPts.ReadOnly(false);
+   if(!Add(m_edtTriggerPts)) return(false);
+   
+   if(!m_lblScalePct.Create(m_chart_id,m_name+"LblScalePct",m_subwin,
+                            m5Col2X,y,m5Col2X+m5LblW,y+m5BtnH))
+      return(false);
+   if(!m_lblScalePct.Text("减仓:")) return(false);
+   if(!Add(m_lblScalePct)) return(false);
+   
+   if(!m_edtScalePct.Create(m_chart_id,m_name+"EdtScalePct",m_subwin,
+                            m5Col2X+m5LblW+3,y,m5Col2X+m5Col2W,y+m5BtnH))
+      return(false);
+   m_edtScalePct.Text("80");
+   m_edtScalePct.ReadOnly(false);
+   if(!Add(m_edtScalePct)) return(false);
+   
+   if(!m_lblScaleLots.Create(m_chart_id,m_name+"LblScaleLots",m_subwin,
+                             m5Col3X,y,m5Col3X+m5LblW,y+m5BtnH))
+      return(false);
+   if(!m_lblScaleLots.Text("或:")) return(false);
+   if(!Add(m_lblScaleLots)) return(false);
+   
+   if(!m_edtScaleLots.Create(m_chart_id,m_name+"EdtScaleLots",m_subwin,
+                             m5Col3X+m5LblW+3,y,m5Col3X+m5Col3W,y+m5BtnH))
+      return(false);
+   m_edtScaleLots.Text("0.04");
+   m_edtScaleLots.ReadOnly(false);
+   if(!Add(m_edtScaleLots)) return(false);
+   
+   y += m5BtnH + 8;
+   
+   // 第二行：[开启自动减仓] [智能计算保本]
+   int m5Btn1W = (width - m5Gap) / 2;
+   int m5Btn2W = width - m5Btn1W - m5Gap;
+   
+   if(!m_btnToggleScaleOut.Create(m_chart_id,m_name+"BtnToggleScaleOut",m_subwin,
+                                   x,y,x+m5Btn1W,y+m5BtnH))
+      return(false);
+   if(!m_btnToggleScaleOut.Text("开启自动减仓")) return(false);
+   m_btnToggleScaleOut.ColorBackground(clrLightGray);
+   if(!Add(m_btnToggleScaleOut)) return(false);
+   
+   if(!m_btnSmartCalc.Create(m_chart_id,m_name+"BtnSmartCalc",m_subwin,
+                             x+m5Btn1W+m5Gap,y,x+width,y+m5BtnH))
+      return(false);
+   if(!m_btnSmartCalc.Text("智能计算保本")) return(false);
+   m_btnSmartCalc.ColorBackground(clrMediumSeaGreen);
+   if(!Add(m_btnSmartCalc)) return(false);
+
    //=== 模块4: 订单记录模块 ===
    y += m3BtnH + 10;
 
@@ -793,6 +907,10 @@ bool CTradePanel::OnEvent(const int id,const long &lparam,const double &dparam,c
       if(sparam == m_name+"BtnToggleProfit")  { OnClickToggleProfit();  return(true); }
       // 切换持仓容器显示
       if(sparam == m_name+"BtnTogglePos")     { OnClickTogglePositions(); return(true); }
+      // 切换自动减仓开关
+      if(sparam == m_name+"BtnToggleScaleOut") { OnClickToggleScaleOut(); return(true); }
+      // 智能计算保本参数
+      if(sparam == m_name+"BtnSmartCalc")     { OnClickSmartCalc();     return(true); }
    }
    
    return(CAppDialog::OnEvent(id,lparam,dparam,sparam));
@@ -1513,6 +1631,277 @@ string CTradePanel::GetCurrentPositions(void)
 }
 
 //+------------------------------------------------------------------+
+//| 切换自动减仓开关                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickToggleScaleOut(void)
+{
+   m_scaleOutEnabled = !m_scaleOutEnabled;
+   
+   if(m_scaleOutEnabled)
+   {
+      m_btnToggleScaleOut.Text("关闭自动减仓");
+      m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
+      Print("✅ 自动减仓功能已开启");
+   }
+   else
+   {
+      m_btnToggleScaleOut.Text("开启自动减仓");
+      m_btnToggleScaleOut.ColorBackground(clrLightGray);
+      Print("⏸️ 自动减仓功能已关闭");
+   }
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| 智能计算保本参数                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickSmartCalc(void)
+{
+   // 检查是否有持仓
+   bool found = false;
+   for(int i = 0; i < OrdersTotal(); i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != _Symbol) continue;
+      if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
+      
+      found = true;
+      
+      // 获取订单参数
+      double openPrice = OrderOpenPrice();
+      double stopLoss = OrderStopLoss();
+      double lots = OrderLots();
+      
+      if(stopLoss == 0)
+      {
+         Alert("订单 ", OrderTicket(), " 没有设置止损，无法计算！");
+         continue;
+      }
+      
+      // 计算止损风险（点数）
+      double slDiff = (OrderType() == OP_BUY) ? 
+                      (openPrice - stopLoss) :
+                      (stopLoss - openPrice);
+      int slPts = (int)(slDiff / _Point);
+      
+      // 计算最大亏损金额
+      double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      double maxLoss = slDiff * lots / _Point * tickValue;
+      
+      // 智能计算：假设减仓 80%
+      double scalePct = 80.0;
+      double remainPct = 100.0 - scalePct;
+      
+      // 剩余仓位如果止损的亏损
+      double remainLoss = maxLoss * remainPct / 100.0;
+      
+      // 计算需要走多少点（减仓部分获利 = 剩余部分风险）
+      // scalePct% × triggerPts = remainPct% × slPts
+      // triggerPts = remainPct × slPts / scalePct
+      int triggerPts = (int)(remainPct * slPts / scalePct);
+      
+      // 更新UI
+      m_edtTriggerPts.Text(IntegerToString(triggerPts));
+      m_edtScalePct.Text(DoubleToString(scalePct, 0));
+      
+      string msg = StringFormat(
+         "智能计算完成！\n\n"
+         "订单: %d\n"
+         "手数: %.2f\n"
+         "止损点数: %d 点\n"
+         "最大风险: $%.2f\n\n"
+         "建议参数：\n"
+         "触发点数: %d 点\n"
+         "减仓比例: %.0f%%\n\n"
+         "逻辑：走出 %d 点后减仓 %.0f%%，\n"
+         "锁定利润 $%.2f，可覆盖剩余仓位风险 $%.2f",
+         OrderTicket(), lots, slPts, maxLoss,
+         triggerPts, scalePct,
+         triggerPts, scalePct, remainLoss, remainLoss
+      );
+      
+      Alert(msg);
+      Print(msg);
+      break;  // 只计算第一个订单
+   }
+   
+   if(!found)
+   {
+      Alert("当前品种没有持仓订单！");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 检查并执行自动减仓                                                |
+//+------------------------------------------------------------------+
+void CTradePanel::CheckAutoScaleOut(void)
+{
+   if(!m_scaleOutEnabled) return;  // 功能未开启
+   
+   // 读取参数
+   int triggerPts = (int)StringToInteger(m_edtTriggerPts.Text());
+   double scalePct = StringToDouble(m_edtScalePct.Text());
+   double scaleLots = StringToDouble(m_edtScaleLots.Text());
+   
+   if(triggerPts <= 0)
+   {
+      Print("⚠️ 触发点数无效，已跳过检测");
+      return;
+   }
+   
+   // 定期清理已关闭订单
+   CleanupScaledOrders();
+   
+   // 遍历所有持仓订单
+   for(int i = 0; i < OrdersTotal(); i++)
+   {
+      if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+      if(OrderSymbol() != _Symbol) continue;
+      if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
+      
+      int ticket = OrderTicket();
+      
+      // 检查是否已减仓
+      if(IsOrderScaled(ticket)) continue;
+      
+      // 计算浮盈点数
+      double currentPrice = (OrderType() == OP_BUY) ? Bid : Ask;
+      double diff = (OrderType() == OP_BUY) ? 
+                    (currentPrice - OrderOpenPrice()) :
+                    (OrderOpenPrice() - currentPrice);
+      int profitPts = (int)(diff / _Point);
+      
+      // 达到触发条件？
+      if(profitPts >= triggerPts)
+      {
+         ExecuteScaleOut(ticket, scalePct, scaleLots);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 执行减仓                                                          |
+//+------------------------------------------------------------------+
+void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
+{
+   if(!OrderSelect(ticket, SELECT_BY_TICKET)) return;
+   
+   // 计算减仓手数
+   double currentLots = OrderLots();
+   double closeAmount = 0;
+   
+   // 优先使用比例，如果比例为0则使用固定手数
+   if(pct > 0)
+   {
+      closeAmount = NormalizeDouble(currentLots * pct / 100.0, 2);
+   }
+   else if(lots > 0)
+   {
+      closeAmount = lots;
+   }
+   else
+   {
+      Print("❌ 减仓参数无效");
+      return;
+   }
+   
+   // 确保手数符合规范
+   double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
+   double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
+   closeAmount = MathFloor(closeAmount / lotStep) * lotStep;
+   
+   // 确保不超过当前手数，并至少保留最小手数
+   if(closeAmount >= currentLots)
+   {
+      closeAmount = currentLots - minLot;
+      if(closeAmount < minLot)
+      {
+         Print("⚠️ 订单 ", ticket, " 仓位太小，无法减仓");
+         return;
+      }
+   }
+   
+   // 执行部分平仓
+   double closePrice = (OrderType() == OP_BUY) ? Bid : Ask;
+   bool result = OrderClose(ticket, closeAmount, closePrice, 3);
+   
+   if(result)
+   {
+      // 记录已减仓（使用开仓时间）
+      m_scaledOpenTimes[m_scaledCount++] = OrderOpenTime();
+      
+      // 计算锁定利润
+      double profit = (OrderType() == OP_BUY) ? 
+                      (closePrice - OrderOpenPrice()) :
+                      (OrderOpenPrice() - closePrice);
+      double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      double lockedProfit = profit * closeAmount / _Point * tickValue;
+      
+      Print("✅ 自动减仓成功: Ticket=", ticket, 
+            " 减仓=", closeAmount, " 手，锁定利润=$", DoubleToString(lockedProfit, 2));
+      
+      // 发送通知
+      string msg = StringFormat("✅ 自动减仓\nTicket: %d\n减仓: %.2f 手\n利润: $%.2f",
+                                ticket, closeAmount, lockedProfit);
+      Comment(msg);
+   }
+   else
+   {
+      int error = GetLastError();
+      Print("❌ 自动减仓失败: Ticket=", ticket, " Error=", error);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 检查订单是否已减仓                                                |
+//+------------------------------------------------------------------+
+bool CTradePanel::IsOrderScaled(int ticket)
+{
+   if(!OrderSelect(ticket, SELECT_BY_TICKET)) return false;
+   datetime openTime = OrderOpenTime();
+   
+   for(int i = 0; i < m_scaledCount; i++)
+   {
+      if(m_scaledOpenTimes[i] == openTime) return true;
+   }
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| 清理已关闭订单记录                                                |
+//+------------------------------------------------------------------+
+void CTradePanel::CleanupScaledOrders(void)
+{
+   for(int i = m_scaledCount - 1; i >= 0; i--)
+   {
+      datetime openTime = m_scaledOpenTimes[i];
+      bool found = false;
+      
+      // 检查这个开仓时间的订单是否还存在
+      for(int j = 0; j < OrdersTotal(); j++)
+      {
+         if(!OrderSelect(j, SELECT_BY_POS, MODE_TRADES)) continue;
+         if(OrderOpenTime() == openTime)
+         {
+            found = true;
+            break;
+         }
+      }
+      
+      // 如果订单已关闭，从数组中移除
+      if(!found)
+      {
+         for(int j = i; j < m_scaledCount - 1; j++)
+         {
+            m_scaledOpenTimes[j] = m_scaledOpenTimes[j + 1];
+         }
+         m_scaledCount--;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| 手数减少                                                          |
 //+------------------------------------------------------------------+
 void CTradePanel::OnClickLotsDecrease(void)
@@ -1570,8 +1959,8 @@ bool         g_ordersCreated      = false;  // 是否已创建过（Create 只�
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // 创建面板（高度从432增加到522，因为增加了两个信息容器）
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+522))
+   // 创建面板（高度638：原432 + 信息容器90 + 自动减仓模块116）
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+638))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
@@ -1612,6 +2001,9 @@ void OnTick()
       g_tradePanel.UpdateInfoContainers();
       lastUpdate = TimeCurrent();
    }
+   
+   // 检查自动减仓（每个tick都检查）
+   g_tradePanel.CheckAutoScaleOut();
 }
 
 //+------------------------------------------------------------------+
