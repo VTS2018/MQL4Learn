@@ -22,6 +22,15 @@ input color  PanelColor = clrWhite;  // 面板背景色
 input color  BorderColor = clrNavy;  // 边框颜色
 
 //+------------------------------------------------------------------+
+//| 止损标签参数                                                      |
+//+------------------------------------------------------------------+
+input bool   Show_EA_SL_Labels = true;   // 显示EA止损标签
+input int    SL_Distance_Dollars = 5;    // 止损距离（美金）
+input double Label_Offset = 0.3;         // 标签偏移量（避免重叠）
+input color  Buy_SL_Color = clrOrangeRed;   // 做多止损颜色
+input color  Sell_SL_Color = clrLimeGreen; // 做空止损颜色
+
+//+------------------------------------------------------------------+
 //| 今日订单记录面板                                                  |
 //+------------------------------------------------------------------+
 #define ORDERS_ROWS 100  // 绝对上限，今日订单实际不会超过此数
@@ -1955,6 +1964,85 @@ bool         g_ordersCreated      = false;  // 是否已创建过（Create 只�
 // bool        g_allowNextMouseMove = false; // 点击后允许下一次鼠标释放事件通过
 
 //+------------------------------------------------------------------+
+//| 全局常量：EA 对象命名前缀                                          |
+//+------------------------------------------------------------------+
+string EA_OBJECT_PREFIX = "KT_EA_Panel_";
+
+//+------------------------------------------------------------------+
+//| 更新EA止损标签（实时显示现价±5美金的止损位置）                    |
+//+------------------------------------------------------------------+
+void UpdateEA_SL_Display()
+{
+   if(!Show_EA_SL_Labels) return; // 用户关闭功能
+   
+   // 1. 计算止损价格（现价 ± SL_Distance_Dollars 美金）
+   double current_price = (Bid + Ask) / 2.0;
+   double sl_distance = SL_Distance_Dollars;
+   
+   // 应用偏移量避免与指标重叠
+   double buy_sl_price = current_price - sl_distance - Label_Offset;  // 做多止损（下方）
+   double sell_sl_price = current_price + sl_distance + Label_Offset; // 做空止损（上方）
+   
+   datetime current_time = Time[0]; // 当前K线时间
+   
+   // 2. 创建/更新 Buy SL 标签（做多止损，显示在下方）
+   string buy_label_name = EA_OBJECT_PREFIX + "Buy_SL_Label";
+   if(ObjectFind(0, buy_label_name) == -1)
+   {
+      // 首次创建
+      ObjectCreate(0, buy_label_name, OBJ_ARROW_RIGHT_PRICE, 0, current_time, buy_sl_price);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_COLOR, Buy_SL_Color);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, buy_label_name, OBJPROP_HIDDEN, true);
+   }
+   else
+   {
+      // 更新位置
+      ObjectSetInteger(0, buy_label_name, OBJPROP_TIME, 0, current_time);
+      ObjectSetDouble(0, buy_label_name, OBJPROP_PRICE, 0, buy_sl_price);
+   }
+   
+   // 3. 创建/更新 Sell SL 标签（做空止损，显示在上方）
+   string sell_label_name = EA_OBJECT_PREFIX + "Sell_SL_Label";
+   if(ObjectFind(0, sell_label_name) == -1)
+   {
+      // 首次创建
+      ObjectCreate(0, sell_label_name, OBJ_ARROW_RIGHT_PRICE, 0, current_time, sell_sl_price);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_COLOR, Sell_SL_Color);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_STYLE, STYLE_SOLID);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, sell_label_name, OBJPROP_HIDDEN, true);
+   }
+   else
+   {
+      // 更新位置
+      ObjectSetInteger(0, sell_label_name, OBJPROP_TIME, 0, current_time);
+      ObjectSetDouble(0, sell_label_name, OBJPROP_PRICE, 0, sell_sl_price);
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 清理EA止损标签                                                    |
+//+------------------------------------------------------------------+
+void CleanupEA_SL_Labels()
+{
+   // 删除所有以 EA_OBJECT_PREFIX 开头的对象
+   for(int i = ObjectsTotal() - 1; i >= 0; i--)
+   {
+      string obj_name = ObjectName(i);
+      if(StringFind(obj_name, EA_OBJECT_PREFIX) == 0) // 检查前缀
+      {
+         ObjectDelete(0, obj_name);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -1978,6 +2066,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   // 清理EA止损标签
+   CleanupEA_SL_Labels();
+   
    // 销毁面板（OnDeinit 时 EA 本身已在退出，不会再处理图表事件，无级联风险）
    if(g_ordersCreated)
    {
@@ -2004,6 +2095,9 @@ void OnTick()
    
    // 检查自动减仓（每个tick都检查）
    g_tradePanel.CheckAutoScaleOut();
+   
+   // 更新EA止损标签（实时显示）
+   UpdateEA_SL_Display();
 }
 
 //+------------------------------------------------------------------+
