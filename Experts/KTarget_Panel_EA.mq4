@@ -31,6 +31,22 @@ input color  Buy_SL_Color = clrOrangeRed;   // 做多止损颜色
 input color  Sell_SL_Color = clrLimeGreen; // 做空止损颜色
 
 //+------------------------------------------------------------------+
+//| 价格选择模式枚举                                                  |
+//+------------------------------------------------------------------+
+enum PriceSelectMode
+{
+   MODE_NONE = 0,         // 正常模式
+   MODE_SELECT_SL = 1,    // 选择止损价格
+   MODE_SELECT_TP = 2     // 选择止盈价格
+};
+
+//+------------------------------------------------------------------+
+//| 全局状态变量                                                      |
+//+------------------------------------------------------------------+
+PriceSelectMode g_priceSelectMode = MODE_NONE;     // 价格选择模式
+uint g_lastButtonClickTime = 0;                     // 上次按钮点击时间戳（防穿透）
+
+//+------------------------------------------------------------------+
 //| 今日订单记录面板                                                  |
 //+------------------------------------------------------------------+
 #define ORDERS_ROWS 100  // 绝对上限，今日订单实际不会超过此数
@@ -224,6 +240,7 @@ private:
    // 模块1: 开仓交易模块控件
    CLabel           m_lblStopLoss;    // 止损标签
    CEdit            m_edtStopLoss;    // 止损输入框
+   CButton          m_btnSelectSL;    // 选择止损按钮 (NEW)
    
    CLabel           m_lblLots;        // 手数标签
    CButton          m_btnLotsDecrease;// 手数减少按钮
@@ -232,6 +249,7 @@ private:
    
    CLabel           m_lblTakeProfit;  // 止盈标签
    CEdit            m_edtTakeProfit;  // 止盈输入框
+   CButton          m_btnSelectTP;    // 选择止盈按钮 (NEW)
    
    CButton          m_btnBuy;         // 现价买入按钮
    CButton          m_btnSell;        // 现价卖出按钮
@@ -297,6 +315,11 @@ public:
    void             UpdateInfoContainers(void);  // 更新信息容器
    void             CheckAutoScaleOut(void);     // 检查并执行自动减仓（需要public以便在OnTick中调用）
    
+   // 价格选择功能的公共方法（NEW）
+   void             SetStopLossPrice(double price);    // 设置止损价格
+   void             SetTakeProfitPrice(double price);  // 设置止盈价格
+   void             ResetSelectButton(int mode);       // 重置选择按钮颜色
+   
 protected:
    bool             CreateControls(void);
    void             OnClickLotsDecrease(void);
@@ -331,6 +354,10 @@ protected:
    void             ExecuteScaleOut(int ticket, double pct, double lots); // 执行减仓
    bool             IsOrderScaled(int ticket);        // 检查订单是否已减仓
    void             CleanupScaledOrders(void);        // 清理已关闭订单记录
+   
+   // 价格选择功能方法（NEW）
+   void             OnClickSelectSL(void);            // 点击选择止损按钮
+   void             OnClickSelectTP(void);            // 点击选择止盈按钮
 };
 
 //+------------------------------------------------------------------+
@@ -468,12 +495,23 @@ bool CTradePanel::CreateControls(void)
    int lotsEdtX = col2X + lotsBW + 5;
    int lotsEdtW = col2W - lotsBW * 2 - 10;
 
-   // 止损输入框
-   if(!m_edtStopLoss.Create(m_chart_id,m_name+"EdtSL",m_subwin,col1X,rowY,col1X+col1W,rowY+edtRowH))
+   // 止损: [输入框] [📍按钮]
+   int selectBtnW = 35;  // 选择按钮宽度
+   int slEditW = col1W - selectBtnW - 3;  // 止损输入框宽度
+   
+   if(!m_edtStopLoss.Create(m_chart_id,m_name+"EdtSL",m_subwin,col1X,rowY,col1X+slEditW,rowY+edtRowH))
       return(false);
    m_edtStopLoss.Text("0.00000");
    m_edtStopLoss.ReadOnly(false);
    if(!Add(m_edtStopLoss)) return(false);
+   
+   // 选择止损按钮
+   if(!m_btnSelectSL.Create(m_chart_id,m_name+"BtnSelectSL",m_subwin,
+                             col1X+slEditW+3,rowY,col1X+col1W,rowY+edtRowH))
+      return(false);
+   m_btnSelectSL.Text(">");
+   m_btnSelectSL.ColorBackground(clrLightGray);
+   if(!Add(m_btnSelectSL)) return(false);
 
    // 手数: [-] [输入框] [+]
    if(!m_btnLotsDecrease.Create(m_chart_id,m_name+"BtnLotsDecrease",m_subwin,
@@ -496,12 +534,22 @@ bool CTradePanel::CreateControls(void)
    m_btnLotsIncrease.ColorBackground(clrLightGreen);
    if(!Add(m_btnLotsIncrease)) return(false);
 
-   // 止盈输入框
-   if(!m_edtTakeProfit.Create(m_chart_id,m_name+"EdtTP",m_subwin,col3X,rowY,col3X+col3W,rowY+edtRowH))
+   // 止盈: [输入框] [📍按钮]
+   int tpEditW = col3W - selectBtnW - 3;  // 止盈输入框宽度
+   
+   if(!m_edtTakeProfit.Create(m_chart_id,m_name+"EdtTP",m_subwin,col3X,rowY,col3X+tpEditW,rowY+edtRowH))
       return(false);
    m_edtTakeProfit.Text("0.00000");
    m_edtTakeProfit.ReadOnly(false);
    if(!Add(m_edtTakeProfit)) return(false);
+   
+   // 选择止盈按钮
+   if(!m_btnSelectTP.Create(m_chart_id,m_name+"BtnSelectTP",m_subwin,
+                             col3X+tpEditW+3,rowY,col3X+col3W,rowY+edtRowH))
+      return(false);
+   m_btnSelectTP.Text(">");
+   m_btnSelectTP.ColorBackground(clrLightGray);
+   if(!Add(m_btnSelectTP)) return(false);
 
    // y 推进到买卖按钮行
    y = rowY + edtRowH + 8;
@@ -920,6 +968,10 @@ bool CTradePanel::OnEvent(const int id,const long &lparam,const double &dparam,c
       if(sparam == m_name+"BtnToggleScaleOut") { OnClickToggleScaleOut(); return(true); }
       // 智能计算保本参数
       if(sparam == m_name+"BtnSmartCalc")     { OnClickSmartCalc();     return(true); }
+      // 选择止损价格按钮 (NEW)
+      if(sparam == m_name+"BtnSelectSL")      { OnClickSelectSL();      return(true); }
+      // 选择止盈价格按钮 (NEW)
+      if(sparam == m_name+"BtnSelectTP")      { OnClickSelectTP();      return(true); }
    }
    
    return(CAppDialog::OnEvent(id,lparam,dparam,sparam));
@@ -1521,7 +1573,7 @@ void CTradePanel::UpdateInfoContainers(void)
       double balance = AccountBalance();
       double profitPercent = (balance > 0) ? (dailyProfit / balance * 100) : 0;
       
-      string profitText = StringFormat("今日盈亏: %s¥%.2f (%s%.2f%%)",
+      string profitText = StringFormat("今日盈亏: %s$%.2f (%s%.2f%%)",
          dailyProfit >= 0 ? "+" : "",
          dailyProfit,
          profitPercent >= 0 ? "+" : "",
@@ -1732,6 +1784,26 @@ void CTradePanel::OnClickSmartCalc(void)
       
       Alert(msg);
       Print(msg);
+      /*
+      // === 自动开启减仓功能 ===
+      if(!m_scaleOutEnabled)
+      {
+         m_scaleOutEnabled = true;
+         m_btnToggleScaleOut.Text("关闭自动减仓");
+         m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
+         Print(" [智能计算] 自动减仓功能已自动开启");
+         
+         // 更新提示信息
+         Comment("【智能计算完成】\n参数已更新，自动减仓已启动！");
+      }
+      else
+      {
+         Print(" [智能计算] 自动减仓已在运行中，参数已更新");
+         Comment("【智能计算完成】\n参数已更新，自动减仓继续运行！");
+      }
+      
+      ChartRedraw();
+      */
       break;  // 只计算第一个订单
    }
    
@@ -1955,6 +2027,77 @@ void CTradePanel::OnClickLotsIncrease(void)
 }
 
 //+------------------------------------------------------------------+
+//| 点击选择止损按钮                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickSelectSL(void)
+{
+   // 激活止损选择模式
+   g_priceSelectMode = MODE_SELECT_SL;
+   g_lastButtonClickTime = GetTickCount();  // 记录时间戳（防穿透）
+   
+   // 视觉反馈：按钮高亮
+   m_btnSelectSL.ColorBackground(clrYellow);
+   
+   // 禁用鼠标滚动（避免误操作）
+   ChartSetInteger(0, CHART_MOUSE_SCROLL, false);
+   
+   // 显示提示
+   Comment("【选择止损价格】\n请点击图表任意位置...\n(将自动磁吸到最近的High/Low)");
+   
+   ChartRedraw();
+   PlaySound("tick.wav");
+}
+
+//+------------------------------------------------------------------+
+//| 点击选择止盈按钮                                                  |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickSelectTP(void)
+{
+   // 激活止盈选择模式
+   g_priceSelectMode = MODE_SELECT_TP;
+   g_lastButtonClickTime = GetTickCount();  // 记录时间戳（防穿透）
+   
+   // 视觉反馈：按钮高亮
+   m_btnSelectTP.ColorBackground(clrYellow);
+   
+   // 禁用鼠标滚动（避免误操作）
+   ChartSetInteger(0, CHART_MOUSE_SCROLL, false);
+   
+   // 显示提示
+   Comment("【选择止盈价格】\n请点击图表任意位置...\n(将自动磁吸到最近的High/Low)");
+   
+   ChartRedraw();
+   PlaySound("tick.wav");
+}
+
+//+------------------------------------------------------------------+
+//| 设置止损价格（公共方法）                                          |
+//+------------------------------------------------------------------+
+void CTradePanel::SetStopLossPrice(double price)
+{
+   m_edtStopLoss.Text(DoubleToString(price, _Digits));
+}
+
+//+------------------------------------------------------------------+
+//| 设置止盈价格（公共方法）                                          |
+//+------------------------------------------------------------------+
+void CTradePanel::SetTakeProfitPrice(double price)
+{
+   m_edtTakeProfit.Text(DoubleToString(price, _Digits));
+}
+
+//+------------------------------------------------------------------+
+//| 重置选择按钮颜色（公共方法）                                      |
+//+------------------------------------------------------------------+
+void CTradePanel::ResetSelectButton(int mode)
+{
+   if(mode == MODE_SELECT_SL)
+      m_btnSelectSL.ColorBackground(clrLightGray);
+   else if(mode == MODE_SELECT_TP)
+      m_btnSelectTP.ColorBackground(clrLightGray);
+}
+
+//+------------------------------------------------------------------+
 //| 全局变量                                                          |
 //+------------------------------------------------------------------+
 CTradePanel  g_tradePanel;
@@ -2127,7 +2270,57 @@ void OnChartEvent(const int id,
    g_tradePanel.ChartEvent(id,lparam,dparam,sparam);
    */
 
-   // 将事件传递给面板处理
+   // === [NEW] 处理图表点击事件（价格选择） ===
+   if(id == CHARTEVENT_CLICK && g_priceSelectMode != MODE_NONE)
+   {
+      // 防穿透：如果距离按钮点击时间不到300ms，忽略
+      if(GetTickCount() - g_lastButtonClickTime < 300)
+         return;
+      
+      // 获取点击位置的价格
+      datetime time;
+      double price;
+      int sub_window;
+      
+      if(ChartXYToTimePrice(0, (int)lparam, (int)dparam, sub_window, time, price))
+      {
+         // === 可选：磁吸到最近的High/Low（提升精度） ===
+         int barIndex = iBarShift(NULL, 0, time);
+         double high = iHigh(NULL, 0, barIndex);
+         double low = iLow(NULL, 0, barIndex);
+         
+         double finalPrice = price;
+         // 简单磁吸：选最近的High或Low
+         if(MathAbs(price - high) < MathAbs(price - low))
+            finalPrice = high;
+         else
+            finalPrice = low;
+         
+         // 填入对应的输入框（使用公共方法）
+         if(g_priceSelectMode == MODE_SELECT_SL)
+         {
+            g_tradePanel.SetStopLossPrice(finalPrice);
+            g_tradePanel.ResetSelectButton(MODE_SELECT_SL);
+         }
+         else if(g_priceSelectMode == MODE_SELECT_TP)
+         {
+            g_tradePanel.SetTakeProfitPrice(finalPrice);
+            g_tradePanel.ResetSelectButton(MODE_SELECT_TP);
+         }
+         
+         // 退出选择模式
+         g_priceSelectMode = MODE_NONE;
+         Comment("");  // 清除提示
+         ChartSetInteger(0, CHART_MOUSE_SCROLL, true);  // 恢复滚动
+         
+         PlaySound("ok.wav");  // 音效反馈
+         ChartRedraw();
+      }
+      
+      return;  // 不再传递给面板
+   }
+   
+   // === 传递事件给面板处理（原有逻辑） ===
    g_tradePanel.ChartEvent(id,lparam,dparam,sparam);
    if(g_ordersCreated && g_ordersPanelVisible)
       g_ordersPanel.ChartEvent(id,lparam,dparam,sparam);
