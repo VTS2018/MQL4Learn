@@ -8,10 +8,10 @@
 #property version   "1.00"
 #property strict
 
-#include <Controls\Dialog.mqh>
-#include <Controls\Button.mqh>
-#include <Controls\Edit.mqh>
-#include <Controls\Label.mqh>
+#include <Controls/Dialog.mqh>
+#include <Controls/Button.mqh>
+#include <Controls/Edit.mqh>
+#include <Controls/Label.mqh>
 
 //+------------------------------------------------------------------+
 //| 面板参数                                                          |
