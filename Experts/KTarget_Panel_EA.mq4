@@ -1650,13 +1650,13 @@ void CTradePanel::OnClickToggleScaleOut(void)
    {
       m_btnToggleScaleOut.Text("关闭自动减仓");
       m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
-      Print("✅ 自动减仓功能已开启");
+      Print(" 自动减仓功能已开启");
    }
    else
    {
       m_btnToggleScaleOut.Text("开启自动减仓");
       m_btnToggleScaleOut.ColorBackground(clrLightGray);
-      Print("⏸️ 自动减仓功能已关闭");
+      Print(" 自动减仓功能已关闭");
    }
    
    ChartRedraw();
@@ -1755,7 +1755,7 @@ void CTradePanel::CheckAutoScaleOut(void)
    
    if(triggerPts <= 0)
    {
-      Print("⚠️ 触发点数无效，已跳过检测");
+      Print(" 触发点数无效，已跳过检测");
       return;
    }
    
@@ -1811,7 +1811,7 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
    }
    else
    {
-      Print("❌ 减仓参数无效");
+      Print(" 减仓参数无效");
       return;
    }
    
@@ -1826,7 +1826,7 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       closeAmount = currentLots - minLot;
       if(closeAmount < minLot)
       {
-         Print("⚠️ 订单 ", ticket, " 仓位太小，无法减仓");
+         Print(" 订单 ", ticket, " 仓位太小，无法减仓");
          return;
       }
    }
@@ -1847,18 +1847,18 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
       double lockedProfit = profit * closeAmount / _Point * tickValue;
       
-      Print("✅ 自动减仓成功: Ticket=", ticket, 
+      Print(" 自动减仓成功: Ticket=", ticket, 
             " 减仓=", closeAmount, " 手，锁定利润=$", DoubleToString(lockedProfit, 2));
       
       // 发送通知
-      string msg = StringFormat("✅ 自动减仓\nTicket: %d\n减仓: %.2f 手\n利润: $%.2f",
+      string msg = StringFormat(" 自动减仓\nTicket: %d\n减仓: %.2f 手\n利润: $%.2f",
                                 ticket, closeAmount, lockedProfit);
       Comment(msg);
    }
    else
    {
       int error = GetLastError();
-      Print("❌ 自动减仓失败: Ticket=", ticket, " Error=", error);
+      Print(" 自动减仓失败: Ticket=", ticket, " Error=", error);
    }
 }
 
