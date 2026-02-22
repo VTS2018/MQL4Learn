@@ -57,6 +57,27 @@ input color Color_D1   = clrRed;          // D1 Timeframe Color
 input color Color_W1   = clrDarkGreen;    // W1 Timeframe Color
 input color Color_MN1  = clrDarkViolet;   // MN1 Timeframe Color
 
+//--- [新增] 关口线功能设置
+input string Sep_Round = "======= Round Number Lines ======="; // ----
+input bool   Enable_Round_100  = false;         // Enable 100 Round Lines
+input bool   Enable_Round_50   = false;         // Enable 50 Round Lines
+input bool   Enable_Round_10   = false;         // Enable 10 Round Lines
+input bool   Enable_Round_5    = false;         // Enable 5 Round Lines
+// [已废弃] input int Round_Lines_Range = 500;  // 现在自动使用图表可见范围
+
+input color  Color_Round_100   = clrDarkSlateGray;  // 100 Round Line Color
+input color  Color_Round_50    = clrGray;           // 50 Round Line Color
+input color  Color_Round_10    = clrLightGray;      // 10 Round Line Color
+input color  Color_Round_5     = clrSilver;         // 5 Round Line Color
+
+input int    Width_Round_100   = 2;             // 100 Round Line Width
+input int    Width_Round_50    = 2;             // 50 Round Line Width
+input int    Width_Round_10    = 1;             // 10 Round Line Width
+input int    Width_Round_5     = 1;             // 5 Round Line Width
+
+input ENUM_LINE_STYLE Style_Round_Key    = STYLE_SOLID;  // Key Round Lines Style (100/50)
+input ENUM_LINE_STYLE Style_Round_Normal = STYLE_DOT;    // Normal Round Lines Style (10/5)
+
 //--- 内部变量
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
 string btnName_MainMenu = "Btn_MainMenu";  // [新增] 主控菜单按钮
@@ -93,6 +114,10 @@ const uint CONFIRM_TIMEOUT = 10000; // 10秒超时
 // [新增] 存储对象对关系：记录每个画线对象及其关联的标记对象
 string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名 
 
+// [新增] 关口线管理变量
+uint lastRoundLinesUpdate = 0;          // 上次更新关口线的时间
+const uint ROUND_UPDATE_INTERVAL = 60000; // 关口线更新间隔（60秒） 
+
 //+------------------------------------------------------------------+
 //| 初始化函数
 //+------------------------------------------------------------------+
@@ -125,6 +150,9 @@ int OnInit()
    // [新增] 更新所有射线的终点到最新K线，防止射线"变短"
    UpdateRayEndpoints();
    
+   // [新增] 绘制关口线
+   DrawRoundNumberLines();
+   
    return(INIT_SUCCEEDED);
   }
 
@@ -134,6 +162,10 @@ int OnInit()
 void OnDeinit(const int reason)
   {
    EventKillTimer();  // 关闭定时器
+   
+   // [新增] 删除所有关口线
+   DeleteRoundNumberLines();
+   
    ObjectDelete(0, btnName_MainMenu);  // [新增] 删除主控按钮
    ObjectDelete(0, btnName1);
    ObjectDelete(0, btnName2);
@@ -774,6 +806,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
          ChartRedraw(); // 强制刷新界面状态
         }
      }
+   
+   // =================================================================
+   // 3. 监听图表变化事件（缩放、滚动）
+   // =================================================================
+   if(id == CHARTEVENT_CHART_CHANGE)
+     {
+      // 当图表缩放或滚动时，更新关口线
+      UpdateRoundNumberLines();
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -896,6 +937,14 @@ void OnTimer()
       // 恢复按钮颜色为深红色
       ObjectSetInteger(0, btnName4, OBJPROP_BGCOLOR, clrMaroon);
       ChartRedraw();
+   }
+   
+   // [新增] 定期更新关口线
+   uint currentTime = GetTickCount();
+   if(currentTime - lastRoundLinesUpdate >= ROUND_UPDATE_INTERVAL)
+   {
+      UpdateRoundNumberLines();
+      lastRoundLinesUpdate = currentTime;
    }
 }
 
@@ -1504,4 +1553,191 @@ void ForceCleanAllObjects()
       Print("[强制清除] 成功删除 ", total_deleted, " 个绘图对象（包含所有类型）");
    else
       Print("[强制清除] 图表上没有可删除的对象");
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 绘制关口线（整数价位参考线）
+//+------------------------------------------------------------------+
+void DrawRoundNumberLines()
+{
+   // 检查是否所有开关都关闭
+   if(!Enable_Round_100 && !Enable_Round_50 && !Enable_Round_10 && !Enable_Round_5)
+      return;  // 全部关闭，不绘制
+   
+   // 获取图表可见范围的价格上下限
+   double upperPrice = ChartGetDouble(0, CHART_PRICE_MAX, 0);
+   double lowerPrice = ChartGetDouble(0, CHART_PRICE_MIN, 0);
+   
+   // 检查数据有效性
+   if(upperPrice == 0 || lowerPrice == 0 || upperPrice <= lowerPrice)
+      return;  // 数据未就绪或无效
+   
+   // 根据Point大小确定合适的步长单位
+   // XAUUSD: Point=0.01, 所以100美金 = 100/0.01 = 10000点
+   double unit_100 = 100.0;
+   double unit_50 = 50.0;
+   double unit_10 = 10.0;
+   double unit_5 = 5.0;
+   
+   // 绘制计数
+   int count100 = 0, count50 = 0, count10 = 0, count5 = 0;
+   
+   // 从下限开始遍历到上限
+   // 找到最小的起始价格（向下取整到最小单位）
+   double minUnit = 1000.0;  // 默认最大单位
+   if(Enable_Round_5) minUnit = unit_5;
+   else if(Enable_Round_10) minUnit = unit_10;
+   else if(Enable_Round_50) minUnit = unit_50;
+   else if(Enable_Round_100) minUnit = unit_100;
+   
+   double startPrice = MathFloor(lowerPrice / minUnit) * minUnit;
+   
+   // 遍历价格范围
+   for(double price = startPrice; price <= upperPrice; price += minUnit)
+   {
+      // 优先级覆盖策略：100 > 50 > 10 > 5
+      // 如果某个价位同时满足多个条件，只绘制优先级最高的那条线
+      
+      if(Enable_Round_100 && MathAbs(MathMod(price, unit_100)) < 0.001)
+      {
+         // 绘制100关口线
+         DrawSingleRoundLine(price, 100, Color_Round_100, Width_Round_100, Style_Round_Key);
+         count100++;
+      }
+      else if(Enable_Round_50 && MathAbs(MathMod(price, unit_50)) < 0.001)
+      {
+         // 绘制50关口线
+         DrawSingleRoundLine(price, 50, Color_Round_50, Width_Round_50, Style_Round_Key);
+         count50++;
+      }
+      else if(Enable_Round_10 && MathAbs(MathMod(price, unit_10)) < 0.001)
+      {
+         // 绘制10关口线
+         DrawSingleRoundLine(price, 10, Color_Round_10, Width_Round_10, Style_Round_Normal);
+         count10++;
+      }
+      else if(Enable_Round_5 && MathAbs(MathMod(price, unit_5)) < 0.001)
+      {
+         // 绘制5关口线
+         DrawSingleRoundLine(price, 5, Color_Round_5, Width_Round_5, Style_Round_Normal);
+         count5++;
+      }
+   }
+   
+   // 打印日志
+   int total = count100 + count50 + count10 + count5;
+   if(total > 0)
+   {
+      Print("[关口线] 绘制完成: 100(", count100, ") 50(", count50, ") 10(", count10, ") 5(", count5, ") 共", total, "条");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 绘制单条关口线
+//+------------------------------------------------------------------+
+void DrawSingleRoundLine(double price, int interval, color lineColor, int lineWidth, ENUM_LINE_STYLE lineStyle)
+{
+   // 对象命名：Round_间隔_价格（去掉小数点）
+   string priceSt = DoubleToString(price, 2);
+   StringReplace(priceSt, ".", "");
+   string objName = "Round_" + IntegerToString(interval) + "_" + priceSt;
+   
+   // 检查对象是否已存在
+   if(ObjectFind(0, objName) >= 0)
+      return;  // 已存在，跳过
+   
+   // 创建水平线
+   ObjectCreate(0, objName, OBJ_HLINE, 0, 0, price);
+   ObjectSetInteger(0, objName, OBJPROP_COLOR, lineColor);
+   ObjectSetInteger(0, objName, OBJPROP_WIDTH, lineWidth);
+   ObjectSetInteger(0, objName, OBJPROP_STYLE, lineStyle);
+   ObjectSetInteger(0, objName, OBJPROP_SELECTABLE, false);  // 不可选择
+   ObjectSetInteger(0, objName, OBJPROP_HIDDEN, true);       // 对象列表隐藏
+   // 注意：不设置OBJPROP_BACK，让线条在前景层，这样MT4会自动显示价格
+   ObjectSetInteger(0, objName, OBJPROP_TIMEFRAMES, OBJ_ALL_PERIODS);  // 所有周期可见
+   
+   // 设置描述文字
+   string desc = "";
+   if(interval == 100 || interval == 50)
+      desc = "[Key Round " + IntegerToString(interval) + "]";
+   else
+      desc = "[Round " + IntegerToString(interval) + "]";
+   
+   ObjectSetString(0, objName, OBJPROP_TEXT, desc);
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 更新关口线（价格范围变化时）
+//+------------------------------------------------------------------+
+void UpdateRoundNumberLines()
+{
+   // 检查是否所有开关都关闭
+   if(!Enable_Round_100 && !Enable_Round_50 && !Enable_Round_10 && !Enable_Round_5)
+      return;
+   
+   // 获取图表可见范围的价格上下限
+   double upperPrice = ChartGetDouble(0, CHART_PRICE_MAX, 0);
+   double lowerPrice = ChartGetDouble(0, CHART_PRICE_MIN, 0);
+   
+   // 检查数据有效性
+   if(upperPrice == 0 || lowerPrice == 0 || upperPrice <= lowerPrice)
+      return;
+   
+   // 删除超出范围的关口线，创建新进入范围的关口线
+   int total = ObjectsTotal(0, 0, -1);
+   int deletedCount = 0;
+   
+   // 从后向前遍历，删除超出范围的线
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是关口线对象
+      if(StringFind(objName, "Round_") == 0)
+      {
+         double linePrice = ObjectGetDouble(0, objName, OBJPROP_PRICE, 0);
+         
+         // 如果超出当前价格范围，删除
+         if(linePrice < lowerPrice || linePrice > upperPrice)
+         {
+            ObjectDelete(0, objName);
+            deletedCount++;
+         }
+      }
+   }
+   
+   // 重新绘制（只会创建不存在的线）
+   DrawRoundNumberLines();
+   
+   if(deletedCount > 0)
+   {
+      Print("[关口线] 更新: 删除超出范围的 ", deletedCount, " 条线");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 删除所有关口线
+//+------------------------------------------------------------------+
+void DeleteRoundNumberLines()
+{
+   int total = ObjectsTotal(0, 0, -1);
+   int deleteCount = 0;
+   
+   // 从后向前遍历，删除所有关口线
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是关口线对象（以 "Round_" 开头）
+      if(StringFind(objName, "Round_") == 0)
+      {
+         ObjectDelete(0, objName);
+         deleteCount++;
+      }
+   }
+   
+   if(deleteCount > 0)
+   {
+      Print("[关口线] 清理: 删除 ", deleteCount, " 条关口线");
+   }
 }
