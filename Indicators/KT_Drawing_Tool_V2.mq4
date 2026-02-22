@@ -1463,18 +1463,18 @@ int IsPinbarV2(int barIndex)
    double upperWickPercent = upperWick / totalRange * 100;
    double lowerWickPercent = lowerWick / totalRange * 100;
    
-   // 宽松标准：影线 > 2/3 (66.7%), 实体 < 1/3 (33.3%)
+   // 宽松标准：影线 > 55%, 实体 < 1/3 (33.3%)
    
    // 判断看涨Pinbar（长下影线）
-   // 下影线超过整根K线的2/3，且实体小于1/3
-   if(lowerWickPercent > 60 && bodyPercent < 33.3)
+   // 下影线超过整根K线的55%，且实体小于1/3
+   if(lowerWickPercent > 55 && bodyPercent < 33.3)
    {
       return 1;  // 看涨Pinbar（宽松版）
    }
    
    // 判断看跌Pinbar（长上影线）
-   // 上影线超过整根K线的2/3，且实体小于1/3
-   if(upperWickPercent > 60 && bodyPercent < 33.3)
+   // 上影线超过整根K线的55%，且实体小于1/3
+   if(upperWickPercent > 55 && bodyPercent < 33.3)
    {
       return 2;  // 看跌Pinbar（宽松版）
    }
