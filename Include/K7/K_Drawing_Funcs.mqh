@@ -1355,16 +1355,48 @@ void UpdateATRDisplay()
    // 计算具体的止损价格
    double buy_sl_price = current_price - sl_distance;  // 做多止损在下方
    double sell_sl_price = current_price + sl_distance; // 做空止损在上方
-
-   // 3. 构建多行文本数组（每行独立）
-   string lines[];
-   ArrayResize(lines, 5);
    
-   lines[0] = StringFormat("ATR(%d): %.5f  |  Mult: %.1fx", atr_period, atr_value, atr_mult);
+   // [新增] 获取日线数据（跨周期访问）
+   double yesterday_close = iClose(_Symbol, PERIOD_D1, 1);  // 昨天收盘
+   double today_open = iOpen(_Symbol, PERIOD_D1, 0);        // 今天开盘
+   double today_high = iHigh(_Symbol, PERIOD_D1, 0);        // 今天最高
+   double today_low = iLow(_Symbol, PERIOD_D1, 0);          // 今天最低
+   
+   // [新增] 计算市场数据
+   int spread = (int)MarketInfo(_Symbol, MODE_SPREAD);                         // 点差（点）
+   double range_price = today_high - today_low;                                // 波幅（价格）
+   int range_points = (int)(range_price / Point);                              // 波幅（点）
+   double change_price = current_price - yesterday_close;                      // 涨跌（价格）
+   int change_points = (int)(change_price / Point);                            // 涨跌（点）
+   
+   // [新增] 格式化涨跌字符串（正数加"+"）
+   string change_str;
+   if(change_points > 0)
+      change_str = "+" + IntegerToString(change_points);
+   else if(change_points < 0)
+      change_str = IntegerToString(change_points);
+   else
+      change_str = "0";
+   
+   // 获取当前品种的小数位数
+   int digits = (int)MarketInfo(_Symbol, MODE_DIGITS);
+
+   // 3. 构建多行文本数组（每行独立）- 扩展到12行
+   string lines[];
+   ArrayResize(lines, 12);
+   
+   lines[0] = StringFormat("ATR(%d): %s  |  Mult: %.1fx", atr_period, DoubleToString(atr_value, digits), atr_mult);
    lines[1] = StringFormat("SL Space: %d pts", (int)(sl_distance / Point));
    lines[2] = "------------------";
-   lines[3] = StringFormat("Buy SL: %.5f", buy_sl_price);
-   lines[4] = StringFormat("Sell SL: %.5f", sell_sl_price);
+   lines[3] = StringFormat("Buy SL: %s", DoubleToString(buy_sl_price, digits));
+   lines[4] = StringFormat("Sell SL: %s", DoubleToString(sell_sl_price, digits));
+   lines[5] = "==================";
+   lines[6] = StringFormat("昨收: %s", DoubleToString(yesterday_close, digits));
+   lines[7] = StringFormat("今开: %s", DoubleToString(today_open, digits));
+   lines[8] = StringFormat("今高: %s", DoubleToString(today_high, digits));
+   lines[9] = StringFormat("今低: %s", DoubleToString(today_low, digits));
+   lines[10] = StringFormat("点差: %d pts  |  波幅: %d pts", spread, range_points);
+   lines[11] = StringFormat("涨跌: %s pts", change_str);
 
    // 4. 创建或更新多个 Label 对象（每行一个）
    int line_height = 15; // 每行间距（像素）
