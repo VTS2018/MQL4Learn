@@ -1912,12 +1912,33 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       // 记录已减仓（使用开仓时间）
       m_scaledOpenTimes[m_scaledCount++] = OrderOpenTime();
       
+      // === 详细调试信息（NEW）===
+      Print("========== 自动减仓利润计算调试 ==========");
+      Print(" OrderOpenPrice: ", DoubleToString(OrderOpenPrice(), _Digits));
+      Print(" closePrice: ", DoubleToString(closePrice, _Digits));
+      
       // 计算锁定利润
       double profit = (OrderType() == OP_BUY) ? 
                       (closePrice - OrderOpenPrice()) :
                       (OrderOpenPrice() - closePrice);
+      Print(" profit (价格差): ", DoubleToString(profit, _Digits));
+      Print(" closeAmount (减仓手数): ", DoubleToString(closeAmount, 2));
+      Print(" _Point: ", DoubleToString(_Point, _Digits));
+      
       double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+      double contractSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);
+      Print(" SYMBOL_TRADE_TICK_VALUE: ", DoubleToString(tickValue, 4));
+      Print(" SYMBOL_TRADE_TICK_SIZE: ", DoubleToString(tickSize, _Digits));
+      Print(" SYMBOL_TRADE_CONTRACT_SIZE: ", DoubleToString(contractSize, 0));
+      
       double lockedProfit = profit * closeAmount / _Point * tickValue;
+      Print(" lockedProfit (当前公式): ", DoubleToString(lockedProfit, 2));
+      
+      // 使用标准公式重新计算
+      double standardProfit = profit * closeAmount * contractSize;
+      Print(" standardProfit (标准公式): ", DoubleToString(standardProfit, 2));
+      Print("==========================================");
       
       Print(" 自动减仓成功: Ticket=", ticket, 
             " 减仓=", closeAmount, " 手，锁定利润=$", DoubleToString(lockedProfit, 2));
