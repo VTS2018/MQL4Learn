@@ -1571,7 +1571,9 @@ void CTradePanel::UpdateInfoContainers(void)
    {
       double dailyProfit = CalculateDailyProfit();
       double balance = AccountBalance();
-      double profitPercent = (balance > 0) ? (dailyProfit / balance * 100) : 0;
+      // === 【修复】正确计算百分比：相对于今日起始余额，而不是当前余额 ===
+      double startBalance = balance - dailyProfit;  // 今日起始余额 = 当前余额 - 今日盈亏
+      double profitPercent = (startBalance > 0) ? (dailyProfit / startBalance * 100) : 0;
       
       string profitText = StringFormat("今日盈亏: %s$%.2f (%s%.2f%%)",
          dailyProfit >= 0 ? "+" : "",
