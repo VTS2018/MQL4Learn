@@ -1467,6 +1467,76 @@ void UpdateATRDisplay()
       ObjectSetInteger(0, sell_sl_name, OBJPROP_TIME, 0, current_time);
       ObjectSetDouble(0, sell_sl_name, OBJPROP_PRICE, 0, sell_sl_price);
    }
+   
+   // ====================================================================
+   // === 新增功能：动态显示当前价格大字体标签（醒目） ===
+   // ====================================================================
+   
+   string price_label_name = base_name + "_CurrentPrice_BigLabel";
+   
+   // 判断价格涨跌，决定颜色
+   color price_color;
+   if(change_points > 0)
+      price_color = clrLime;           // 上涨：亮绿色
+   else if(change_points < 0)
+      price_color = clrRed;            // 下跌：红色
+   else
+      price_color = clrYellow;         // 持平：黄色
+   
+   // 格式化当前价格文本
+   string price_text = DoubleToString(current_price, digits);
+   
+   // 计算价格标签的Y坐标（在第11行下方）
+   // 第11行Y坐标 = start_y + (11 * line_height) = 50 + 165 = 215
+   // 价格标签Y = 215 + 20（额外间距）= 235
+   int price_label_y = start_y + (11 * line_height) + 20;
+   
+   // 创建或更新大字体价格标签
+   if(ObjectFind(0, price_label_name) == -1)
+   {
+      ObjectCreate(0, price_label_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, price_label_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);   // 右上角定位
+      ObjectSetInteger(0, price_label_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);   // 右对齐
+      ObjectSetInteger(0, price_label_name, OBJPROP_FONTSIZE, 32);                 // 大字体32号
+      ObjectSetString(0, price_label_name, OBJPROP_FONT, "Arial Black");           // 粗体字体
+      ObjectSetInteger(0, price_label_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, price_label_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, price_label_name, OBJPROP_HIDDEN, true);
+   }
+   
+   // 更新位置、颜色和文本
+   ObjectSetInteger(0, price_label_name, OBJPROP_XDISTANCE, start_x);      // 与Dashboard对齐
+   ObjectSetInteger(0, price_label_name, OBJPROP_YDISTANCE, price_label_y); // 第11行下方
+   ObjectSetInteger(0, price_label_name, OBJPROP_COLOR, price_color);      // 动态颜色
+   ObjectSetString(0, price_label_name, OBJPROP_TEXT, price_text);         // 当前价格
+   
+   // === 新增：在价格标签下方显示涨跌信息（小字体） ===
+   string change_label_name = base_name + "_PriceChange_Label";
+   
+   // 涨跌文本（带符号）
+   string change_display = StringFormat("%s pts", change_str);
+   
+   // 计算涨跌标签的Y坐标（在价格标签下方）
+   int change_label_y = price_label_y + 60;
+   
+   // 创建或更新涨跌标签
+   if(ObjectFind(0, change_label_name) == -1)
+   {
+      ObjectCreate(0, change_label_name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, change_label_name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);  // 右上角定位
+      ObjectSetInteger(0, change_label_name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);  // 右对齐
+      ObjectSetInteger(0, change_label_name, OBJPROP_FONTSIZE, 12);                // 小字体
+      ObjectSetString(0, change_label_name, OBJPROP_FONT, "Arial");
+      ObjectSetInteger(0, change_label_name, OBJPROP_BACK, false);
+      ObjectSetInteger(0, change_label_name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, change_label_name, OBJPROP_HIDDEN, true);
+   }
+   
+   // 更新位置、颜色和文本
+   ObjectSetInteger(0, change_label_name, OBJPROP_XDISTANCE, start_x);      // 与Dashboard对齐
+   ObjectSetInteger(0, change_label_name, OBJPROP_YDISTANCE, change_label_y); // 价格标签下方
+   ObjectSetInteger(0, change_label_name, OBJPROP_COLOR, price_color);      // 与价格颜色一致
+   ObjectSetString(0, change_label_name, OBJPROP_TEXT, change_display);     // 涨跌点数
 }
 
 //+------------------------------------------------------------------+
