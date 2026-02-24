@@ -326,6 +326,7 @@ public:
                    ~CTradePanel();
    virtual bool     Create(const long chart,const string name,const int subwin,const int x1,const int y1,const int x2,const int y2);
    virtual bool     OnEvent(const int id,const long &lparam,const double &dparam,const string &sparam);
+   virtual void     ChartEvent(const int id,const long &lparam,const double &dparam,const string &sparam); // 拦截CHART_CHANGE防止自动最小化
    void             UpdateInfoContainers(void);  // 更新信息容器
    void             CheckAutoScaleOut(void);     // 检查并执行自动减仓（需要public以便在OnTick中调用）
    
@@ -435,6 +436,22 @@ bool CTradePanel::Create(const long chart,const string name,const int subwin,con
    SyncUIWithState();
       
    return(true);
+}
+
+//+------------------------------------------------------------------+
+//| 重写ChartEvent - 拦截CHART_CHANGE事件防止自动最小化                  |
+//+------------------------------------------------------------------+
+void CTradePanel::ChartEvent(const int id,const long &lparam,const double &dparam,const string &sparam)
+{
+   // 拦截 CHARTEVENT_CHART_CHANGE 事件，防止自动最小化
+   if(id == CHARTEVENT_CHART_CHANGE)
+   {
+      Print("[面板防护] 拦截CHART_CHANGE事件，防止自动最小化");
+      return;  // 不调用父类，完全拦截
+   }
+   
+   // 其他所有事件正常传递给父类处理
+   CAppDialog::ChartEvent(id, lparam, dparam, sparam);
 }
 
 //+------------------------------------------------------------------+
