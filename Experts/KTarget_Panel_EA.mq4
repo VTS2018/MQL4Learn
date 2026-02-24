@@ -302,6 +302,20 @@ private:
    bool             m_scaleOutEnabled;     // 是否启用自动减仓
    datetime         m_scaledOpenTimes[100];// 已减仓订单的开仓时间
    int              m_scaledCount;         // 已减仓订单数量
+   
+   // === 输入框状态保存变量（12个）===
+   string           m_lastLots;            // 最后的手数值
+   string           m_lastStopLoss;        // 最后的止损价格
+   string           m_lastTakeProfit;      // 最后的止盈价格
+   string           m_lastSlPoints;        // 止损点数
+   string           m_lastSlPrice2;        // 止损价格(模块2)
+   string           m_lastTpPoints;        // 止盈点数
+   string           m_lastTpPrice2;        // 止盈价格(模块2)
+   string           m_lastClosePct;        // 平仓百分比
+   string           m_lastCloseLots;       // 平仓手数
+   string           m_lastTriggerPts;      // 触发点数
+   string           m_lastScalePct;        // 减仓比例
+   string           m_lastScaleLots;       // 减仓手数
 
    // 模块4: 订单记录模块控件
    CLabel           m_lblMod4;          // 模块4标题
@@ -319,6 +333,10 @@ public:
    void             SetStopLossPrice(double price);    // 设置止损价格
    void             SetTakeProfitPrice(double price);  // 设置止盈价格
    void             ResetSelectButton(int mode);       // 重置选择按钮颜色
+   
+   // 状态管理公共方法（需要从外部调用）
+   void             SaveInputValues(void);            // 保存输入框值到成员变量
+   void             RestoreInputValues(void);         // 从成员变量恢复输入框值
    
 protected:
    bool             CreateControls(void);
@@ -359,7 +377,7 @@ protected:
    void             OnClickSelectSL(void);            // 点击选择止损按钮
    void             OnClickSelectTP(void);            // 点击选择止盈按钮
    
-   // 状态同步方法
+   // 状态同步方法（内部）
    void             SyncUIWithState(void);            // 同步UI显示与内部状态
 };
 
@@ -372,6 +390,23 @@ CTradePanel::CTradePanel()
    m_scaleOutEnabled = false;
    m_scaledCount = 0;
    ArrayInitialize(m_scaledOpenTimes, 0);
+   
+   // === 初始化输入框默认值（12个）===
+   m_lastLots = "0.01";
+   m_lastStopLoss = "0.00000";
+   m_lastTakeProfit = "0.00000";
+
+   m_lastSlPoints = "500";
+   m_lastSlPrice2 = "0.00000";
+   m_lastTpPoints = "1000";
+   m_lastTpPrice2 = "0.00000";
+
+   m_lastClosePct = "30";
+   m_lastCloseLots = "0.10";
+
+   m_lastTriggerPts = "200";
+   m_lastScalePct = "80";
+   m_lastScaleLots = "0.04";
 }
 
 //+------------------------------------------------------------------+
@@ -949,7 +984,66 @@ void CTradePanel::SyncUIWithState(void)
       m_edtPositions.Text("[ 已隐藏 ]");
    }
    
+   // === 4. 恢复输入框值 ===
+   RestoreInputValues();
+   
    Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
+}
+
+//+------------------------------------------------------------------+
+//| 保存输入框值到成员变量（在OnDeinit中调用）                  |
+//+------------------------------------------------------------------+
+void CTradePanel::SaveInputValues(void)
+{
+   // 模块1: 开仓模块
+   m_lastLots = m_edtLots.Text();
+   m_lastStopLoss = m_edtStopLoss.Text();
+   m_lastTakeProfit = m_edtTakeProfit.Text();
+   
+   // 模块2: SL/TP管理模块
+   m_lastSlPoints = m_edtSlPoints.Text();
+   m_lastSlPrice2 = m_edtSlPrice2.Text();
+   m_lastTpPoints = m_edtTpPoints.Text();
+   m_lastTpPrice2 = m_edtTpPrice2.Text();
+   
+   // 模块3: 平仓模块
+   m_lastClosePct = m_edtClosePct.Text();
+   m_lastCloseLots = m_edtCloseLots.Text();
+   
+   // 模块5: 自动减仓模块
+   m_lastTriggerPts = m_edtTriggerPts.Text();
+   m_lastScalePct = m_edtScalePct.Text();
+   m_lastScaleLots = m_edtScaleLots.Text();
+   
+   Print("[状态保存] 已保存12个输入框的值：手数=", m_lastLots, ", 止损=", m_lastStopLoss, ", 触发点数=", m_lastTriggerPts);
+}
+
+//+------------------------------------------------------------------+
+//| 从成员变量恢复输入框值（在SyncUIWithState中调用）         |
+//+------------------------------------------------------------------+
+void CTradePanel::RestoreInputValues(void)
+{
+   // 模块1: 开仓模块
+   m_edtLots.Text(m_lastLots);
+   m_edtStopLoss.Text(m_lastStopLoss);
+   m_edtTakeProfit.Text(m_lastTakeProfit);
+   
+   // 模块2: SL/TP管理模块
+   m_edtSlPoints.Text(m_lastSlPoints);
+   m_edtSlPrice2.Text(m_lastSlPrice2);
+   m_edtTpPoints.Text(m_lastTpPoints);
+   m_edtTpPrice2.Text(m_lastTpPrice2);
+   
+   // 模块3: 平仓模块
+   m_edtClosePct.Text(m_lastClosePct);
+   m_edtCloseLots.Text(m_lastCloseLots);
+   
+   // 模块5: 自动减仓模块
+   m_edtTriggerPts.Text(m_lastTriggerPts);
+   m_edtScalePct.Text(m_lastScalePct);
+   m_edtScaleLots.Text(m_lastScaleLots);
+   
+   Print("[状态恢复] 已恢复12个输入框的值：手数=", m_lastLots, ", 止损=", m_lastStopLoss, ", 触发点数=", m_lastTriggerPts);
 }
 
 //+------------------------------------------------------------------+
@@ -2286,6 +2380,9 @@ void OnDeinit(const int reason)
 {
    // 清理EA止损标签
    CleanupEA_SL_Labels();
+   
+   // === 【重要】保存输入框值到成员变量（即使是图表切换也要保存） ===
+   g_tradePanel.SaveInputValues();
    
    // 销毁面板（OnDeinit 时 EA 本身已在退出，不会再处理图表事件，无级联风险）
    if(g_ordersCreated)
