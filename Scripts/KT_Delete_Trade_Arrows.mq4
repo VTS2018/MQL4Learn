@@ -28,6 +28,19 @@ void OnStart()
       // StringFind 返回 0 表示在字符串起始位置找到
       if(StringFind(obj_name, "#") == 0)
       {
+         // === 新增功能：删除订单轨迹画线 ===
+         // 特征：类型为趋势线 + 名称包含 "->" 模式
+         // 示例：#40265328 5213.68 -> 5213.13
+         int obj_type = ObjectType(obj_name);
+         if(obj_type == OBJ_TREND && StringFind(obj_name, " -> ") != -1)
+         {
+            if(ObjectDelete(0, obj_name))
+            {
+               deleted_count++;
+            }
+            continue;  // 已处理，跳到下一个对象
+         }
+         
          // 2. 特征二：名称中包含 "buy"、"sell" 或 "modified" (双重确认，防止误删自定义的 # 标签)
          // StringToLower 将名称转为小写，忽略大小写差异
          string name_lower = obj_name;
@@ -50,7 +63,12 @@ void OnStart()
    }
    
    // 打印结果到“专家”选项卡
-   Print(" 清理完成！共删除了 ", deleted_count, " 个交易箭头对象。");
+   Print("════════════════════════════════════════════");
+   Print(" 交易标记清理完成！");
+   Print("────────────────────────────────────────────");
+   Print(" 共删除: ", deleted_count, " 个对象");
+   Print("   └─ 包含订单轨迹线和交易箭头");
+   Print("════════════════════════════════════════════");
    // Comment("已清理 ", deleted_count, " 个交易箭头。");
    // Sleep(1000);
    // Comment(""); // 清除注释
