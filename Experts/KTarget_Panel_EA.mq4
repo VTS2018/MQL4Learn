@@ -358,6 +358,9 @@ protected:
    // 价格选择功能方法（NEW）
    void             OnClickSelectSL(void);            // 点击选择止损按钮
    void             OnClickSelectTP(void);            // 点击选择止盈按钮
+   
+   // 状态同步方法
+   void             SyncUIWithState(void);            // 同步UI显示与内部状态
 };
 
 //+------------------------------------------------------------------+
@@ -392,6 +395,9 @@ bool CTradePanel::Create(const long chart,const string name,const int subwin,con
    // 创建控件
    if(!CreateControls())
       return(false);
+   
+   // === 【重要】同步UI与内部状态（解决切换周期后状态不一致问题） ===
+   SyncUIWithState();
       
    return(true);
 }
@@ -898,6 +904,52 @@ bool CTradePanel::CreateControls(void)
       return(false);
 
    return(true);
+}
+
+//+------------------------------------------------------------------+
+//| 同步UI显示与内部状态（解决切换周期后按钮文字错误问题）            |
+//+------------------------------------------------------------------+
+void CTradePanel::SyncUIWithState(void)
+{
+   // === 1. 同步自动减仓按钮状态 ===
+   if(m_scaleOutEnabled)
+   {
+      m_btnToggleScaleOut.Text("关闭自动减仓");
+      m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
+   }
+   else
+   {
+      m_btnToggleScaleOut.Text("开启自动减仓");
+      m_btnToggleScaleOut.ColorBackground(clrLightGray);
+   }
+   
+   // === 2. 同步今日盈亏容器显示状态 ===
+   if(m_showProfit)
+   {
+      m_btnToggleProfit.Text("隐藏");
+      // 触发一次更新以显示数据
+      UpdateInfoContainers();
+   }
+   else
+   {
+      m_btnToggleProfit.Text("显示");
+      m_edtDailyProfit.Text("[ 已隐藏 ]");
+   }
+   
+   // === 3. 同步持仓信息容器显示状态 ===
+   if(m_showPositions)
+   {
+      m_btnTogglePositions.Text("隐藏");
+      // 触发一次更新以显示数据
+      UpdateInfoContainers();
+   }
+   else
+   {
+      m_btnTogglePositions.Text("显示");
+      m_edtPositions.Text("[ 已隐藏 ]");
+   }
+   
+   Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
 }
 
 //+------------------------------------------------------------------+
