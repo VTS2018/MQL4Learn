@@ -24,7 +24,7 @@ input color  BorderColor = clrNavy;  // 边框颜色
 //+------------------------------------------------------------------+
 //| 止损标签参数                                                      |
 //+------------------------------------------------------------------+
-input bool   Show_EA_SL_Labels = true;   // 显示EA止损标签
+input bool   Show_EA_SL_Labels = false;   // 显示EA止损标签
 input int    SL_Distance_Dollars = 5;    // 止损距离（美金）
 input double Label_Offset = 0.3;         // 标签偏移量（避免重叠）
 input color  Buy_SL_Color = clrOrangeRed;   // 做多止损颜色
@@ -471,7 +471,7 @@ bool CTradePanel::CreateControls(void)
    int btnW = 50;                          // 按钮宽度
    int gap = 5;                            // 间距
    int editW = width - btnW - gap;         // 容器宽度
-   int containerH = 35;                    // 容器高度
+   int containerH = 30;                    // 容器高度
    
    // --- 容器1: 今日盈亏 ---
    if(!m_edtDailyProfit.Create(m_chart_id, m_name+"DailyProfit", m_subwin,
@@ -529,7 +529,7 @@ bool CTradePanel::CreateControls(void)
    int col2X   = col1X + col1W + cGap;
    int col3X   = col2X + col2W + cGap;
    int lblRowH = 16;  // 标签行高
-   int edtRowH = 25;  // 输入行高
+   int edtRowH = 22;  // 输入行高
    int lotsBW  = 28;  // +/- 按钮宽度
 
    // 第一行: 三列标签
@@ -737,7 +737,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    y += 20;
 
-   int m3BtnH = 28;                        // 行高
+   int m3BtnH = 25;                        // 行高
    int m3LW   = (width - 10) / 2;          // 左侧快捷按钮区宽
    int m3RX   = x + m3LW + 10;             // 右侧起点X
    int m3RW   = width - m3LW - 10;         // 右侧宽度
@@ -863,7 +863,7 @@ bool CTradePanel::CreateControls(void)
    y += 20;
    
    // 布局参数
-   int m5BtnH = 25;                           // 控件高度
+   int m5BtnH = 22;                           // 控件高度
    int m5LblW = 35;                           // 标签宽度
    int m5Gap = 5;                             // 间距
    int m5Col1W = (width - m5Gap*2) / 3;      // 第一列宽度（触发点数）
@@ -2468,8 +2468,8 @@ void CleanupEA_SL_Labels()
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // 创建面板（高度550：压缩间距优化）
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+550))
+   // 创建面板（高度690：保证所有控件可见）
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+530))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
