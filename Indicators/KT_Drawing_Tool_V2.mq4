@@ -587,7 +587,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName50, OBJPROP_COLOR, levelColor);
                   ObjectSetInteger(0, objName50, OBJPROP_WIDTH, LineWidth);
                   ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);  // 虚线
-                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
+                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5 @" + DoubleToString(level50, Digits));
                   ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
@@ -595,7 +595,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectCreate(0, objName618, OBJ_HLINE, 0, 0, level618);
                   ObjectSetInteger(0, objName618, OBJPROP_COLOR, levelColor);
                   ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
-                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
+                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618 @" + DoubleToString(level618, Digits));
                   ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
                }
@@ -610,7 +610,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName50, OBJPROP_WIDTH, LineWidth);
                   ObjectSetInteger(0, objName50, OBJPROP_STYLE, STYLE_DOT);
                   ObjectSetInteger(0, objName50, OBJPROP_RAY_RIGHT, false);
-                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5");
+                  ObjectSetString(0, objName50, OBJPROP_TEXT, pinbarTypeStr + " 0.5 @" + DoubleToString(level50, Digits));
                   ObjectSetInteger(0, objName50, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName50, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
@@ -619,7 +619,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                   ObjectSetInteger(0, objName618, OBJPROP_COLOR, levelColor);
                   ObjectSetInteger(0, objName618, OBJPROP_WIDTH, LineWidth);
                   ObjectSetInteger(0, objName618, OBJPROP_RAY_RIGHT, false);
-                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618");
+                  ObjectSetString(0, objName618, OBJPROP_TEXT, pinbarTypeStr + " 0.618 @" + DoubleToString(level618, Digits));
                   ObjectSetInteger(0, objName618, OBJPROP_SELECTABLE, !isLinesLocked);
                   ObjectSetInteger(0, objName618, OBJPROP_TIMEFRAMES, visibilityFlags);
                   
