@@ -459,16 +459,16 @@ void CTradePanel::ChartEvent(const int id,const long &lparam,const double &dpara
 //+------------------------------------------------------------------+
 bool CTradePanel::CreateControls(void)
 {
-   int x = 10;
+   int x = 8;
    int y = 10;
-   int width = ClientAreaWidth() - 20;
+   int width = ClientAreaWidth() - 16;
    int btnHeight = 25;
    int inputHeight = 22;
    int spacing = 10;
    
    //=== 信息容器区域 ===
    int infoY = y;
-   int btnW = 50;                          // 按钮宽度
+   int btnW = 45;                          // 按钮宽度
    int gap = 5;                            // 间距
    int editW = width - btnW - gap;         // 容器宽度
    int containerH = 30;                    // 容器高度
@@ -520,17 +520,17 @@ bool CTradePanel::CreateControls(void)
    
    //--- 模块1: 开仓交易模块 (三列横排: 止损 | 手数 | 止盈) ---
 
-   // 列布局: 手数列占40%, 止损/止盈各占30%
-   int cGap    = 10;
-   int col2W   = width * 2 / 5;                     // 手数列宽(40%)
-   int col1W   = (width - col2W - cGap * 2) / 2;   // 止损列宽(30%)
-   int col3W   = width - col2W - col1W - cGap * 2; // 止盈列宽(余量)
+   // 列布局: 紧凑优化
+   int cGap    = 6;
+   int col1W   = 100;                               // 止损列宽（固定）
+   int col2W   = 154;                               // 手数列宽（固定）
+   int col3W   = 100;                               // 止盈列宽（固定）
    int col1X   = x;
    int col2X   = col1X + col1W + cGap;
    int col3X   = col2X + col2W + cGap;
    int lblRowH = 16;  // 标签行高
    int edtRowH = 22;  // 输入行高
-   int lotsBW  = 28;  // +/- 按钮宽度
+   int lotsBW  = 25;  // +/- 按钮宽度
 
    // 第一行: 三列标签
    if(!m_lblStopLoss.Create(m_chart_id,m_name+"LblSL",m_subwin,col1X,y,col1X+col1W,y+lblRowH))
@@ -554,7 +554,7 @@ bool CTradePanel::CreateControls(void)
    int lotsEdtW = col2W - lotsBW * 2 - 10;
 
    // 止损: [输入框] [📍按钮]
-   int selectBtnW = 35;  // 选择按钮宽度
+   int selectBtnW = 30;  // 选择按钮宽度
    int slEditW = col1W - selectBtnW - 3;  // 止损输入框宽度
    
    if(!m_edtStopLoss.Create(m_chart_id,m_name+"EdtSL",m_subwin,col1X,rowY,col1X+slEditW,rowY+edtRowH))
@@ -640,12 +640,12 @@ bool CTradePanel::CreateControls(void)
    y += 20; // 补偿买卖按钮高度
 
    int rowH2   = 25;                              // 输入行高（模块3也使用此变量）
-   int m2Gap   = 10;                              // 两列间距
+   int m2Gap   = 6;                               // 两列间距
    int m2ColW  = (width - m2Gap) / 2;             // 每列宽度
    int m2C1X   = x;                               // 左列起点X
    int m2C2X   = x + m2ColW + m2Gap;              // 右列起点X
-   int m2LblW  = 45;                              // 内联标签宽度
-   int m2BtnW  = 38;                              // Set按钮宽度
+   int m2LblW  = 40;                              // 内联标签宽度
+   int m2BtnW  = 35;                              // Set按钮宽度
    int m2EdtW  = m2ColW - m2LblW - m2BtnW - 6;   // 输入框宽度（两侧各3px间距）
    int m2Edt1X = m2C1X + m2LblW + 3;             // 左列输入框X
    int m2Edt2X = m2C2X + m2LblW + 3;             // 右列输入框X
@@ -738,12 +738,12 @@ bool CTradePanel::CreateControls(void)
    y += 20;
 
    int m3BtnH = 25;                        // 行高
-   int m3LW   = (width - 10) / 2;          // 左侧快捷按钮区宽
-   int m3RX   = x + m3LW + 10;             // 右侧起点X
-   int m3RW   = width - m3LW - 10;         // 右侧宽度
+   int m3LW   = (width - 8) / 2;           // 左侧快捷按钮区宽
+   int m3RX   = x + m3LW + 8;              // 右侧起点X
+   int m3RW   = width - m3LW - 8;          // 右侧宽度
    int m3QB   = (m3LW - 10) / 3;           // 快捷按钮宽（内含5px间距）
-   int m3LblW = 30;                         // 右侧标签宽
-   int m3GoW  = 38;                         // Go按钮宽
+   int m3LblW = 28;                        // 右侧标签宽
+   int m3GoW  = 35;                        // Go按钮宽
    int m3EdtW = m3RW - m3LblW - m3GoW - 6; // 右侧输入框宽
    int m3EdtX = m3RX + m3LblW + 3;         // 右侧输入框X
    int m3GoX  = m3EdtX + m3EdtW + 3;       // 右侧Go按钮X
@@ -864,8 +864,8 @@ bool CTradePanel::CreateControls(void)
    
    // 布局参数
    int m5BtnH = 22;                           // 控件高度
-   int m5LblW = 35;                           // 标签宽度
-   int m5Gap = 5;                             // 间距
+   int m5LblW = 32;                           // 标签宽度
+   int m5Gap = 4;                             // 间距
    int m5Col1W = (width - m5Gap*2) / 3;      // 第一列宽度（触发点数）
    int m5Col2W = m5Col1W;                     // 第二列宽度（减仓比例）
    int m5Col3W = width - m5Col1W - m5Col2W - m5Gap*2; // 第三列宽度（减仓手数）
@@ -2468,8 +2468,8 @@ void CleanupEA_SL_Labels()
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // 创建面板（高度690：保证所有控件可见）
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+530))
+   // 创建面板（宽400×高530：紧凑优化）
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+400,PanelY+530))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
