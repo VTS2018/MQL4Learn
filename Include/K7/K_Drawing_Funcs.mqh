@@ -136,6 +136,12 @@ void DrawP1Baseline(int target_index, int breakout_index, bool is_bullish, doubl
     
     // 将趋势线设置为不可选中
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    
+    // === 【NEW】控制对象列表可见性 ===
+    if (Hide_Auxiliary_In_List)
+    {
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    }
 }
 
 /**
@@ -195,6 +201,12 @@ void DrawP2Baseline(int target_index, int breakout_index, bool is_bullish)
     comment = "P2 Baseline" + " (P2:" + DoubleToString(P2_price, Digits) + ")";
     ObjectSetString(0, name, OBJPROP_TEXT, comment);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    
+    // === 【NEW】控制对象列表可见性 ===
+    if (Hide_Auxiliary_In_List)
+    {
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    }
 }
 
 //========================================================================
@@ -260,6 +272,12 @@ void DrawAbsoluteSupportLine(int abs_index, bool is_bullish, int extend_bars)
     ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
     ObjectSetDouble(0, name, OBJPROP_PRICE2, price);
     ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+    
+    // === 【NEW】控制对象列表可见性 ===
+    if (Hide_Auxiliary_In_List)
+    {
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    }
 }
 
 //========================================================================

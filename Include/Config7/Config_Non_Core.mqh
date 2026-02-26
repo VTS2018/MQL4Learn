@@ -24,4 +24,5 @@ extern int Timer_Interval_Seconds = 5;    // Timer Interval (Sec)
 //+------------------------------------------------------------------+
 //| ✅ Visual Control Switches
 //+------------------------------------------------------------------+
-extern bool Is_DrawFibonacciLines = true; // Draw Signal Fibo Lines
+extern bool Is_DrawFibonacciLines = true;   // Draw Signal Fibo Lines
+extern bool Hide_Auxiliary_In_List = true; // Hide Auxiliary Objects In List
