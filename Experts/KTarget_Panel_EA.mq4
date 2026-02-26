@@ -516,7 +516,7 @@ bool CTradePanel::CreateControls(void)
    m_showPositions = true;  // 初始状态：显示
    
    // === 模块1起始位置向下移动 ===
-   y = infoY + containerH + 15;
+   y = infoY + containerH + 8;
    
    //--- 模块1: 开仓交易模块 (三列横排: 止损 | 手数 | 止盈) ---
 
@@ -637,7 +637,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    
    //=== 模块2: 止盈止损管理 (2列×2行, 标签内联) ===
-   y += 30; // 补偿买卖按钮高度
+   y += 20; // 补偿买卖按钮高度
 
    int rowH2   = 25;                              // 输入行高（模块3也使用此变量）
    int m2Gap   = 10;                              // 两列间距
@@ -660,7 +660,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    if(!Add(m_lblMod2))
       return(false);
-   y += 28;
+   y += 20;
 
    //--- 第一行: [SL pts:][input][Set] | [TP pts:][input][Set] ---
    if(!m_lblSlPoints.Create(m_chart_id,m_name+"LblSlPts",m_subwin,m2C1X,y,m2C1X+m2LblW,y+rowH2))
@@ -726,7 +726,7 @@ bool CTradePanel::CreateControls(void)
    if(!Add(m_btnSetTpPrice)) return(false);
 
    //=== 模块3: 比例平仓 (2行紧凑布局) ===
-   y += rowH2 + 10;
+   y += rowH2 + 5;
 
    // 模块3标题
    if(!m_lblMod3.Create(m_chart_id,m_name+"LblMod3",m_subwin,x,y,x+width,y+20))
@@ -735,7 +735,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    if(!Add(m_lblMod3))
       return(false);
-   y += 28;
+   y += 20;
 
    int m3BtnH = 28;                        // 行高
    int m3LW   = (width - 10) / 2;          // 左侧快捷按钮区宽
@@ -851,7 +851,7 @@ bool CTradePanel::CreateControls(void)
    if(!Add(m_btnBreakEven)) return(false);
 
    //=== 模块5: 自动减仓 ===
-   y += m3BtnH + 10;
+   y += m3BtnH + 5;
    
    // 模块标题
    if(!m_lblScaleOut.Create(m_chart_id,m_name+"LblScaleOut",m_subwin,x,y,x+width,y+20))
@@ -860,7 +860,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    if(!Add(m_lblScaleOut))
       return(false);
-   y += 28;
+   y += 20;
    
    // 布局参数
    int m5BtnH = 25;                           // 控件高度
@@ -937,7 +937,7 @@ bool CTradePanel::CreateControls(void)
    if(!Add(m_btnSmartCalc)) return(false);
 
    //=== 模块4: 订单记录模块 ===
-   y += m3BtnH + 10;
+   y += m3BtnH + 5;
 
    if(!m_lblMod4.Create(m_chart_id,m_name+"LblMod4",m_subwin,x,y,x+width,y+20))
       return(false);
@@ -945,7 +945,7 @@ bool CTradePanel::CreateControls(void)
       return(false);
    if(!Add(m_lblMod4))
       return(false);
-   y += 28;
+   y += 20;
 
    if(!m_btnViewOrders.Create(m_chart_id,m_name+"BtnViewOrders",m_subwin,x,y,x+width,y+28))
       return(false);
@@ -2468,8 +2468,8 @@ void CleanupEA_SL_Labels()
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // 创建面板（高度638：原432 + 信息容器90 + 自动减仓模块116）
-   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+638))
+   // 创建面板（高度550：压缩间距优化）
+   if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+500,PanelY+550))
    {
       Print("创建交易面板失败!");
       return(INIT_FAILED);
