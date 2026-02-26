@@ -338,6 +338,7 @@ public:
    // 状态管理公共方法（需要从外部调用）
    void             SaveInputValues(void);            // 保存输入框值到成员变量
    void             RestoreInputValues(void);         // 从成员变量恢复输入框值
+   void             ForceMaximize(void);              // 强制最大化面板
    
 protected:
    bool             CreateControls(void);
@@ -1011,6 +1012,14 @@ void CTradePanel::SyncUIWithState(void)
    RestoreInputValues();
    
    Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
+}
+
+//+------------------------------------------------------------------+
+//| 强制最大化面板（切换周期时调用）                               |
+//+------------------------------------------------------------------+
+void CTradePanel::ForceMaximize(void)
+{
+   Maximize();
 }
 
 //+------------------------------------------------------------------+
@@ -2495,6 +2504,9 @@ void OnDeinit(const int reason)
 {
    // 清理EA止损标签
    CleanupEA_SL_Labels();
+   
+   // === 【修复】切换周期前强制最大化，确保重建时状态正确 ===
+   g_tradePanel.ForceMaximize();
    
    // === 【重要】保存输入框值到成员变量（即使是图表切换也要保存） ===
    g_tradePanel.SaveInputValues();
