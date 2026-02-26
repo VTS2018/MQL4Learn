@@ -1756,10 +1756,10 @@ void CTradePanel::OnClickViewOrders(void)
       int rows   = MathMax(todayCnt, 3);
       int panelH = 43 + rows * 17 + 36;
 
-      int ox = PanelX + 510;
+      int ox = PanelX + 410;
       int oy = PanelY;
       g_ordersPanel.SetMaxRows(rows);
-      if(!g_ordersPanel.Create(0,"OrdersPanel",0,ox,oy,ox+600,oy+panelH))
+      if(!g_ordersPanel.Create(0,"OrdersPanel",0,ox,oy,ox+460,oy+panelH))
       {
          Print("创建订单记录面板失败!");
          return;
