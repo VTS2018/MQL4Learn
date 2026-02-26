@@ -392,6 +392,12 @@ void DrawP1P2Rectangle(int target_index, int P2_index, bool is_bullish)
     ObjectSetDouble(0, name, OBJPROP_PRICE1, price1);
     ObjectSetInteger(0, name, OBJPROP_TIME2, time2);
     ObjectSetDouble(0, name, OBJPROP_PRICE2, price2);
+    
+    // === 【NEW】控制对象列表可见性 ===
+    if (Hide_Auxiliary_In_List)
+    {
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+    }
 }
 
 //========================================================================
@@ -568,6 +574,12 @@ void DrawP1P2Fibonacci(int target_index, int P2_index, bool is_bullish)
     {
         // 🚨 最终修正：使用转换后的正确的位标志 🚨
         ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, current_tf_flag);
+    }
+    
+    // === 【NEW】控制对象列表可见性 ===
+    if (Hide_Auxiliary_In_List)
+    {
+        ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
     }
 }
 
