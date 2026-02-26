@@ -228,6 +228,17 @@ void COrdersPanel::RefreshOrders(void)
 }
 
 //+------------------------------------------------------------------+
+//| 自动减仓记录结构体（方案B：支持多次减仓）                          |
+//+------------------------------------------------------------------+
+struct ScaleRecord
+{
+   int      ticket;      // 订单票号
+   double   lastLots;    // 上次检查时的手数（手数变少说明刚减仓）
+   datetime lastCheck;   // 上次检查时间（用于清理）
+   bool     everScaled;  // 该订单是否曾经减仓过（用于"单次减仓模式"）
+};
+
+//+------------------------------------------------------------------+
 //| 自定义面板类                                                      |
 //+------------------------------------------------------------------+
 class CTradePanel : public CAppDialog
@@ -302,11 +313,13 @@ private:
    CEdit            m_edtScaleLots;        // 减仓手数输入框
    CButton          m_btnToggleScaleOut;   // 开启/关闭按钮
    CButton          m_btnSmartCalc;        // 智能计算按钮
+   CButton          m_btnToggleMultiScale; // 允许多次减仓开关（NEW）
    
-   // 自动减仓状态变量
+   // 自动减仓状态变量（方案B：用Ticket+手数跟踪，支持多次减仓）
    bool             m_scaleOutEnabled;     // 是否启用自动减仓
-   datetime         m_scaledOpenTimes[100];// 已减仓订单的开仓时间
-   int              m_scaledCount;         // 已减仓订单数量
+   bool             m_allowMultipleScaleOut; // 是否允许同一订单多次减仓（默认false）
+   ScaleRecord      m_scaleRecords[100];   // 减仓记录数组（Ticket + 上次手数）
+   int              m_recordCount;         // 记录数量
    
    // === 输入框状态保存变量（12个）===
    string           m_lastLots;            // 最后的手数值
@@ -375,6 +388,7 @@ protected:
    
    // 自动减仓相关方法（内部）
    void             OnClickToggleScaleOut(void);      // 切换自动减仓开关
+   void             OnClickToggleMultiScale(void);    // 切换多次减仓开关（NEW）
    void             OnClickSmartCalc(void);           // 智能计算保本参数
    void             ExecuteScaleOut(int ticket, double pct, double lots); // 执行减仓
    bool             IsOrderScaled(int ticket);        // 检查订单是否已减仓
@@ -395,8 +409,9 @@ CTradePanel::CTradePanel()
 {
    // 初始化自动减仓状态
    m_scaleOutEnabled = false;
-   m_scaledCount = 0;
-   ArrayInitialize(m_scaledOpenTimes, 0);
+   m_allowMultipleScaleOut = false;  // 默认：每笔订单只减仓一次
+   m_recordCount = 0;
+   // 注：m_scaleRecords 结构体数组会自动零初始化，无需手动处理
    
    // === 初始化输入框默认值（12个）===
    m_lastLots = "0.01";
@@ -947,6 +962,16 @@ bool CTradePanel::CreateControls(void)
    if(!m_btnSmartCalc.Text("智能计算保本")) return(false);
    m_btnSmartCalc.ColorBackground(clrMediumSeaGreen);
    if(!Add(m_btnSmartCalc)) return(false);
+   
+   y += m5BtnH + 5;
+   
+   // 第三行：[允许多次减仓] 切换按钮
+   if(!m_btnToggleMultiScale.Create(m_chart_id,m_name+"BtnToggleMultiScale",m_subwin,
+                                     x,y,x+width,y+m5BtnH))
+      return(false);
+   if(!m_btnToggleMultiScale.Text("多次减仓(关)")) return(false);
+   m_btnToggleMultiScale.ColorBackground(clrLightGray);
+   if(!Add(m_btnToggleMultiScale)) return(false);
 
    //=== 模块4: 订单记录模块 ===
    y += m3BtnH + 5;
@@ -987,6 +1012,18 @@ void CTradePanel::SyncUIWithState(void)
       m_btnToggleScaleOut.ColorBackground(clrLightGray);
    }
    
+   // === 1.1 同步多次减仓按钮状态（NEW）===
+   if(m_allowMultipleScaleOut)
+   {
+      m_btnToggleMultiScale.Text("多次减仓(开)");
+      m_btnToggleMultiScale.ColorBackground(clrMediumSeaGreen);
+   }
+   else
+   {
+      m_btnToggleMultiScale.Text("多次减仓(关)");
+      m_btnToggleMultiScale.ColorBackground(clrLightGray);
+   }
+   
    // === 2. 同步今日盈亏容器显示状态 ===
    if(m_showProfit)
    {
@@ -1016,7 +1053,8 @@ void CTradePanel::SyncUIWithState(void)
    // === 4. 恢复输入框值 ===
    RestoreInputValues();
    
-   Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
+   Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, 
+         ", 多次减仓=", m_allowMultipleScaleOut, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
 }
 
 //+------------------------------------------------------------------+
@@ -1149,6 +1187,8 @@ bool CTradePanel::OnEvent(const int id,const long &lparam,const double &dparam,c
       if(sparam == m_name+"BtnTogglePos")     { OnClickTogglePositions(); return(true); }
       // 切换自动减仓开关
       if(sparam == m_name+"BtnToggleScaleOut") { OnClickToggleScaleOut(); return(true); }
+      // 切换多次减仓开关（NEW）
+      if(sparam == m_name+"BtnToggleMultiScale") { OnClickToggleMultiScale(); return(true); }
       // 智能计算保本参数
       if(sparam == m_name+"BtnSmartCalc")     { OnClickSmartCalc();     return(true); }
       // 选择止损价格按钮 (NEW)
@@ -1992,6 +2032,30 @@ void CTradePanel::OnClickToggleScaleOut(void)
 }
 
 //+------------------------------------------------------------------+
+//| 切换多次减仓开关（NEW）                                            |
+//+------------------------------------------------------------------+
+void CTradePanel::OnClickToggleMultiScale(void)
+{
+   m_allowMultipleScaleOut = !m_allowMultipleScaleOut;
+   
+   if(m_allowMultipleScaleOut)
+   {
+      m_btnToggleMultiScale.Text("多次减仓(开)");
+      m_btnToggleMultiScale.ColorBackground(clrMediumSeaGreen);
+      Print("多次减仓已启用：同一订单可多次达标减仓");
+   }
+   else
+   {
+      m_btnToggleMultiScale.Text("多次减仓(关)");
+      m_btnToggleMultiScale.ColorBackground(clrLightGray);
+      Print("多次减仓已关闭：每笔订单仅减仓一次");
+      // 注意：不清除 everScaled 标记，已减仓的订单保持状态
+   }
+   
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
 //| 智能计算保本参数                                                  |
 //+------------------------------------------------------------------+
 void CTradePanel::OnClickSmartCalc(void)
@@ -2186,8 +2250,17 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
    
    if(result)
    {
-      // 记录已减仓（使用开仓时间）
-      m_scaledOpenTimes[m_scaledCount++] = OrderOpenTime();
+      // 记录已减仓（方案B：记录 Ticket 和减仓后的手数）
+      double newLots = OrderLots() - closeAmount;  // 剩余手数
+      for(int i = 0; i < m_recordCount; i++)
+      {
+         if(m_scaleRecords[i].ticket == ticket)
+         {
+            m_scaleRecords[i].lastLots = newLots;  // 更新为减仓后手数
+            m_scaleRecords[i].lastCheck = TimeCurrent();
+            break;
+         }
+      }
       
       // === 详细调试信息（NEW）===
       Print("========== 自动减仓利润计算调试 ==========");
@@ -2233,49 +2306,81 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
 }
 
 //+------------------------------------------------------------------+
-//| 检查订单是否已减仓                                                |
+//| 检查订单是否刚减仓过（方案B增强：支持单次/多次减仓模式）            |
 //+------------------------------------------------------------------+
 bool CTradePanel::IsOrderScaled(int ticket)
 {
    if(!OrderSelect(ticket, SELECT_BY_TICKET)) return false;
-   datetime openTime = OrderOpenTime();
+   double currentLots = OrderLots();
    
-   for(int i = 0; i < m_scaledCount; i++)
+   // 查找该订单的历史记录
+   for(int i = 0; i < m_recordCount; i++)
    {
-      if(m_scaledOpenTimes[i] == openTime) return true;
+      if(m_scaleRecords[i].ticket == ticket)
+      {
+         // === 单次减仓模式（默认）：检查是否曾减仓过 ===
+         if(!m_allowMultipleScaleOut && m_scaleRecords[i].everScaled)
+         {
+            return true;  // 已经减仓过，永久跳过
+         }
+         
+         // === 多次减仓模式：检查手数变化 ===
+         // 手数变少了，说明刚减仓过，更新记录并返回true（本轮跳过）
+         if(currentLots < m_scaleRecords[i].lastLots)
+         {
+            m_scaleRecords[i].lastLots = currentLots;
+            m_scaleRecords[i].lastCheck = TimeCurrent();
+            m_scaleRecords[i].everScaled = true;  // 标记为已减仓
+            return true;  // 刚减仓，本轮跳过
+         }
+         // 手数未变，允许再次减仓（多次模式）或首次减仓（单次模式）
+         m_scaleRecords[i].lastCheck = TimeCurrent();
+         return false;
+      }
    }
-   return false;
+   
+   // 首次遇到该订单，添加新记录
+   if(m_recordCount < 100)
+   {
+      m_scaleRecords[m_recordCount].ticket = ticket;
+      m_scaleRecords[m_recordCount].lastLots = currentLots;
+      m_scaleRecords[m_recordCount].lastCheck = TimeCurrent();
+      m_scaleRecords[m_recordCount].everScaled = false;  // 初始化为未减仓
+      m_recordCount++;
+   }
+   return false;  // 首次检查，允许减仓
 }
 
 //+------------------------------------------------------------------+
-//| 清理已关闭订单记录                                                |
+//| 清理已关闭订单记录（方案B优化：O(n)复杂度，按Ticket精确查找）      |
 //+------------------------------------------------------------------+
 void CTradePanel::CleanupScaledOrders(void)
 {
-   for(int i = m_scaledCount - 1; i >= 0; i--)
+   // 倒序遍历，删除时不影响后续索引
+   for(int i = m_recordCount - 1; i >= 0; i--)
    {
-      datetime openTime = m_scaledOpenTimes[i];
-      bool found = false;
+      int ticket = m_scaleRecords[i].ticket;
       
-      // 检查这个开仓时间的订单是否还存在
-      for(int j = 0; j < OrdersTotal(); j++)
+      // 直接用 Ticket 查询，O(1) 而非遍历所有持仓 O(n)
+      if(!OrderSelect(ticket, SELECT_BY_TICKET))
       {
-         if(!OrderSelect(j, SELECT_BY_POS, MODE_TRADES)) continue;
-         if(OrderOpenTime() == openTime)
+         // 订单不存在（已关闭或错误），删除记录
+         for(int j = i; j < m_recordCount - 1; j++)
          {
-            found = true;
-            break;
+            m_scaleRecords[j] = m_scaleRecords[j + 1];
          }
+         m_recordCount--;
+         continue;
       }
       
-      // 如果订单已关闭，从数组中移除
-      if(!found)
+      // 订单存在但不是持仓（已平仓），删除记录
+      if(OrderCloseTime() > 0)
       {
-         for(int j = i; j < m_scaledCount - 1; j++)
+         for(int j = i; j < m_recordCount - 1; j++)
          {
-            m_scaledOpenTimes[j] = m_scaledOpenTimes[j + 1];
+            m_scaleRecords[j] = m_scaleRecords[j + 1];
          }
-         m_scaledCount--;
+         m_recordCount--;
       }
    }
 }
@@ -2540,8 +2645,13 @@ void OnTick()
       lastUpdate = TimeCurrent();
    }
    
-   // 检查自动减仓（每个tick都检查）
-   g_tradePanel.CheckAutoScaleOut();
+   // 自动减仓节流优化：每秒最多检查1次（避免频繁扫描）
+   static datetime lastScaleCheck = 0;
+   if(TimeCurrent() != lastScaleCheck)
+   {
+      g_tradePanel.CheckAutoScaleOut();
+      lastScaleCheck = TimeCurrent();
+   }
    
    // 更新EA止损标签（实时显示）
    UpdateEA_SL_Display();
