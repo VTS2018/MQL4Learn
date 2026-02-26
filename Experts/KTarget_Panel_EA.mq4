@@ -31,6 +31,11 @@ input color  Buy_SL_Color = clrOrangeRed;   // 做多止损颜色
 input color  Sell_SL_Color = clrLimeGreen; // 做空止损颜色
 
 //+------------------------------------------------------------------+
+//| 时区调整参数                                                      |
+//+------------------------------------------------------------------+
+input int    ServerGMT_Offset = 0;        // 服务器GMT时区偏移修正（如夏令时问题调整-1或+1）
+
+//+------------------------------------------------------------------+
 //| 价格选择模式枚举                                                  |
 //+------------------------------------------------------------------+
 enum PriceSelectMode
@@ -135,7 +140,7 @@ void COrdersPanel::RefreshOrders(void)
    // 根据报价位数动态计算 pip 单位（支持4位和5位报价）
    double pointsPerPip = (_Digits == 5 || _Digits == 3) ? 10.0 : 1.0;
    
-   int      serverGMT = (int)((TimeCurrent() - TimeGMT()) / 3600);
+   int      serverGMT = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
    int      bjOffset  = (8 - serverGMT) * 3600;
    datetime bjNow     = (datetime)(TimeCurrent() + bjOffset);
    datetime bjToday0  = bjNow - (bjNow % 86400);
@@ -1728,7 +1733,7 @@ void CTradePanel::OnClickViewOrders(void)
    if(!g_ordersCreated)
    {
       // 首次打开：统计今日订单数、动态计算高度、创建面板（只创建一次）
-      int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600);
+      int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
       int      bjOffset   = (8 - serverGMT) * 3600;
       datetime bjNow      = (datetime)(TimeCurrent() + bjOffset);
       datetime bjToday0   = bjNow - (bjNow % 86400);
@@ -1879,7 +1884,7 @@ void CTradePanel::UpdateInfoContainers(void)
 double CTradePanel::CalculateDailyProfit(void)
 {
    // 计算今日北京时间起始点
-   int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600);
+   int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
    int      bjOffset   = (8 - serverGMT) * 3600;
    datetime bjNow      = (datetime)(TimeCurrent() + bjOffset);
    datetime bjToday0   = bjNow - (bjNow % 86400);
