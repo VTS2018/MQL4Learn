@@ -1507,9 +1507,9 @@ void UpdateATRDisplay()
    // 判断价格涨跌，决定颜色
    color price_color;
    if(change_points > 0)
-      price_color = clrLime;           // 上涨：亮绿色
+      price_color = C'0,130,0';           // 上涨：亮绿色
    else if(change_points < 0)
-      price_color = clrRed;            // 下跌：红色
+      price_color = C'253,0,2';            // 下跌：红色
    else
       price_color = clrYellow;         // 持平：黄色
    
