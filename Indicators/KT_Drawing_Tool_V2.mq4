@@ -714,9 +714,11 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                
                // ⭐[新增] 根据Stop模式自动设置画线描述
                if(stopOrderMode == 1)
-                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop]");
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop] @" + DoubleToString(finalPrice, Digits));
                else if(stopOrderMode == 2)
-                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop]");
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop] @" + DoubleToString(finalPrice, Digits));
+               else
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "@" + DoubleToString(finalPrice, Digits));
                
                // [新增功能] 在磁吸的K线上绘制Check标记（仅在磁吸模式下）
                if(isMagneticMode)
@@ -755,9 +757,11 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
                
                // ⭐[新增] 根据Stop模式自动设置画线描述
                if(stopOrderMode == 1)
-                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop]");
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[BUY stop] @" + DoubleToString(finalPrice, Digits));
                else if(stopOrderMode == 2)
-                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop]");
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "[SELL stop] @" + DoubleToString(finalPrice, Digits));
+               else
+                  ObjectSetString(0, objName, OBJPROP_TEXT, "@" + DoubleToString(finalPrice, Digits));
                
                // [新增功能] 在图表右侧价格轴显示射线价格标签
                // [修改] 使用uniqueID建立关联，根据模式使用不同前缀
