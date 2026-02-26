@@ -536,16 +536,19 @@ bool CTradePanel::CreateControls(void)
    if(!m_lblStopLoss.Create(m_chart_id,m_name+"LblSL",m_subwin,col1X,y,col1X+col1W,y+lblRowH))
       return(false);
    if(!m_lblStopLoss.Text("止  损:")) return(false);
+   m_lblStopLoss.FontSize(8);  // 缩小字体
    if(!Add(m_lblStopLoss)) return(false);
 
    if(!m_lblLots.Create(m_chart_id,m_name+"LblLots",m_subwin,col2X,y,col2X+col2W,y+lblRowH))
       return(false);
    if(!m_lblLots.Text("手    数:")) return(false);
+   m_lblLots.FontSize(8);  // 缩小字体
    if(!Add(m_lblLots)) return(false);
 
    if(!m_lblTakeProfit.Create(m_chart_id,m_name+"LblTP",m_subwin,col3X,y,col3X+col3W,y+lblRowH))
       return(false);
    if(!m_lblTakeProfit.Text("止  盈:")) return(false);
+   m_lblTakeProfit.FontSize(8);  // 缩小字体
    if(!Add(m_lblTakeProfit)) return(false);
 
    // 第二行: 三列输入框 (手数列含 [-][输入][+])
@@ -864,7 +867,7 @@ bool CTradePanel::CreateControls(void)
    
    // 布局参数
    int m5BtnH = 22;                           // 控件高度
-   int m5LblW = 32;                           // 标签宽度
+   int m5LblW = 40;                           // 标签宽度（加宽防止遮挡）
    int m5Gap = 4;                             // 间距
    int m5Col1W = (width - m5Gap*2) / 3;      // 第一列宽度（触发点数）
    int m5Col2W = m5Col1W;                     // 第二列宽度（减仓比例）
@@ -881,6 +884,7 @@ bool CTradePanel::CreateControls(void)
                                m5Col1X,y,m5Col1X+m5LblW,y+m5BtnH))
       return(false);
    if(!m_lblTriggerPts.Text("触发:")) return(false);
+   m_lblTriggerPts.FontSize(8);  // 缩小字体
    if(!Add(m_lblTriggerPts)) return(false);
    
    if(!m_edtTriggerPts.Create(m_chart_id,m_name+"EdtTrigPts",m_subwin,
@@ -894,6 +898,7 @@ bool CTradePanel::CreateControls(void)
                             m5Col2X,y,m5Col2X+m5LblW,y+m5BtnH))
       return(false);
    if(!m_lblScalePct.Text("减仓:")) return(false);
+   m_lblScalePct.FontSize(8);  // 缩小字体
    if(!Add(m_lblScalePct)) return(false);
    
    if(!m_edtScalePct.Create(m_chart_id,m_name+"EdtScalePct",m_subwin,
@@ -907,6 +912,7 @@ bool CTradePanel::CreateControls(void)
                              m5Col3X,y,m5Col3X+m5LblW,y+m5BtnH))
       return(false);
    if(!m_lblScaleLots.Text("或:")) return(false);
+   m_lblScaleLots.FontSize(8);  // 缩小字体
    if(!Add(m_lblScaleLots)) return(false);
    
    if(!m_edtScaleLots.Create(m_chart_id,m_name+"EdtScaleLots",m_subwin,
