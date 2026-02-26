@@ -945,31 +945,32 @@ bool CTradePanel::CreateControls(void)
    
    y += m5BtnH + 8;
    
-   // 第二行：[开启自动减仓] [智能计算保本]
-   int m5Btn1W = (width - m5Gap) / 2;
-   int m5Btn2W = width - m5Btn1W - m5Gap;
+   // 第二行：[开启自动减仓] [智能计算保本] [允许多次减仓] 三个按钮一行
+   int m5Btn1W = (width - 2*m5Gap) / 3;      // 第1个按钮宽度
+   int m5Btn2W = (width - 2*m5Gap) / 3;      // 第2个按钮宽度
+   int m5Btn3W = width - m5Btn1W - m5Btn2W - 2*m5Gap;  // 第3个按钮宽度（自适应剩余）
    
    if(!m_btnToggleScaleOut.Create(m_chart_id,m_name+"BtnToggleScaleOut",m_subwin,
                                    x,y,x+m5Btn1W,y+m5BtnH))
       return(false);
-   if(!m_btnToggleScaleOut.Text("开启自动减仓")) return(false);
+   if(!m_btnToggleScaleOut.Text("自动减仓(关)")) return(false);
+   m_btnToggleScaleOut.FontSize(8);  // 缩小字体
    m_btnToggleScaleOut.ColorBackground(clrLightGray);
    if(!Add(m_btnToggleScaleOut)) return(false);
    
    if(!m_btnSmartCalc.Create(m_chart_id,m_name+"BtnSmartCalc",m_subwin,
-                             x+m5Btn1W+m5Gap,y,x+width,y+m5BtnH))
+                             x+m5Btn1W+m5Gap,y,x+m5Btn1W+m5Gap+m5Btn2W,y+m5BtnH))
       return(false);
    if(!m_btnSmartCalc.Text("智能计算保本")) return(false);
+   m_btnSmartCalc.FontSize(8);  // 缩小字体
    m_btnSmartCalc.ColorBackground(clrMediumSeaGreen);
    if(!Add(m_btnSmartCalc)) return(false);
    
-   y += m5BtnH + 5;
-   
-   // 第三行：[允许多次减仓] 切换按钮
    if(!m_btnToggleMultiScale.Create(m_chart_id,m_name+"BtnToggleMultiScale",m_subwin,
-                                     x,y,x+width,y+m5BtnH))
+                                     x+m5Btn1W+m5Gap+m5Btn2W+m5Gap,y,x+width,y+m5BtnH))
       return(false);
    if(!m_btnToggleMultiScale.Text("多次减仓(关)")) return(false);
+   m_btnToggleMultiScale.FontSize(8);  // 缩小字体
    m_btnToggleMultiScale.ColorBackground(clrLightGray);
    if(!Add(m_btnToggleMultiScale)) return(false);
 
@@ -1003,12 +1004,12 @@ void CTradePanel::SyncUIWithState(void)
    // === 1. 同步自动减仓按钮状态 ===
    if(m_scaleOutEnabled)
    {
-      m_btnToggleScaleOut.Text("关闭自动减仓");
+      m_btnToggleScaleOut.Text("自动减仓(开)");
       m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
    }
    else
    {
-      m_btnToggleScaleOut.Text("开启自动减仓");
+      m_btnToggleScaleOut.Text("自动减仓(关)");
       m_btnToggleScaleOut.ColorBackground(clrLightGray);
    }
    
@@ -2017,15 +2018,15 @@ void CTradePanel::OnClickToggleScaleOut(void)
    
    if(m_scaleOutEnabled)
    {
-      m_btnToggleScaleOut.Text("关闭自动减仓");
+      m_btnToggleScaleOut.Text("自动减仓(开)");
       m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
-      Print(" 自动减仓功能已开启");
+      Print("自动减仓功能已开启");
    }
    else
    {
-      m_btnToggleScaleOut.Text("开启自动减仓");
+      m_btnToggleScaleOut.Text("自动减仓(关)");
       m_btnToggleScaleOut.ColorBackground(clrLightGray);
-      Print(" 自动减仓功能已关闭");
+      Print("自动减仓功能已关闭");
    }
    
    ChartRedraw();
