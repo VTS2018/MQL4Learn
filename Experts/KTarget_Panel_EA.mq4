@@ -67,9 +67,9 @@ uint g_lastButtonClickTime = 0;                     // 上次按钮点击时间�
 //+------------------------------------------------------------------+
 //| 日志宏定义（避免重复if判断）                                      |
 //+------------------------------------------------------------------+
-#define LOG_ERROR(msg)  if(Log_Level >= LOG_ERROR) Print("❌ ", msg)
-#define LOG_INFO(msg)   if(Log_Level >= LOG_INFO)  Print("ℹ️ ", msg)
-#define LOG_DEBUG(msg)  if(Log_Level >= LOG_DEBUG) Print("🐛 ", msg)
+#define LOG_ERROR(msg)  if(Log_Level >= LOG_ERROR) Print("[ERR] ", msg)
+#define LOG_INFO(msg)   if(Log_Level >= LOG_INFO)  Print("[INFO] ", msg)
+#define LOG_DEBUG(msg)  if(Log_Level >= LOG_DEBUG) Print("[DBG] ", msg)
 
 //+------------------------------------------------------------------+
 //| 今日订单记录面板                                                  |
