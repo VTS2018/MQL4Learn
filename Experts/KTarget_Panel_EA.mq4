@@ -2040,13 +2040,13 @@ void CTradePanel::OnClickToggleScaleOut(void)
    {
       m_btnToggleScaleOut.Text("自动减仓(开)");
       m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
-      Print("自动减仓功能已开启");
+      LOG_INFO("自动减仓功能已开启");
    }
    else
    {
       m_btnToggleScaleOut.Text("自动减仓(关)");
       m_btnToggleScaleOut.ColorBackground(clrLightGray);
-      Print("自动减仓功能已关闭");
+      LOG_INFO("自动减仓功能已关闭");
    }
    
    ChartRedraw();
@@ -2063,13 +2063,13 @@ void CTradePanel::OnClickToggleMultiScale(void)
    {
       m_btnToggleMultiScale.Text("多次减仓(开)");
       m_btnToggleMultiScale.ColorBackground(clrMediumSeaGreen);
-      Print("多次减仓已启用：同一订单可多次达标减仓");
+      LOG_INFO("多次减仓已启用：同一订单可多次达标减仓");
    }
    else
    {
       m_btnToggleMultiScale.Text("多次减仓(关)");
       m_btnToggleMultiScale.ColorBackground(clrLightGray);
-      Print("多次减仓已关闭：每笔订单仅减仓一次");
+      LOG_INFO("多次减仓已关闭：每笔订单仅减仓一次");
       // 注意：不清除 everScaled 标记，已减仓的订单保持状态
    }
    
@@ -2145,7 +2145,7 @@ void CTradePanel::OnClickSmartCalc(void)
       );
       
       Alert(msg);
-      Print(msg);
+      LOG_INFO(msg);
       /*
       // === 自动开启减仓功能 ===
       if(!m_scaleOutEnabled)
@@ -2153,14 +2153,14 @@ void CTradePanel::OnClickSmartCalc(void)
          m_scaleOutEnabled = true;
          m_btnToggleScaleOut.Text("关闭自动减仓");
          m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
-         Print(" [智能计算] 自动减仓功能已自动开启");
+         LOG_INFO("[智能计算] 自动减仓功能已自动开启");
          
          // 更新提示信息
          Comment("【智能计算完成】\n参数已更新，自动减仓已启动！");
       }
       else
       {
-         Print(" [智能计算] 自动减仓已在运行中，参数已更新");
+         LOG_INFO("[智能计算] 自动减仓已在运行中，参数已更新");
          Comment("【智能计算完成】\n参数已更新，自动减仓继续运行！");
       }
       
@@ -2189,7 +2189,7 @@ void CTradePanel::CheckAutoScaleOut(void)
    
    if(triggerPts <= 0)
    {
-      Print(" 触发点数无效，已跳过检测");
+      LOG_DEBUG("触发点数无效，已跳过检测");
       return;
    }
    
@@ -2245,7 +2245,7 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
    }
    else
    {
-      Print(" 减仓参数无效");
+      LOG_ERROR("减仓参数无效");
       return;
    }
    
@@ -2260,7 +2260,7 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       closeAmount = currentLots - minLot;
       if(closeAmount < minLot)
       {
-         Print(" 订单 ", ticket, " 仓位太小，无法减仓");
+         LOG_DEBUG("订单 " + IntegerToString(ticket) + " 仓位太小，无法减仓");
          return;
       }
    }
@@ -2284,35 +2284,35 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       }
       
       // === 详细调试信息（NEW）===
-      Print("========== 自动减仓利润计算调试 ==========");
-      Print(" OrderOpenPrice: ", DoubleToString(OrderOpenPrice(), _Digits));
-      Print(" closePrice: ", DoubleToString(closePrice, _Digits));
+      LOG_DEBUG("========== 自动减仓利润计算调试 ==========");
+      LOG_DEBUG("OrderOpenPrice: " + DoubleToString(OrderOpenPrice(), _Digits));
+      LOG_DEBUG("closePrice: " + DoubleToString(closePrice, _Digits));
       
       // 计算锁定利润
       double profit = (OrderType() == OP_BUY) ? 
                       (closePrice - OrderOpenPrice()) :
                       (OrderOpenPrice() - closePrice);
-      Print(" profit (价格差): ", DoubleToString(profit, _Digits));
-      Print(" closeAmount (减仓手数): ", DoubleToString(closeAmount, 2));
-      Print(" _Point: ", DoubleToString(_Point, _Digits));
+      LOG_DEBUG("profit (价格差): " + DoubleToString(profit, _Digits));
+      LOG_DEBUG("closeAmount (减仓手数): " + DoubleToString(closeAmount, 2));
+      LOG_DEBUG("_Point: " + DoubleToString(_Point, _Digits));
       
       double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
       double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
       double contractSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);
-      Print(" SYMBOL_TRADE_TICK_VALUE: ", DoubleToString(tickValue, 4));
-      Print(" SYMBOL_TRADE_TICK_SIZE: ", DoubleToString(tickSize, _Digits));
-      Print(" SYMBOL_TRADE_CONTRACT_SIZE: ", DoubleToString(contractSize, 0));
+      LOG_DEBUG("SYMBOL_TRADE_TICK_VALUE: " + DoubleToString(tickValue, 4));
+      LOG_DEBUG("SYMBOL_TRADE_TICK_SIZE: " + DoubleToString(tickSize, _Digits));
+      LOG_DEBUG("SYMBOL_TRADE_CONTRACT_SIZE: " + DoubleToString(contractSize, 0));
       
       double lockedProfit = profit * closeAmount / _Point * tickValue;
-      Print(" lockedProfit (当前公式): ", DoubleToString(lockedProfit, 2));
+      LOG_DEBUG("lockedProfit (当前公式): " + DoubleToString(lockedProfit, 2));
       
       // 使用标准公式重新计算
       double standardProfit = profit * closeAmount * contractSize;
-      Print(" standardProfit (标准公式): ", DoubleToString(standardProfit, 2));
-      Print("==========================================");
+      LOG_DEBUG("standardProfit (标准公式): " + DoubleToString(standardProfit, 2));
+      LOG_DEBUG("==========================================");
       
-      Print(" 自动减仓成功: Ticket=", ticket, 
-            " 减仓=", closeAmount, " 手，锁定利润=$", DoubleToString(lockedProfit, 2));
+      LOG_INFO("自动减仓成功: Ticket=" + IntegerToString(ticket) + 
+            " 减仓=" + DoubleToString(closeAmount, 2) + " 手，锁定利润=$" + DoubleToString(lockedProfit, 2));
       
       // 发送通知
       string msg = StringFormat(" 自动减仓\nTicket: %d\n减仓: %.2f 手\n利润: $%.2f",
@@ -2322,7 +2322,7 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
    else
    {
       int error = GetLastError();
-      Print(" 自动减仓失败: Ticket=", ticket, " Error=", error);
+      LOG_ERROR("自动减仓失败: Ticket=" + IntegerToString(ticket) + " Error=" + IntegerToString(error));
    }
 }
 
