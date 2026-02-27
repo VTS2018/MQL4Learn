@@ -1819,7 +1819,7 @@ void ToggleLinesVisibility()
       
       ObjectSetString(0, btnName12, OBJPROP_TEXT, "Show All");
       ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrOrange); // 橙色警示
-      Alert(" 已隐藏所有画线及关联对象\n(包括射线价格标签、Check标记)");
+      Alert("已隐藏所有画线及关联对象\n(包括射线价格标签、Check标记)");
    }
    else
    {
@@ -1841,6 +1841,6 @@ void ToggleLinesVisibility()
       
       ObjectSetString(0, btnName12, OBJPROP_TEXT, "Hide All");
       ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrGray); // 恢复灰色
-      Alert(" 已恢复显示所有画线");
+      Alert("已恢复显示所有画线");
    }
 }
