@@ -36,6 +36,19 @@ input color  Sell_SL_Color = clrLimeGreen; // 做空止损颜色
 input int    ServerGMT_Offset = 0;        // 服务器GMT时区偏移修正（如夏令时问题调整-1或+1）
 
 //+------------------------------------------------------------------+
+//| 日志级别枚举                                                      |
+//+------------------------------------------------------------------+
+enum LogLevel
+{
+   LOG_OFF   = 0,  // 静默模式（仅Alert弹窗）
+   LOG_ERROR = 1,  // 仅错误（失败、异常）
+   LOG_INFO  = 2,  // 正常信息（成功汇总、关键事件）
+   LOG_DEBUG = 3   // 调试详情（跳过原因、中间变量）
+};
+
+input LogLevel Log_Level = LOG_INFO;  // 日志级别（生产推荐INFO，调试推荐DEBUG）
+
+//+------------------------------------------------------------------+
 //| 价格选择模式枚举                                                  |
 //+------------------------------------------------------------------+
 enum PriceSelectMode
@@ -50,6 +63,13 @@ enum PriceSelectMode
 //+------------------------------------------------------------------+
 PriceSelectMode g_priceSelectMode = MODE_NONE;     // 价格选择模式
 uint g_lastButtonClickTime = 0;                     // 上次按钮点击时间戳（防穿透）
+
+//+------------------------------------------------------------------+
+//| 日志宏定义（避免重复if判断）                                      |
+//+------------------------------------------------------------------+
+#define LOG_ERROR(msg)  if(Log_Level >= LOG_ERROR) Print("❌ ", msg)
+#define LOG_INFO(msg)   if(Log_Level >= LOG_INFO)  Print("ℹ️ ", msg)
+#define LOG_DEBUG(msg)  if(Log_Level >= LOG_DEBUG) Print("🐛 ", msg)
 
 //+------------------------------------------------------------------+
 //| 今日订单记录面板                                                  |
@@ -1321,16 +1341,16 @@ void CTradePanel::OnClickSetSlPoints(void)
          if(OrderType() == OP_BUY && newSL <= oldSL)
          {
             // 买单：新止损更危险或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止损(", DoubleToString(newSL, _Digits), 
-                  ")≤当前(", DoubleToString(oldSL, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止损(" + DoubleToString(newSL, _Digits) + 
+                  ")≤当前(" + DoubleToString(oldSL, _Digits) + ")");
             skipped++;
             continue;
          }
          if(OrderType() == OP_SELL && newSL >= oldSL)
          {
             // 卖单：新止损更危险或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止损(", DoubleToString(newSL, _Digits), 
-                  ")≥当前(", DoubleToString(oldSL, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止损(" + DoubleToString(newSL, _Digits) + 
+                  ")≥当前(" + DoubleToString(oldSL, _Digits) + ")");
             skipped++;
             continue;
          }
@@ -1340,14 +1360,14 @@ void CTradePanel::OnClickSetSlPoints(void)
          count++;
       else
       {
-         Print("设置止损失败 订单=", OrderTicket(), " 错误=", GetLastError());
+         LOG_ERROR("设置止损失败 订单=" + IntegerToString(OrderTicket()) + " 错误=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(count == 0 && failed == 0 && skipped == 0)
-      Print("当前品种无持仓订单");
+      LOG_INFO("当前品种无持仓订单");
    else
-      Print("按点数设置止损: 成功=", count, " 跳过已保护=", skipped, " 失败=", failed, " 点数=", pts);
+      LOG_INFO("按点数设置止损: 成功=" + IntegerToString(count) + " 跳过已保护=" + IntegerToString(skipped) + " 失败=" + IntegerToString(failed) + " 点数=" + IntegerToString(pts));
    if(failed > 0) Alert("部分订单设置止损失败! 失败数=" + IntegerToString(failed));
    if(skipped > 0) Alert("提示: 已跳过" + IntegerToString(skipped) + "笔受保护订单（止损更优）");
 }
@@ -1376,16 +1396,16 @@ void CTradePanel::OnClickSetSlPrice(void)
          if(OrderType() == OP_BUY && slPrice <= oldSL)
          {
             // 买单：新止损更危险或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止损(", DoubleToString(slPrice, _Digits), 
-                  ")≤当前(", DoubleToString(oldSL, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止损(" + DoubleToString(slPrice, _Digits) + 
+                  ")≤当前(" + DoubleToString(oldSL, _Digits) + ")");
             skipped++;
             continue;
          }
          if(OrderType() == OP_SELL && slPrice >= oldSL)
          {
             // 卖单：新止损更危险或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止损(", DoubleToString(slPrice, _Digits), 
-                  ")≥当前(", DoubleToString(oldSL, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止损(" + DoubleToString(slPrice, _Digits) + 
+                  ")≥当前(" + DoubleToString(oldSL, _Digits) + ")");
             skipped++;
             continue;
          }
@@ -1395,14 +1415,14 @@ void CTradePanel::OnClickSetSlPrice(void)
          count++;
       else
       {
-         Print("设置止损失败 订单=", OrderTicket(), " 错误=", GetLastError());
+         LOG_ERROR("设置止损失败 订单=" + IntegerToString(OrderTicket()) + " 错误=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(count == 0 && failed == 0 && skipped == 0)
-      Print("当前品种无持仓订单");
+      LOG_INFO("当前品种无持仓订单");
    else
-      Print("按价格设置止损: 成功=", count, " 跳过已保护=", skipped, " 失败=", failed, " 价格=", slPrice);
+      LOG_INFO("按价格设置止损: 成功=" + IntegerToString(count) + " 跳过已保护=" + IntegerToString(skipped) + " 失败=" + IntegerToString(failed) + " 价格=" + DoubleToString(slPrice, _Digits));
    if(failed > 0) Alert("部分订单设置止损失败! 失败数=" + IntegerToString(failed));
    if(skipped > 0) Alert("提示: 已跳过" + IntegerToString(skipped) + "笔受保护订单（止损更优）");
 }
@@ -1437,16 +1457,16 @@ void CTradePanel::OnClickSetTpPoints(void)
          if(OrderType() == OP_BUY && newTP <= oldTP)
          {
             // 买单：新止盈更差或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止盈(", DoubleToString(newTP, _Digits), 
-                  ")≤当前(", DoubleToString(oldTP, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止盈(" + DoubleToString(newTP, _Digits) + 
+                  ")≤当前(" + DoubleToString(oldTP, _Digits) + ")");
             skipped++;
             continue;
          }
          if(OrderType() == OP_SELL && newTP >= oldTP)
          {
             // 卖单：新止盈更差或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止盈(", DoubleToString(newTP, _Digits), 
-                  ")≥当前(", DoubleToString(oldTP, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止盈(" + DoubleToString(newTP, _Digits) + 
+                  ")≥当前(" + DoubleToString(oldTP, _Digits) + ")");
             skipped++;
             continue;
          }
@@ -1456,14 +1476,14 @@ void CTradePanel::OnClickSetTpPoints(void)
          count++;
       else
       {
-         Print("设置止盈失败 订单=", OrderTicket(), " 错误=", GetLastError());
+         LOG_ERROR("设置止盈失败 订单=" + IntegerToString(OrderTicket()) + " 错误=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(count == 0 && failed == 0 && skipped == 0)
-      Print("当前品种无持仓订单");
+      LOG_INFO("当前品种无持仓订单");
    else
-      Print("按点数设置止盈: 成功=", count, " 跳过已保护=", skipped, " 失败=", failed, " 点数=", pts);
+      LOG_INFO("按点数设置止盈: 成功=" + IntegerToString(count) + " 跳过已保护=" + IntegerToString(skipped) + " 失败=" + IntegerToString(failed) + " 点数=" + IntegerToString(pts));
    if(failed > 0) Alert("部分订单设置止盈失败! 失败数=" + IntegerToString(failed));
    if(skipped > 0) Alert("提示: 已跳过" + IntegerToString(skipped) + "笔受保护订单（止盈更优）");
 }
@@ -1492,16 +1512,16 @@ void CTradePanel::OnClickSetTpPrice(void)
          if(OrderType() == OP_BUY && tpPrice <= oldTP)
          {
             // 买单：新止盈更差或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止盈(", DoubleToString(tpPrice, _Digits), 
-                  ")≤当前(", DoubleToString(oldTP, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止盈(" + DoubleToString(tpPrice, _Digits) + 
+                  ")≤当前(" + DoubleToString(oldTP, _Digits) + ")");
             skipped++;
             continue;
          }
          if(OrderType() == OP_SELL && tpPrice >= oldTP)
          {
             // 卖单：新止盈更差或相同 → 跳过
-            Print("订单#", OrderTicket(), " 跳过：新止盈(", DoubleToString(tpPrice, _Digits), 
-                  ")≥当前(", DoubleToString(oldTP, _Digits), ")");
+            LOG_DEBUG("订单#" + IntegerToString(OrderTicket()) + " 跳过：新止盈(" + DoubleToString(tpPrice, _Digits) + 
+                  ")≥当前(" + DoubleToString(oldTP, _Digits) + ")");
             skipped++;
             continue;
          }
@@ -1511,14 +1531,14 @@ void CTradePanel::OnClickSetTpPrice(void)
          count++;
       else
       {
-         Print("设置止盈失败 订单=", OrderTicket(), " 错误=", GetLastError());
+         LOG_ERROR("设置止盈失败 订单=" + IntegerToString(OrderTicket()) + " 错误=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(count == 0 && failed == 0 && skipped == 0)
-      Print("当前品种无持仓订单");
+      LOG_INFO("当前品种无持仓订单");
    else
-      Print("按价格设置止盈: 成功=", count, " 跳过已保护=", skipped, " 失败=", failed, " 价格=", tpPrice);
+      LOG_INFO("按价格设置止盈: 成功=" + IntegerToString(count) + " 跳过已保护=" + IntegerToString(skipped) + " 失败=" + IntegerToString(failed) + " 价格=" + DoubleToString(tpPrice, _Digits));
    if(failed > 0) Alert("部分订单设置止盈失败! 失败数=" + IntegerToString(failed));
    if(skipped > 0) Alert("提示: 已跳过" + IntegerToString(skipped) + "笔受保护订单（止盈更优）");
 }
