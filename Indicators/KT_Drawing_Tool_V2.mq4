@@ -30,10 +30,6 @@ enum ENUM_VISIBILITY_MODE
 };
 
 //--- 参数设置
-// input color ColorHLine = clrRed;        // 水平线颜色
-// input color ColorRay   = clrDeepSkyBlue;// 射线(趋势水平线)颜色
-// input int   LineWidth  = 2;             // 线条宽度
-
 input color ColorHLine = clrRed;          // Horizontal Line Color
 input color ColorRay   = clrDeepSkyBlue;  // Ray Color (Segment)
 input int   LineWidth  = 2;               // Line Width
@@ -45,12 +41,6 @@ input color BtnBgColor  = clrGray;        // Button Background Color
 input color BtnTxtColor = clrWhite;       // Button Text Color
 
 //--- [新增] 周期专属颜色设置 (针对浅色背景 229,230,250 优化)
-// input color Color_H1   = clrBlue;         // H1 周期颜色
-// input color Color_H4   = clrDarkOrange;   // H4 周期颜色
-// input color Color_D1   = clrRed;          // D1 周期颜色
-// input color Color_W1   = clrDarkGreen;    // W1 周期颜色
-// input color Color_MN1  = clrDarkViolet;   // MN1 周期颜色
-
 input color Color_H1   = clrBlue;         // H1 Timeframe Color
 input color Color_H4   = clrDarkOrange;   // H4 Timeframe Color
 input color Color_D1   = clrRed;          // D1 Timeframe Color
