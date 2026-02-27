@@ -157,6 +157,34 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
+   // [新增] 安全机制：如果当前处于隐藏状态，自动恢复所有对象
+   // 防止切换周期/重载指标时状态丢失导致对象永久不可见
+   if(isLinesHidden)
+   {
+      int size = ArrayRange(g_objectVisibility, 0);
+      
+      for(int i = 0; i < size; i++)
+      {
+         string name = g_objectVisibility[i][0];
+         long originalFlags = StringToInteger(g_objectVisibility[i][1]);
+         
+         if(ObjectFind(0, name) >= 0)
+         {
+            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, originalFlags);
+         }
+      }
+      
+      // 清空记录并重置状态
+      ArrayResize(g_objectVisibility, 0);
+      isLinesHidden = false;
+      
+      // 如果是切换周期导致的重载，提示用户
+      if(reason == REASON_CHARTCHANGE)
+      {
+         Print("[自动恢复] 检测到周期切换，已自动显示所有隐藏的画线");
+      }
+   }
+   
    EventKillTimer();  // 关闭定时器
    
    // [新增] 删除所有关口线
@@ -1771,8 +1799,10 @@ void ToggleLinesVisibility()
       {
          string name = ObjectName(0, i, 0, -1);
          
-         // 只处理本指标创建的画线对象
-         if(StringFind(name, "Keep_") == 0 || StringFind(name, "Draw_") == 0)
+         // 处理本指标创建的所有对象（线条、标签、标记）
+         if(StringFind(name, "Keep_") == 0 || StringFind(name, "Draw_") == 0 ||
+            StringFind(name, "KeepLabel_") == 0 || StringFind(name, "PriceLabel_") == 0 ||
+            StringFind(name, "KeepMark_") == 0 || StringFind(name, "Mark_") == 0)
          {
             // 保存原始可见性设置
             long originalFlags = ObjectGetInteger(0, name, OBJPROP_TIMEFRAMES);
@@ -1789,7 +1819,7 @@ void ToggleLinesVisibility()
       
       ObjectSetString(0, btnName12, OBJPROP_TEXT, "Show All");
       ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrOrange); // 橙色警示
-      Alert(" 已隐藏所有画线\n(标记对象不受影响)");
+      Alert(" 已隐藏所有画线及关联对象\n(包括射线价格标签、Check标记)");
    }
    else
    {
