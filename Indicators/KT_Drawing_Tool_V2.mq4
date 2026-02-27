@@ -82,6 +82,7 @@ string btnName8 = "Btn_Stop_Mode";  // 新增：Stop模式按钮
 string btnName9 = "Btn_Pinbar_Mode"; // [新增] Pinbar标注按钮
 string btnName10 = "Btn_Force_Clear"; // [新增] 强制清除按钮
 string btnName11 = "Btn_Lock_Lines";  // [新增] 锁定线条按钮
+string btnName12 = "Btn_Toggle_Visibility"; // [新增] 隐藏/显示切换按钮
 
 // [新增] 菜单折叠状态
 bool isMenuExpanded = false;  // false=折叠, true=展开
@@ -106,7 +107,11 @@ string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名
 
 // [新增] 关口线管理变量
 uint lastRoundLinesUpdate = 0;          // 上次更新关口线的时间
-const uint ROUND_UPDATE_INTERVAL = 60000; // 关口线更新间隔（60秒） 
+const uint ROUND_UPDATE_INTERVAL = 60000; // 关口线更新间隔（60秒）
+
+// [新增] 线条显示/隐藏管理变量
+bool isLinesHidden = false;           // 线条隐藏状态
+string g_objectVisibility[][2];       // [][0]=对象名, [][1]=原始可见性标志 
 
 //+------------------------------------------------------------------+
 //| 初始化函数
@@ -128,6 +133,7 @@ int OnInit()
    CreateButton(btnName9, "Pinbar",    150, -1000, 80, 25, clrGray,      BtnTxtColor); // Pinbar标注
    CreateButton(btnName10, "Force Clear", 150, -1000, 80, 25, clrCrimson, BtnTxtColor); // 强制清除
    CreateButton(btnName11, "Unlock",     150, -1000, 80, 25, clrGray,    BtnTxtColor); // 锁定/解锁线条
+   CreateButton(btnName12, "Hide All",   150, -1000, 80, 25, clrGray,    BtnTxtColor); // 隐藏/显示切换
 
    ChartSetInteger(0, CHART_EVENT_MOUSE_MOVE, true); // 开启鼠标捕捉
    
@@ -168,6 +174,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, btnName9);  // 删除Pinbar按钮
    ObjectDelete(0, btnName10); // 删除强制清除按钮
    ObjectDelete(0, btnName11); // 删除锁定线条按钮
+   ObjectDelete(0, btnName12); // 删除隐藏/显示按钮
    // Comment("");
   }
 
@@ -212,6 +219,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName9, true, 290);  // Pinbar
             SetButtonVisibility(btnName10, true, 320); // Force Clear
             SetButtonVisibility(btnName11, true, 350); // Lock/Unlock
+            SetButtonVisibility(btnName12, true, 380); // Hide/Show
          }
          else
          {
@@ -229,6 +237,7 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
             SetButtonVisibility(btnName9, false, 0);
             SetButtonVisibility(btnName10, false, 0);
             SetButtonVisibility(btnName11, false, 0);
+            SetButtonVisibility(btnName12, false, 0);
          }
          
          PlaySound("tick.wav");
@@ -441,6 +450,15 @@ void OnChartEvent(const int id, const long &lparam, const double &dparam, const 
         {
          ObjectSetInteger(0, btnName11, OBJPROP_STATE, false); // 立即弹起按钮
          ToggleLinesLock(); // 切换锁定状态
+         PlaySound("tick.wav");
+         ChartRedraw();
+        }
+      
+      // [新增] 处理隐藏/显示按钮点击
+      if(sparam == btnName12)
+        {
+         ObjectSetInteger(0, btnName12, OBJPROP_STATE, false); // 立即弹起按钮
+         ToggleLinesVisibility(); // 切换显示/隐藏
          PlaySound("tick.wav");
          ChartRedraw();
         }
@@ -1733,5 +1751,66 @@ void DeleteRoundNumberLines()
    if(deleteCount > 0)
    {
       Print("[关口线] 清理: 删除 ", deleteCount, " 条关口线");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 切换所有画线的显示/隐藏状态
+//+------------------------------------------------------------------+
+void ToggleLinesVisibility()
+{
+   isLinesHidden = !isLinesHidden;
+   
+   if(isLinesHidden)
+   {
+      // 隐藏模式：保存当前可见性并设为不可见
+      ArrayResize(g_objectVisibility, 0);
+      
+      int total = ObjectsTotal(0, 0, -1);
+      for(int i = 0; i < total; i++)
+      {
+         string name = ObjectName(0, i, 0, -1);
+         
+         // 只处理本指标创建的画线对象
+         if(StringFind(name, "Keep_") == 0 || StringFind(name, "Draw_") == 0)
+         {
+            // 保存原始可见性设置
+            long originalFlags = ObjectGetInteger(0, name, OBJPROP_TIMEFRAMES);
+            
+            int size = ArrayRange(g_objectVisibility, 0);
+            ArrayResize(g_objectVisibility, size + 1);
+            g_objectVisibility[size][0] = name;
+            g_objectVisibility[size][1] = IntegerToString(originalFlags);
+            
+            // 设置为所有周期都不可见
+            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+         }
+      }
+      
+      ObjectSetString(0, btnName12, OBJPROP_TEXT, "Show All");
+      ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrOrange); // 橙色警示
+      Alert(" 已隐藏所有画线\n(标记对象不受影响)");
+   }
+   else
+   {
+      // 显示模式：恢复原始可见性
+      int size = ArrayRange(g_objectVisibility, 0);
+      
+      for(int i = 0; i < size; i++)
+      {
+         string name = g_objectVisibility[i][0];
+         long originalFlags = StringToInteger(g_objectVisibility[i][1]);
+         
+         if(ObjectFind(0, name) >= 0)
+         {
+            ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, originalFlags);
+         }
+      }
+      
+      ArrayResize(g_objectVisibility, 0); // 清空记录
+      
+      ObjectSetString(0, btnName12, OBJPROP_TEXT, "Hide All");
+      ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrGray); // 恢复灰色
+      Alert(" 已恢复显示所有画线");
    }
 }
