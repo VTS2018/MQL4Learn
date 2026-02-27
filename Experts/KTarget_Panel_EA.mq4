@@ -487,7 +487,7 @@ void CTradePanel::ChartEvent(const int id,const long &lparam,const double &dpara
    // 拦截 CHARTEVENT_CHART_CHANGE 事件，防止自动最小化
    if(id == CHARTEVENT_CHART_CHANGE)
    {
-      Print("[面板防护] 拦截CHART_CHANGE事件，防止自动最小化");
+      LOG_DEBUG("[面板防护] 拦截CHART_CHANGE事件，防止自动最小化");
       return;  // 不调用父类，完全拦截
    }
    
@@ -1074,8 +1074,8 @@ void CTradePanel::SyncUIWithState(void)
    // === 4. 恢复输入框值 ===
    RestoreInputValues();
    
-   Print("[状态同步] UI已同步到内部状态：自动减仓=", m_scaleOutEnabled, 
-         ", 多次减仓=", m_allowMultipleScaleOut, ", 显示盈亏=", m_showProfit, ", 显示持仓=", m_showPositions);
+   LOG_DEBUG("[状态同步] UI已同步到内部状态：自动减仓=" + IntegerToString(m_scaleOutEnabled) + 
+         ", 多次减仓=" + IntegerToString(m_allowMultipleScaleOut) + ", 显示盈亏=" + IntegerToString(m_showProfit) + ", 显示持仓=" + IntegerToString(m_showPositions));
 }
 
 //+------------------------------------------------------------------+
@@ -1111,7 +1111,7 @@ void CTradePanel::SaveInputValues(void)
    m_lastScalePct = m_edtScalePct.Text();
    m_lastScaleLots = m_edtScaleLots.Text();
    
-   Print("[状态保存] 已保存12个输入框的值：手数=", m_lastLots, ", 止损=", m_lastStopLoss, ", 触发点数=", m_lastTriggerPts);
+   LOG_DEBUG("[状态保存] 已保存12个输入框的值：手数=" + m_lastLots + ", 止损=" + m_lastStopLoss + ", 触发点数=" + m_lastTriggerPts);
 }
 
 //+------------------------------------------------------------------+
@@ -1139,7 +1139,7 @@ void CTradePanel::RestoreInputValues(void)
    m_edtScalePct.Text(m_lastScalePct);
    m_edtScaleLots.Text(m_lastScaleLots);
    
-   Print("[状态恢复] 已恢复12个输入框的值：手数=", m_lastLots, ", 止损=", m_lastStopLoss, ", 触发点数=", m_lastTriggerPts);
+   LOG_DEBUG("[状态恢复] 已恢复12个输入框的值：手数=" + m_lastLots + ", 止损=" + m_lastStopLoss + ", 触发点数=" + m_lastTriggerPts);
 }
 
 //+------------------------------------------------------------------+
@@ -1258,12 +1258,12 @@ void CTradePanel::OnClickBuy(void)
       if(err == 130)  errMsg += " (止损/止盈价格无效)";
       if(err == 131)  errMsg += " (手数无效)";
       if(err == 138)  errMsg += " (报价变动，重试)";
-      Print(errMsg, " 价格=", price, " 止损=", slPrice, " 止盈=", tpPrice, " 手数=", lots);
+      LOG_ERROR(errMsg + " 价格=" + DoubleToString(price, _Digits) + " 止损=" + DoubleToString(slPrice, _Digits) + " 止盈=" + DoubleToString(tpPrice, _Digits) + " 手数=" + DoubleToString(lots, 2));
       Alert(errMsg);
    }
    else
-      Print("买入成功! 订单号=", ticket,
-            " 价格=", price, " 止损=", slPrice, " 止盈=", tpPrice, " 手数=", lots);
+      LOG_INFO("买入成功! 订单号=" + IntegerToString(ticket) +
+            " 价格=" + DoubleToString(price, _Digits) + " 止损=" + DoubleToString(slPrice, _Digits) + " 止盈=" + DoubleToString(tpPrice, _Digits) + " 手数=" + DoubleToString(lots, 2));
 }
 
 //+------------------------------------------------------------------+
@@ -1303,12 +1303,12 @@ void CTradePanel::OnClickSell(void)
       if(err == 130)  errMsg += " (止损/止盈价格无效)";
       if(err == 131)  errMsg += " (手数无效)";
       if(err == 138)  errMsg += " (报价变动，重试)";
-      Print(errMsg, " 价格=", price, " 止损=", slPrice, " 止盈=", tpPrice, " 手数=", lots);
+      LOG_ERROR(errMsg + " 价格=" + DoubleToString(price, _Digits) + " 止损=" + DoubleToString(slPrice, _Digits) + " 止盈=" + DoubleToString(tpPrice, _Digits) + " 手数=" + DoubleToString(lots, 2));
       Alert(errMsg);
    }
    else
-      Print("卖出成功! 订单号=", ticket,
-            " 价格=", price, " 止损=", slPrice, " 止盈=", tpPrice, " 手数=", lots);
+      LOG_INFO("卖出成功! 订单号=" + IntegerToString(ticket) +
+            " 价格=" + DoubleToString(price, _Digits) + " 止损=" + DoubleToString(slPrice, _Digits) + " 止盈=" + DoubleToString(tpPrice, _Digits) + " 手数=" + DoubleToString(lots, 2));
 }
 
 //+------------------------------------------------------------------+
@@ -1572,7 +1572,7 @@ void CTradePanel::CloseByPercent(double pct)
       typesArr[n] = OrderType();
       n++;
    }
-   if(n == 0) { Print("当前品种无持仓订单"); return; }
+   if(n == 0) { LOG_INFO("当前品种无持仓订单"); return; }
 
    int count = 0, failed = 0;
    for(int i = 0; i < n; i++)
@@ -1591,12 +1591,12 @@ void CTradePanel::CloseByPercent(double pct)
          count++;
       else
       {
-         Print("平仓失败 订单=", tickets[i], " 手数=", closeLots,
-               " 错误码=", GetLastError());
+         LOG_ERROR("平仓失败 订单=" + IntegerToString(tickets[i]) + " 手数=" + DoubleToString(closeLots, 2) +
+               " 错误码=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
-   Print("比例平仓完成: 比例=", pct, "% 成功=", count, " 失败=", failed);
+   LOG_INFO("比例平仓完成: 比例=" + DoubleToString(pct, 0) + "% 成功=" + IntegerToString(count) + " 失败=" + IntegerToString(failed));
    if(failed > 0) Alert("部分订单平仓失败! 失败数=" + IntegerToString(failed));
 }
 
@@ -1652,7 +1652,7 @@ void CTradePanel::CloseLots(double lots)
       typesArr[n] = OrderType();
       n++;
    }
-   if(n == 0) { Print("当前品种无持仓订单"); return; }
+   if(n == 0) { LOG_INFO("当前品种无持仓订单"); return; }
 
    double remaining = lots;
    int count = 0, failed = 0;
@@ -1675,15 +1675,15 @@ void CTradePanel::CloseLots(double lots)
       }
       else
       {
-         Print("平仓失败 订单=", tickets[i], " 手数=", closeThis,
-               " 错误码=", GetLastError());
+         LOG_ERROR("平仓失败 订单=" + IntegerToString(tickets[i]) + " 手数=" + DoubleToString(closeThis, 2) +
+               " 错误码=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(remaining > minLot)
-      Print("注意: 持仓不足, 尚有 ", remaining, " 手未平。共平仓单数=", count, " 失败=", failed);
+      LOG_INFO("注意: 持仓不足, 尚有 " + DoubleToString(remaining, 2) + " 手未平。共平仓单数=" + IntegerToString(count) + " 失败=" + IntegerToString(failed));
    else
-      Print("手数平仓完成: 平入=", lots, " 手 成功单数=", count, " 失败=", failed);
+      LOG_INFO("手数平仓完成: 平入=" + DoubleToString(lots, 2) + " 手 成功单数=" + IntegerToString(count) + " 失败=" + IntegerToString(failed));
    if(failed > 0) Alert("部分订单平仓失败! 失败数=" + IntegerToString(failed));
 }
 
@@ -1729,7 +1729,7 @@ void CTradePanel::OnClickCloseSymbol(void)
       typesArr[n] = OrderType();
       n++;
    }
-   if(n == 0) { Print("当前品种无持仓订单"); return; }
+   if(n == 0) { LOG_INFO("当前品种无持仓订单"); return; }
 
    int count = 0, failed = 0;
    for(int i = 0; i < n; i++)
@@ -1741,11 +1741,11 @@ void CTradePanel::OnClickCloseSymbol(void)
          count++;
       else
       {
-         Print("平仓失败 订单=", tickets[i], " 错误码=", GetLastError());
+         LOG_ERROR("平仓失败 订单=" + IntegerToString(tickets[i]) + " 错误码=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
-   Print("平当前品种完成: 成功=", count, " 失败=", failed);
+   LOG_INFO("平当前品种完成: 成功=" + IntegerToString(count) + " 失败=" + IntegerToString(failed));
    if(failed > 0) Alert("部分订单平仓失败! 失败数=" + IntegerToString(failed));
 }
 
@@ -1775,14 +1775,14 @@ void CTradePanel::OnClickBreakEven(void)
          count++;
       else
       {
-         Print("保本设置失败 订单=", OrderTicket(), " 错误=", GetLastError());
+         LOG_ERROR("保本设置失败 订单=" + IntegerToString(OrderTicket()) + " 错误=" + IntegerToString(GetLastError()));
          failed++;
       }
    }
    if(count == 0 && failed == 0 && skipped == 0)
-      Print("当前品种无持仓订单");
+      LOG_INFO("当前品种无持仓订单");
    else
-      Print("一键保本: 成功=", count, " 跳过已保本=", skipped, " 失败=", failed);
+      LOG_INFO("一键保本: 成功=" + IntegerToString(count) + " 跳过已保本=" + IntegerToString(skipped) + " 失败=" + IntegerToString(failed));
    if(failed > 0) Alert("部分订单保本失败! 失败数=" + IntegerToString(failed));
 }
 
@@ -1822,7 +1822,7 @@ void CTradePanel::OnClickViewOrders(void)
       g_ordersPanel.SetMaxRows(rows);
       if(!g_ordersPanel.Create(0,"OrdersPanel",0,ox,oy,ox+460,oy+panelH))
       {
-         Print("创建订单记录面板失败!");
+         LOG_ERROR("创建订单记录面板失败!");
          return;
       }
       g_ordersPanel.Run();
@@ -2422,7 +2422,7 @@ void CTradePanel::OnClickLotsDecrease(void)
    string newValue = DoubleToString(currentLots, 2);
    m_edtLots.Text(newValue);
    
-   Print("手数减少: 当前值=", currentLots, " 最小=", minLot, " 步长=", lotStep);
+   LOG_DEBUG("手数减少: 当前值=" + DoubleToString(currentLots, 2) + " 最小=" + DoubleToString(minLot, 2) + " 步长=" + DoubleToString(lotStep, 2));
    
    // 强制刷新控件
    ChartRedraw();
@@ -2444,7 +2444,7 @@ void CTradePanel::OnClickLotsIncrease(void)
    string newValue = DoubleToString(currentLots, 2);
    m_edtLots.Text(newValue);
    
-   Print("手数增加: 当前值=", currentLots, " 最大=", maxLot, " 步长=", lotStep);
+   LOG_DEBUG("手数增加: 当前值=" + DoubleToString(currentLots, 2) + " 最大=" + DoubleToString(maxLot, 2) + " 步长=" + DoubleToString(lotStep, 2));
    
    // 强制刷新控件
    ChartRedraw();
@@ -2617,14 +2617,14 @@ int OnInit()
    // 创建面板（宽400×高530：紧凑优化）
    if(!g_tradePanel.Create(0,"TradePanelEA",0,PanelX,PanelY,PanelX+400,PanelY+530))
    {
-      Print("创建交易面板失败!");
+      LOG_ERROR("创建交易面板失败!");
       return(INIT_FAILED);
    }
    
    // 运行面板
    g_tradePanel.Run();
    
-   Print("交易面板EA已启动");
+   LOG_INFO("交易面板EA已启动");
    return(INIT_SUCCEEDED);
 }
 
@@ -2650,7 +2650,7 @@ void OnDeinit(const int reason)
       g_ordersPanelVisible = false;
    }
    g_tradePanel.Destroy(reason);
-   Print("交易面板EA已停止");
+   LOG_INFO("交易面板EA已停止");
 }
 
 //+------------------------------------------------------------------+
