@@ -68,6 +68,17 @@ input int    Width_Round_5     = 1;             // 5 Round Line Width
 input ENUM_LINE_STYLE Style_Round_Key    = STYLE_SOLID;  // Key Round Lines Style (100/50)
 input ENUM_LINE_STYLE Style_Round_Normal = STYLE_DOT;    // Normal Round Lines Style (10/5)
 
+//--- [新增] 北京日开盘标注功能
+input string Sep_BJOpen = "======= Beijing Day Open Mark ======="; // ----
+input bool   Enable_BJDayOpen_Mark   = false;          // Enable Beijing Day Open Mark
+input int    Server_GMT_Offset       = 2;              // Server GMT Offset (2=Winter, 3=Summer)
+input int    BJ_DayOpen_Hour         = 7;              // Beijing Open Hour (7=Winter, 6=Summer)
+input int    Mark_Days_Range         = 7;              // Mark Recent Days (0=All History)
+input bool   Only_H1_Period          = true;           // Only Show on H1 Chart
+input bool   Show_BJDayOpen_Label    = true;           // Show Time Label
+input color  BJDayOpen_Label_Color   = clrBlack;       // Label Text Color
+input int    BJDayOpen_Label_Size    = 9;              // Label Font Size
+
 //--- 内部变量
 int drawingState = 0; // 0=无, 1=准备画水平线, 2=准备画射线
 string btnName_MainMenu = "Btn_MainMenu";  // [新增] 主控菜单按钮
@@ -109,6 +120,10 @@ string g_drawnObjects[][2];  // [][0]=线对象名, [][1]=标记对象名
 uint lastRoundLinesUpdate = 0;          // 上次更新关口线的时间
 const uint ROUND_UPDATE_INTERVAL = 60000; // 关口线更新间隔（60秒）
 
+// [新增] 北京日开盘标注管理变量
+uint lastBJDayOpenUpdate = 0;           // 上次更新北京日开盘标注的时间
+const uint BJOPEN_UPDATE_INTERVAL = 60000; // 北京日开盘标注更新间隔（60秒）
+
 // [新增] 线条显示/隐藏管理变量
 bool isLinesHidden = false;           // 线条隐藏状态
 string g_objectVisibility[][2];       // [][0]=对象名, [][1]=原始可见性标志 
@@ -148,6 +163,9 @@ int OnInit()
    
    // [新增] 绘制关口线
    DrawRoundNumberLines();
+   
+   // [新增] 绘制北京日开盘标注
+   DrawBeijingDayOpenMarks();
    
    return(INIT_SUCCEEDED);
   }
@@ -189,6 +207,9 @@ void OnDeinit(const int reason)
    
    // [新增] 删除所有关口线
    DeleteRoundNumberLines();
+   
+   // [新增] 删除所有北京日开盘标注
+   DeleteBeijingDayOpenMarks();
    
    ObjectDelete(0, btnName_MainMenu);  // [新增] 删除主控按钮
    ObjectDelete(0, btnName1);
@@ -985,6 +1006,13 @@ void OnTimer()
    {
       UpdateRoundNumberLines();
       lastRoundLinesUpdate = currentTime;
+   }
+   
+   // [新增] 定期更新北京日开盘标注
+   if(currentTime - lastBJDayOpenUpdate >= BJOPEN_UPDATE_INTERVAL)
+   {
+      UpdateBeijingDayOpenMarks();
+      lastBJDayOpenUpdate = currentTime;
    }
 }
 
@@ -1842,5 +1870,197 @@ void ToggleLinesVisibility()
       ObjectSetString(0, btnName12, OBJPROP_TEXT, "Hide All");
       ObjectSetInteger(0, btnName12, OBJPROP_BGCOLOR, clrGray); // 恢复灰色
       Alert("已恢复显示所有画线");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 判断某根K线是否为北京时间开盘K线
+//+------------------------------------------------------------------+
+bool IsDayOpenBar(int barIndex)
+{
+   // 安全检查
+   if(barIndex < 0 || barIndex >= iBars(NULL, 0))
+      return false;
+   
+   // 获取K线服务器时间
+   datetime barTime = iTime(NULL, 0, barIndex);
+   if(barTime == 0) return false;
+   
+   // 转为北京时间
+   int timeDiff = (8 - Server_GMT_Offset) * 3600; // 秒
+   datetime bjTime = barTime + timeDiff;
+   
+   // 解析时间
+   MqlDateTime dt;
+   TimeToStruct(bjTime, dt);
+   
+   // 判断是否为目标开盘小时（小时匹配 且 分钟为0）
+   return (dt.hour == BJ_DayOpen_Hour && dt.min == 0);
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 绘制北京日开盘标注
+//+------------------------------------------------------------------+
+void DrawBeijingDayOpenMarks()
+{
+   // 检查功能开关
+   if(!Enable_BJDayOpen_Mark)
+      return;
+   
+   // 检查周期限制
+   if(Only_H1_Period && Period() != PERIOD_H1)
+      return;
+   
+   // 计算扫描范围
+   int maxBars = iBars(NULL, 0);
+   int scanLimit = maxBars;
+   
+   // 如果设置了天数范围（非0），则限制扫描范围
+   if(Mark_Days_Range > 0)
+   {
+      // H1周期，24根K线=1天
+      scanLimit = Mark_Days_Range * 24;
+      if(scanLimit > maxBars) scanLimit = maxBars;
+   }
+   
+   int markCount = 0;
+   
+   // 遍历K线查找开盘K线
+   for(int i = 0; i < scanLimit; i++)
+   {
+      if(IsDayOpenBar(i))
+      {
+         DrawSingleBJDayOpenMark(i);
+         markCount++;
+      }
+   }
+   
+   if(markCount > 0)
+   {
+      Print("[北京日开盘] 绘制完成: 共标注 ", markCount, " 个开盘点（最近", Mark_Days_Range > 0 ? Mark_Days_Range : 0, "天）");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 绘制单个北京日开盘标注
+//+------------------------------------------------------------------+
+void DrawSingleBJDayOpenMark(int barIndex)
+{
+   datetime barTime = iTime(NULL, 0, barIndex);
+   if(barTime == 0) return;
+   
+   // 转北京时间用于显示
+   int timeDiff = (8 - Server_GMT_Offset) * 3600;
+   datetime bjTime = barTime + timeDiff;
+   
+   // 生成唯一对象名（基于日期）
+   string dateStr = TimeToString(bjTime, TIME_DATE);
+   StringReplace(dateStr, ".", "");  // 去掉点号
+   
+   // 如果启用文字标签
+   if(Show_BJDayOpen_Label)
+   {
+      string labelName = "BJDayOpen_Label_" + dateStr;
+      
+      if(ObjectFind(0, labelName) < 0)
+      {
+         // 获取K线最低价，在下方显示标签（避免遮挡价格）
+         double low = iLow(NULL, 0, barIndex);
+         double labelPrice = low - 30 * Point;
+         
+         // 创建文字标签
+         ObjectCreate(0, labelName, OBJ_TEXT, 0, barTime, labelPrice);
+         ObjectSetString(0, labelName, OBJPROP_TEXT, "BJ " + IntegerToString(BJ_DayOpen_Hour) + ":00");
+         ObjectSetInteger(0, labelName, OBJPROP_COLOR, BJDayOpen_Label_Color);
+         ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, BJDayOpen_Label_Size);
+         ObjectSetInteger(0, labelName, OBJPROP_SELECTABLE, false);
+         ObjectSetInteger(0, labelName, OBJPROP_HIDDEN, true);
+         ObjectSetInteger(0, labelName, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER); // 锚点在左上，标签在K线下方
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 更新北京日开盘标注（价格范围变化时）
+//+------------------------------------------------------------------+
+void UpdateBeijingDayOpenMarks()
+{
+   // 检查功能开关
+   if(!Enable_BJDayOpen_Mark)
+      return;
+   
+   // 检查周期限制
+   if(Only_H1_Period && Period() != PERIOD_H1)
+      return;
+   
+   // 计算当前应保留的时间范围
+   datetime currentTime = iTime(NULL, 0, 0);
+   if(currentTime == 0) return;
+   
+   int maxBars = iBars(NULL, 0);
+   int rangeLimit = (Mark_Days_Range > 0) ? (Mark_Days_Range * 24) : maxBars;
+   
+   datetime oldestAllowedTime = 0;
+   if(rangeLimit < maxBars)
+   {
+      oldestAllowedTime = iTime(NULL, 0, rangeLimit);
+   }
+   
+   // 删除超出范围的标注
+   int total = ObjectsTotal(0, 0, -1);
+   int deletedCount = 0;
+   
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是北京日开盘标注对象
+      if(StringFind(objName, "BJDayOpen_") == 0)
+      {
+         // 获取对象时间
+         datetime objTime = (datetime)ObjectGetInteger(0, objName, OBJPROP_TIME);
+         
+         // 如果超出范围，删除
+         if(oldestAllowedTime > 0 && objTime < oldestAllowedTime)
+         {
+            ObjectDelete(0, objName);
+            deletedCount++;
+         }
+      }
+   }
+   
+   // 重新绘制（只会创建不存在的标注）
+   DrawBeijingDayOpenMarks();
+   
+   if(deletedCount > 0)
+   {
+      Print("[北京日开盘] 更新: 删除超出范围的 ", deletedCount, " 个标注");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| [新增] 删除所有北京日开盘标注
+//+------------------------------------------------------------------+
+void DeleteBeijingDayOpenMarks()
+{
+   int total = ObjectsTotal(0, 0, -1);
+   int deleteCount = 0;
+   
+   // 从后向前遍历，删除所有北京日开盘标注
+   for(int i = total - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i, 0, -1);
+      
+      // 检查是否是北京日开盘标注对象（以 "BJDayOpen_" 开头）
+      if(StringFind(objName, "BJDayOpen_") == 0)
+      {
+         ObjectDelete(0, objName);
+         deleteCount++;
+      }
+   }
+   
+   if(deleteCount > 0)
+   {
+      Print("[北京日开盘] 清理: 删除 ", deleteCount, " 个标注对象（含标签）");
    }
 }
