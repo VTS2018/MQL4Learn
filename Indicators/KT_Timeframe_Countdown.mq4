@@ -39,6 +39,8 @@ struct TimeframeInfo
    int      remainSeconds;   // 剩余秒数
    bool     isNewBar;        // 是否刚出现新K线
    datetime lastBarTime;     // 上一根K线时间
+   int      position;        // 在上级周期中的位置
+   int      totalPositions;  // 上级周期的总位置数
 };
 
 //+------------------------------------------------------------------+
@@ -48,8 +50,8 @@ TimeframeInfo g_timeframes[6];  // 6个时间周期
 string g_objectPrefix = "KT_TF_";
 
 // 布局计算变量
-int g_col1X, g_col2X, g_col3X;  // 三列的X位置
-int g_panelWidth;                // 面板总宽度
+int g_col1X, g_col2X, g_col3X, g_col4X;  // 四列的X位置
+int g_panelWidth;                         // 面板总宽度
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -81,6 +83,8 @@ int OnInit()
       g_timeframes[i].lastBarTime = iTime(Symbol(), g_timeframes[i].period, 0);
       g_timeframes[i].isNewBar = false;
       g_timeframes[i].remainSeconds = 0;
+      g_timeframes[i].position = 0;
+      g_timeframes[i].totalPositions = 0;
    }
    
    // 创建显示对象
@@ -141,6 +145,53 @@ int OnCalculate(const int rates_total,
 }
 
 //+------------------------------------------------------------------+
+//| 计算周期在上级周期中的位置
+//+------------------------------------------------------------------+
+void CalculatePositionInParent(int period, datetime barTime, int &position, int &total)
+{
+   int hour = TimeHour(barTime);
+   int minute = TimeMinute(barTime);
+   
+   switch(period)
+   {
+      case PERIOD_M1:   // 在M5内的第几个
+         position = (minute % 5) + 1;
+         total = 5;
+         break;
+         
+      case PERIOD_M5:   // 在M15内的第几个
+         position = ((minute % 15) / 5) + 1;
+         total = 3;
+         break;
+         
+      case PERIOD_M15:  // 在H1内的第几个
+         position = (minute / 15) + 1;
+         total = 4;
+         break;
+         
+      case PERIOD_M30:  // 在H1内的第几个
+         position = (minute / 30) + 1;
+         total = 2;
+         break;
+         
+      case PERIOD_H1:   // 在H4内的第几个
+         position = (hour % 4) + 1;
+         total = 4;
+         break;
+         
+      case PERIOD_H4:   // 在D1内的第几个（24小时）
+         position = (hour / 4) + 1;
+         total = 6;
+         break;
+         
+      default:
+         position = 0;
+         total = 0;
+         break;
+   }
+}
+
+//+------------------------------------------------------------------+
 //| 估算文本宽度（像素）
 //+------------------------------------------------------------------+
 int CalculateTextWidth(string text, int fontSize)
@@ -182,39 +233,45 @@ void CreateDisplayObjects()
    // 计算每列标题的宽度
    int col1TitleWidth = CalculateTextWidth("周期", InpFontSize + 1);
    int col2TitleWidth = CalculateTextWidth("剩余时间", InpFontSize + 1);
-   int col3TitleWidth = CalculateTextWidth("状态", InpFontSize + 1);
+   int col3TitleWidth = CalculateTextWidth("位置", InpFontSize + 1);
+   int col4TitleWidth = CalculateTextWidth("状态", InpFontSize + 1);
    
    // 计算每列数据的最大宽度
    int col1DataWidth = CalculateTextWidth("M30", InpFontSize);  // 最长的周期名称
    int col2DataWidth = CalculateTextWidth("00:00:00", InpFontSize);  // 最长的时间格式
-   int col3DataWidth = CalculateTextWidth("运行中", InpFontSize);  // 最长的状态文本
+   int col3DataWidth = CalculateTextWidth("1/6", InpFontSize);  // 最长的位置格式
+   int col4DataWidth = CalculateTextWidth("运行中", InpFontSize);  // 最长的状态文本
    
    // 每列取标题和数据中的最大宽度，并添加额外余量（文本渲染需要额外空间）
    int col1Width = MathMax(col1TitleWidth, col1DataWidth) + 3;
    int col2Width = MathMax(col2TitleWidth, col2DataWidth) + 3;
-   int col3Width = MathMax(col3TitleWidth, col3DataWidth) + 3;  // 统一余量，保持视觉平衡
+   int col3Width = MathMax(col3TitleWidth, col3DataWidth) + 3;
+   int col4Width = MathMax(col4TitleWidth, col4DataWidth) + 3;  // 统一余量，保持视觉平衡
    
    // === 调试信息：打印宽度计算结果 ===
    Print("=== 列宽度计算调试 ===");
    Print("第1列(周期) - 标题宽度:", col1TitleWidth, " 数据宽度:", col1DataWidth, " 最终宽度:", col1Width);
    Print("第2列(剩余时间) - 标题宽度:", col2TitleWidth, " 数据宽度:", col2DataWidth, " 最终宽度:", col2Width);
-   Print("第3列(状态) - 标题宽度:", col3TitleWidth, " 数据宽度:", col3DataWidth, " 最终宽度:", col3Width);
+   Print("第3列(位置) - 标题宽度:", col3TitleWidth, " 数据宽度:", col3DataWidth, " 最终宽度:", col3Width);
+   Print("第4列(状态) - 标题宽度:", col4TitleWidth, " 数据宽度:", col4DataWidth, " 最终宽度:", col4Width);
    Print("面板总宽度:", g_panelWidth, " (将在下方计算)");
    
    // 计算每列的X位置
    g_col1X = x + InpPaddingLeft;
    g_col2X = g_col1X + col1Width + InpColumnSpacing;
    g_col3X = g_col2X + col2Width + InpColumnSpacing;
+   g_col4X = g_col3X + col3Width + InpColumnSpacing;
    
    // 计算面板总宽度
    g_panelWidth = InpPaddingLeft + col1Width + InpColumnSpacing + 
-                  col2Width + InpColumnSpacing + col3Width + InpPaddingRight;
+                  col2Width + InpColumnSpacing + col3Width + InpColumnSpacing +
+                  col4Width + InpPaddingRight;
    
    // 计算面板总高度
    int panelHeight = InpPaddingTop + lineHeight * 7 + InpPaddingBottom;
    
    // === 调试信息：打印布局计算结果 ===
-   Print("列位置 - 第1列X:", g_col1X, " 第2列X:", g_col2X, " 第3列X:", g_col3X);
+   Print("列位置 - 第1列X:", g_col1X, " 第2列X:", g_col2X, " 第3列X:", g_col3X, " 第4列X:", g_col4X);
    Print("面板尺寸 - 宽度:", g_panelWidth, " 高度:", panelHeight);
    Print("内边距 - 左:", InpPaddingLeft, " 右:", InpPaddingRight, " 上:", InpPaddingTop, " 下:", InpPaddingBottom);
    Print("列间距:", InpColumnSpacing);
@@ -234,7 +291,7 @@ void CreateDisplayObjects()
    ObjectSetInteger(0, bgName, OBJPROP_HIDDEN, true);
    ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
    
-   // 创建表头（三列分别对齐）
+   // 创建表头（四列分别对齐）
    CreateLabel(g_objectPrefix + "Header_TF", g_col1X, y + InpPaddingTop, 
                "周期", 
                InpHeaderColor, InpFontSize + 1, "Consolas");
@@ -243,7 +300,11 @@ void CreateDisplayObjects()
                "剩余时间", 
                InpHeaderColor, InpFontSize + 1, "Consolas");
    
-   CreateLabel(g_objectPrefix + "Header_Status", g_col3X, y + InpPaddingTop, 
+   CreateLabel(g_objectPrefix + "Header_Position", g_col3X, y + InpPaddingTop, 
+               "位置", 
+               InpHeaderColor, InpFontSize + 1, "Consolas");
+   
+   CreateLabel(g_objectPrefix + "Header_Status", g_col4X, y + InpPaddingTop, 
                "状态", 
                InpHeaderColor, InpFontSize + 1, "Consolas");
    
@@ -264,9 +325,15 @@ void CreateDisplayObjects()
                   "00:00", 
                   InpTextColor, InpFontSize, "Consolas");
       
+      // 位置
+      CreateLabel(g_objectPrefix + "Position_" + IntegerToString(i), 
+                  g_col3X, yPos, 
+                  "-", 
+                  InpTextColor, InpFontSize, "Consolas");
+      
       // 状态
       CreateLabel(g_objectPrefix + "Status_" + IntegerToString(i), 
-                  g_col3X, yPos, 
+                  g_col4X, yPos, 
                   "等待中", 
                   InpTextColor, InpFontSize, "Consolas");
    }
@@ -334,6 +401,9 @@ void UpdateAllCountdowns()
          remainSeconds = 0;
       
       g_timeframes[i].remainSeconds = remainSeconds;
+      
+      // 计算在上级周期中的位置
+      CalculatePositionInParent(period, barTime, g_timeframes[i].position, g_timeframes[i].totalPositions);
    }
 }
 
@@ -364,6 +434,12 @@ void UpdateDisplay()
          timeColor = InpTextColor;  // 正常：灰色
       }
       ObjectSetInteger(0, timeLabelName, OBJPROP_COLOR, timeColor);
+      
+      // 更新位置文本
+      string positionText = IntegerToString(g_timeframes[i].position) + "/" + IntegerToString(g_timeframes[i].totalPositions);
+      string positionLabelName = g_objectPrefix + "Position_" + IntegerToString(i);
+      ObjectSetString(0, positionLabelName, OBJPROP_TEXT, positionText);
+      ObjectSetInteger(0, positionLabelName, OBJPROP_COLOR, timeColor);
       
       // 更新状态文本
       string statusText;
