@@ -1021,10 +1021,13 @@ void OnTimer()
 //+------------------------------------------------------------------+
 void RecordObjectPair(string mainObj, string associatedObj)
 {
-   int size = ArraySize(g_drawnObjects) / 2;
+   int size = ArrayRange(g_drawnObjects, 0);  // [修复] 使用ArrayRange而非ArraySize/2
    ArrayResize(g_drawnObjects, size + 1);
    g_drawnObjects[size][0] = mainObj;
    g_drawnObjects[size][1] = associatedObj;
+   
+   // [调试日志] 记录对象对关联
+   Print("[对象关联] 新增第", size+1, "对: 主对象=", mainObj, " 关联对象=", associatedObj);
 }
 
 //+------------------------------------------------------------------+
@@ -1032,7 +1035,9 @@ void RecordObjectPair(string mainObj, string associatedObj)
 //+------------------------------------------------------------------+
 void CheckAndCleanOrphanedObjects()
 {
-   int size = ArraySize(g_drawnObjects) / 2;
+   int size = ArrayRange(g_drawnObjects, 0);  // [修复] 使用ArrayRange而非ArraySize/2
+   
+   int cleanedCount = 0;  // [调试] 记录清理数量
    
    for(int i = size - 1; i >= 0; i--)
    {
@@ -1045,12 +1050,17 @@ void CheckAndCleanOrphanedObjects()
          if(ObjectFind(0, assocObj) >= 0)
          {
             ObjectDelete(0, assocObj);
+            cleanedCount++;  // [调试] 计数
          }
          
          // 从数组中移除这一对
          RemoveObjectPair(i);
       }
    }
+   
+   // [调试日志] 输出清理结果（仅在有清理时）
+   if(cleanedCount > 0)
+      Print("[孤儿清理] 已清理 ", cleanedCount, " 个孤立标记对象，当前剩余 ", ArrayRange(g_drawnObjects, 0), " 对关联");
 }
 
 //+------------------------------------------------------------------+
@@ -1058,7 +1068,14 @@ void CheckAndCleanOrphanedObjects()
 //+------------------------------------------------------------------+
 void RemoveObjectPair(int index)
 {
-   int size = ArraySize(g_drawnObjects) / 2;
+   int size = ArrayRange(g_drawnObjects, 0);  // [修复] 使用ArrayRange而非ArraySize/2
+   
+   // [调试] 边界检查
+   if(index < 0 || index >= size)
+   {
+      Print("[警告] RemoveObjectPair: 索引越界 index=", index, " size=", size);
+      return;
+   }
    
    // 将后面的元素前移
    for(int i = index; i < size - 1; i++)
@@ -1154,8 +1171,8 @@ void RebuildObjectPairs()
    }
    
    // 输出日志（可选，用于调试）
-   int pairCount = ArraySize(g_drawnObjects) / 2;
-   Print("重建对象关联: 找到 ", drawCount, " 个Draw对象, ", keepCount, " 个Keep对象, 共 ", pairCount, " 对关联");
+   int pairCount = ArrayRange(g_drawnObjects, 0);  // [修复] 使用ArrayRange而非ArraySize/2
+   Print("[重建关联] 找到 ", drawCount, " 个Draw对象, ", keepCount, " 个Keep对象, 共 ", pairCount, " 对关联");
 }
 
 //+------------------------------------------------------------------+
