@@ -1313,7 +1313,7 @@ void CleanCurrentPeriodObjects()
                }
                
                // 从数组中移除关联记录
-               int arraySize = ArraySize(g_drawnObjects) / 2;
+               int arraySize = ArrayRange(g_drawnObjects, 0);  // [修复] 使用ArrayRange而非ArraySize/2
                for(int j = arraySize - 1; j >= 0; j--)
                {
                   if(g_drawnObjects[j][0] == objName)
