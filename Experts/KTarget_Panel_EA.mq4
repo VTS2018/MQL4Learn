@@ -256,6 +256,7 @@ struct ScaleRecord
    double   lastLots;    // 上次检查时的手数（手数变少说明刚减仓）
    datetime lastCheck;   // 上次检查时间（用于清理）
    bool     everScaled;  // 该订单是否曾经减仓过（用于"单次减仓模式"）
+   bool     tooSmall;    // [优化] 是否已进入"无法减仓"状态（避免重复检查）
 };
 
 //+------------------------------------------------------------------+
@@ -2258,7 +2259,23 @@ void CTradePanel::ExecuteScaleOut(int ticket, double pct, double lots)
       closeAmount = currentLots - minLot;
       if(closeAmount < minLot)
       {
-         LOG_DEBUG("订单 " + IntegerToString(ticket) + " 仓位太小，无法减仓");
+         // [优化] 标记该订单为"太小"状态，避免后续重复检查
+         bool alreadyMarked = false;
+         for(int i = 0; i < m_recordCount; i++)
+         {
+            if(m_scaleRecords[i].ticket == ticket)
+            {
+               alreadyMarked = m_scaleRecords[i].tooSmall;  // 记录之前的状态
+               m_scaleRecords[i].tooSmall = true;           // 永久标记
+               break;
+            }
+         }
+         
+         // 仅第一次标记时输出日志（避免日志爆炸）
+         if(!alreadyMarked)
+         {
+            LOG_INFO("订单 " + IntegerToString(ticket) + " 仓位太小(" + DoubleToString(currentLots, 2) + "手)，已停止自动减仓检测");
+         }
          return;
       }
    }
@@ -2337,6 +2354,12 @@ bool CTradePanel::IsOrderScaled(int ticket)
    {
       if(m_scaleRecords[i].ticket == ticket)
       {
+         // === [优化] 检查是否已标记为"太小"状态 ===
+         if(m_scaleRecords[i].tooSmall)
+         {
+            return true;  // 永久跳过（MT4订单手数只能减少不能增加）
+         }
+         
          // === 单次减仓模式（默认）：检查是否曾减仓过 ===
          if(!m_allowMultipleScaleOut && m_scaleRecords[i].everScaled)
          {
@@ -2365,6 +2388,7 @@ bool CTradePanel::IsOrderScaled(int ticket)
       m_scaleRecords[m_recordCount].lastLots = currentLots;
       m_scaleRecords[m_recordCount].lastCheck = TimeCurrent();
       m_scaleRecords[m_recordCount].everScaled = false;  // 初始化为未减仓
+      m_scaleRecords[m_recordCount].tooSmall = false;    // 初始化为"未太小"
       m_recordCount++;
    }
    return false;  // 首次检查，允许减仓
