@@ -22,6 +22,12 @@ input color    InpNewBarColor = clrLime;  // 新K线颜色
 input int      InpFontSize = 9;           // 字体大小
 input bool     InpEnableAlert = false;     // 启用新K线提醒
 input int      InpWarningSeconds = 10;    // 警告秒数阈值
+// [新增] 自适应宽度设置
+input int      InpPaddingLeft = 8;        // 左内边距
+input int      InpPaddingRight = 8;       // 右内边距
+input int      InpPaddingTop = 5;         // 上内边距
+input int      InpPaddingBottom = 5;      // 下内边距
+input int      InpColumnSpacing = 15;     // 列间距
 
 //+------------------------------------------------------------------+
 //| 时间框架信息结构
@@ -40,6 +46,10 @@ struct TimeframeInfo
 //+------------------------------------------------------------------+
 TimeframeInfo g_timeframes[6];  // 6个时间周期
 string g_objectPrefix = "KT_TF_";
+
+// 布局计算变量
+int g_col1X, g_col2X, g_col3X;  // 三列的X位置
+int g_panelWidth;                // 面板总宽度
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -131,6 +141,34 @@ int OnCalculate(const int rates_total,
 }
 
 //+------------------------------------------------------------------+
+//| 估算文本宽度（像素）
+//+------------------------------------------------------------------+
+int CalculateTextWidth(string text, int fontSize)
+{
+   // 根据字体大小和字符类型估算宽度
+   // Consolas 是等宽字体，但中文字符宽度约为英文的2倍
+   int width = 0;
+   int len = StringLen(text);
+   
+   for(int i = 0; i < len; i++)
+   {
+      ushort ch = StringGetCharacter(text, i);
+      
+      // 判断是否为中文字符（简单判断）
+      if(ch > 0x4E00 && ch < 0x9FA5)  // 中文常用字范围
+      {
+         width += fontSize + 4;  // 中文字符宽度（增加系数）
+      }
+      else
+      {
+         width += (int)(fontSize * 0.65);  // 英文/数字宽度（略微增加）
+      }
+   }
+   
+   return width;
+}
+
+//+------------------------------------------------------------------+
 //| 创建显示对象
 //+------------------------------------------------------------------+
 void CreateDisplayObjects()
@@ -139,45 +177,96 @@ void CreateDisplayObjects()
    int y = InpPosY;
    int lineHeight = InpFontSize + 6;
    
+   // ========== 计算自适应宽度 ==========
+   
+   // 计算每列标题的宽度
+   int col1TitleWidth = CalculateTextWidth("周期", InpFontSize + 1);
+   int col2TitleWidth = CalculateTextWidth("剩余时间", InpFontSize + 1);
+   int col3TitleWidth = CalculateTextWidth("状态", InpFontSize + 1);
+   
+   // 计算每列数据的最大宽度
+   int col1DataWidth = CalculateTextWidth("M30", InpFontSize);  // 最长的周期名称
+   int col2DataWidth = CalculateTextWidth("00:00:00", InpFontSize);  // 最长的时间格式
+   int col3DataWidth = CalculateTextWidth("运行中", InpFontSize);  // 最长的状态文本
+   
+   // 每列取标题和数据中的最大宽度，并添加额外余量（文本渲染需要额外空间）
+   int col1Width = MathMax(col1TitleWidth, col1DataWidth) + 3;
+   int col2Width = MathMax(col2TitleWidth, col2DataWidth) + 3;
+   int col3Width = MathMax(col3TitleWidth, col3DataWidth) + 3;  // 统一余量，保持视觉平衡
+   
+   // === 调试信息：打印宽度计算结果 ===
+   Print("=== 列宽度计算调试 ===");
+   Print("第1列(周期) - 标题宽度:", col1TitleWidth, " 数据宽度:", col1DataWidth, " 最终宽度:", col1Width);
+   Print("第2列(剩余时间) - 标题宽度:", col2TitleWidth, " 数据宽度:", col2DataWidth, " 最终宽度:", col2Width);
+   Print("第3列(状态) - 标题宽度:", col3TitleWidth, " 数据宽度:", col3DataWidth, " 最终宽度:", col3Width);
+   Print("面板总宽度:", g_panelWidth, " (将在下方计算)");
+   
+   // 计算每列的X位置
+   g_col1X = x + InpPaddingLeft;
+   g_col2X = g_col1X + col1Width + InpColumnSpacing;
+   g_col3X = g_col2X + col2Width + InpColumnSpacing;
+   
+   // 计算面板总宽度
+   g_panelWidth = InpPaddingLeft + col1Width + InpColumnSpacing + 
+                  col2Width + InpColumnSpacing + col3Width + InpPaddingRight;
+   
+   // 计算面板总高度
+   int panelHeight = InpPaddingTop + lineHeight * 7 + InpPaddingBottom;
+   
+   // === 调试信息：打印布局计算结果 ===
+   Print("列位置 - 第1列X:", g_col1X, " 第2列X:", g_col2X, " 第3列X:", g_col3X);
+   Print("面板尺寸 - 宽度:", g_panelWidth, " 高度:", panelHeight);
+   Print("内边距 - 左:", InpPaddingLeft, " 右:", InpPaddingRight, " 上:", InpPaddingTop, " 下:", InpPaddingBottom);
+   Print("列间距:", InpColumnSpacing);
+   Print("==================");
+   
    // 创建表头背景
    string bgName = g_objectPrefix + "Background";
    ObjectCreate(0, bgName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
    ObjectSetInteger(0, bgName, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, bgName, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, bgName, OBJPROP_XSIZE, 280);
-   ObjectSetInteger(0, bgName, OBJPROP_YSIZE, lineHeight * 7 + 10);
+   ObjectSetInteger(0, bgName, OBJPROP_XSIZE, g_panelWidth);
+   ObjectSetInteger(0, bgName, OBJPROP_YSIZE, panelHeight);
    ObjectSetInteger(0, bgName, OBJPROP_BGCOLOR, clrBlack);
    ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bgName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
    ObjectSetInteger(0, bgName, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, bgName, OBJPROP_HIDDEN, true);
-   ObjectSetInteger(0, bgName, OBJPROP_BACK, true);
+   ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
    
-   // 创建表头
-   CreateLabel(g_objectPrefix + "Header", x + 5, y + 5, 
-               "周期        剩余时间      状态", 
+   // 创建表头（三列分别对齐）
+   CreateLabel(g_objectPrefix + "Header_TF", g_col1X, y + InpPaddingTop, 
+               "周期", 
+               InpHeaderColor, InpFontSize + 1, "Consolas");
+   
+   CreateLabel(g_objectPrefix + "Header_Time", g_col2X, y + InpPaddingTop, 
+               "剩余时间", 
+               InpHeaderColor, InpFontSize + 1, "Consolas");
+   
+   CreateLabel(g_objectPrefix + "Header_Status", g_col3X, y + InpPaddingTop, 
+               "状态", 
                InpHeaderColor, InpFontSize + 1, "Consolas");
    
    // 创建6个周期的显示行
    for(int i = 0; i < 6; i++)
    {
-      int yPos = y + 5 + lineHeight * (i + 1);
+      int yPos = y + InpPaddingTop + lineHeight * (i + 1);
       
       // 周期名称
       CreateLabel(g_objectPrefix + "TF_" + IntegerToString(i), 
-                  x + 5, yPos, 
+                  g_col1X, yPos, 
                   g_timeframes[i].name, 
                   InpTextColor, InpFontSize, "Consolas");
       
       // 倒计时
       CreateLabel(g_objectPrefix + "Time_" + IntegerToString(i), 
-                  x + 80, yPos, 
+                  g_col2X, yPos, 
                   "00:00", 
                   InpTextColor, InpFontSize, "Consolas");
       
       // 状态
       CreateLabel(g_objectPrefix + "Status_" + IntegerToString(i), 
-                  x + 180, yPos, 
+                  g_col3X, yPos, 
                   "等待中", 
                   InpTextColor, InpFontSize, "Consolas");
    }
