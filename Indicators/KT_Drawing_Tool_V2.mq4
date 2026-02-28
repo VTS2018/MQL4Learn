@@ -1554,7 +1554,7 @@ int IsPinbar(int barIndex)
    if(lowerWickPercent >= 60 &&          // 下影线至少60%
       bodyPercent <= 30 &&                // 实体小于30%
       upperWickPercent <= 20 &&           // 上影线小于20%
-      bodyLow >= low + totalRange * 0.7)  // 实体在上端
+      bodyLow >= low + totalRange * 0.6)  // [修复] 实体在上端（下影线结束位置之上）
    {
       return 1;  // 看涨Pinbar
    }
@@ -1563,7 +1563,7 @@ int IsPinbar(int barIndex)
    if(upperWickPercent >= 60 &&          // 上影线至少60%
       bodyPercent <= 30 &&                // 实体小于30%
       lowerWickPercent <= 20 &&           // 下影线小于20%
-      bodyHigh <= high - totalRange * 0.7) // 实体在下端
+      bodyHigh <= high - totalRange * 0.6) // [修复] 实体在下端（上影线结束位置之下）
    {
       return 2;  // 看跌Pinbar
    }
