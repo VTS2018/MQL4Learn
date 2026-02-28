@@ -49,6 +49,12 @@ enum LogLevel
 input LogLevel Log_Level = LOG_INFO;  // 日志级别（生产推荐INFO，调试推荐DEBUG）
 
 //+------------------------------------------------------------------+
+//| 智能计算参数                                                      |
+//+------------------------------------------------------------------+
+input double SmartCalc_DefaultScalePct = 80.0;  // 智能计算默认减仓比例 (30-95)
+input bool   SmartCalc_AutoEnable = true;       // 计算后自动开启减仓功能
+
+//+------------------------------------------------------------------+
 //| 价格选择模式枚举                                                  |
 //+------------------------------------------------------------------+
 enum PriceSelectMode
@@ -2111,8 +2117,17 @@ void CTradePanel::OnClickSmartCalc(void)
       double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
       double maxLoss = slDiff * lots / _Point * tickValue;
       
-      // 智能计算：假设减仓 80%
-      double scalePct = 80.0;
+      // 智能获取减仓比例：优先使用UI当前设置，否则用默认值
+      double scalePct = SmartCalc_DefaultScalePct;
+      string currentScalePct = m_edtScalePct.Text();
+      if(currentScalePct != "" && StringToDouble(currentScalePct) > 0)
+      {
+         double uiValue = StringToDouble(currentScalePct);
+         if(uiValue >= 30.0 && uiValue <= 95.0)
+            scalePct = uiValue;  // 使用UI设置的合理值
+         else
+            LOG_INFO("[智能计算] UI减仓比例 " + DoubleToString(uiValue, 0) + "% 超出范围(30-95%)，使用默认值 " + DoubleToString(SmartCalc_DefaultScalePct, 0) + "%");
+      }
       double remainPct = 100.0 - scalePct;
       
       // 剩余仓位如果止损的亏损
@@ -2122,6 +2137,26 @@ void CTradePanel::OnClickSmartCalc(void)
       // scalePct% × triggerPts = remainPct% × slPts
       // triggerPts = remainPct × slPts / scalePct
       int triggerPts = (int)(remainPct * slPts / scalePct);
+      
+      // === 参数验证 ===
+      if(triggerPts <= 0)
+      {
+         Alert("计算错误：触发点数为 ", triggerPts, "！\n可能原因：减仓比例设置不合理（当前 ", DoubleToString(scalePct, 0), "%）");
+         LOG_ERROR("[智能计算] 计算结果异常：triggerPts=" + IntegerToString(triggerPts) + ", scalePct=" + DoubleToString(scalePct, 1));
+         return;
+      }
+      
+      if(triggerPts >= slPts)
+      {
+         string warning = StringFormat(
+            "警告：触发点数(%d点)接近或超过止损点数(%d点)！\n"
+            "这意味着需要走很远才减仓，风险较大。\n\n"
+            "建议：增加减仓比例（当前%.0f%%）或调整止损。",
+            triggerPts, slPts, scalePct
+         );
+         Alert(warning);
+         LOG_INFO("[智能计算] " + warning);
+      }
       
       // 更新UI
       m_edtTriggerPts.Text(IntegerToString(triggerPts));
@@ -2145,26 +2180,33 @@ void CTradePanel::OnClickSmartCalc(void)
       
       Alert(msg);
       LOG_INFO(msg);
-      /*
+      
       // === 自动开启减仓功能 ===
-      if(!m_scaleOutEnabled)
+      if(SmartCalc_AutoEnable)
       {
-         m_scaleOutEnabled = true;
-         m_btnToggleScaleOut.Text("关闭自动减仓");
-         m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
-         LOG_INFO("[智能计算] 自动减仓功能已自动开启");
+         if(!m_scaleOutEnabled)
+         {
+            m_scaleOutEnabled = true;
+            m_btnToggleScaleOut.Text("关闭自动减仓");
+            m_btnToggleScaleOut.ColorBackground(clrOrangeRed);
+            LOG_INFO("[智能计算] 自动减仓功能已自动开启");
+            
+            Comment("【智能计算完成】\n参数已更新，自动减仓已启动！");
+         }
+         else
+         {
+            LOG_INFO("[智能计算] 自动减仓已在运行中，参数已更新");
+            Comment("【智能计算完成】\n参数已更新，自动减仓继续运行！");
+         }
          
-         // 更新提示信息
-         Comment("【智能计算完成】\n参数已更新，自动减仓已启动！");
+         ChartRedraw();
       }
       else
       {
-         LOG_INFO("[智能计算] 自动减仓已在运行中，参数已更新");
-         Comment("【智能计算完成】\n参数已更新，自动减仓继续运行！");
+         Comment("【智能计算完成】\n参数已更新，请手动开启自动减仓功能！");
+         LOG_INFO("[智能计算] 参数已更新，自动开启功能已禁用");
       }
       
-      ChartRedraw();
-      */
       break;  // 只计算第一个订单
    }
    
