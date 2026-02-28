@@ -160,15 +160,15 @@ void COrdersPanel::RefreshOrders(void)
    // 根据报价位数动态计算 pip 单位（支持4位和5位报价）
    double pointsPerPip = (_Digits == 5 || _Digits == 3) ? 10.0 : 1.0;
    
-   int      serverGMT = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
-   int      bjOffset  = (8 - serverGMT) * 3600;
-   datetime bjNow     = (datetime)(TimeCurrent() + bjOffset);
-   datetime bjToday0  = bjNow - (bjNow % 86400);
-   datetime svrToday0 = (datetime)(bjToday0 - bjOffset);
+   // [最优方案] 直接计算本地与服务器的时差（秒级精度，自动适应夏令时）
+   int      localOffset = (int)(TimeLocal() - TimeCurrent());
+   datetime localNow    = TimeLocal();  // 直接使用本地系统时间
+   datetime localToday0 = localNow - (localNow % 86400);
+   datetime svrToday0   = (datetime)(localToday0 - localOffset);
 
-   // 更新面板标题（品种 + 北京时间日期）
-   m_lblTitle.Text(StringFormat("-- %s  %04d-%02d-%02d (BJ) --",
-      _Symbol, TimeYear(bjNow), TimeMonth(bjNow), TimeDay(bjNow)));
+   // 更新面板标题（品种 + 本地时间日期）
+   m_lblTitle.Text(StringFormat("-- %s  %04d-%02d-%02d (Local) --",
+      _Symbol, TimeYear(localNow), TimeMonth(localNow), TimeDay(localNow)));
 
    int    count    = 0;
    string rowTexts[ORDERS_ROWS];  // 静态上限缓冲，实际只填 m_maxRows 条
@@ -180,9 +180,9 @@ void COrdersPanel::RefreshOrders(void)
       if(OrderSymbol() != _Symbol) continue;
       if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
 
-      datetime bjOpen = (datetime)(OrderOpenTime() + bjOffset);
+      datetime localOpen = (datetime)(OrderOpenTime() + localOffset);
       string   tStr   = StringFormat("%02d:%02d",
-                           TimeHour(bjOpen), TimeMinute(bjOpen));
+                           TimeHour(localOpen), TimeMinute(localOpen));
       string   typ    = (OrderType() == OP_BUY) ? "B" : "S";
       double   exitPx = (OrderType() == OP_BUY) ? Bid : Ask;
       double   prof   = OrderProfit() + OrderSwap() + OrderCommission();
@@ -214,9 +214,9 @@ void COrdersPanel::RefreshOrders(void)
       if(OrderType() != OP_BUY && OrderType() != OP_SELL) continue;
       if(OrderCloseTime() < svrToday0) continue;
 
-      datetime bjOpen = (datetime)(OrderOpenTime() + bjOffset);
+      datetime localOpen = (datetime)(OrderOpenTime() + localOffset);
       string   tStr   = StringFormat("%02d:%02d",
-                           TimeHour(bjOpen), TimeMinute(bjOpen));
+                           TimeHour(localOpen), TimeMinute(localOpen));
       string   typ    = (OrderType() == OP_BUY) ? "B" : "S";
       double   prof   = OrderProfit() + OrderSwap() + OrderCommission();
       double   diff   = (OrderType() == OP_BUY) ?
@@ -1794,11 +1794,10 @@ void CTradePanel::OnClickViewOrders(void)
    if(!g_ordersCreated)
    {
       // 首次打开：统计今日订单数、动态计算高度、创建面板（只创建一次）
-      int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
-      int      bjOffset   = (8 - serverGMT) * 3600;
-      datetime bjNow      = (datetime)(TimeCurrent() + bjOffset);
-      datetime bjToday0   = bjNow - (bjNow % 86400);
-      datetime svrToday0  = (datetime)(bjToday0 - bjOffset);
+      int      localOffset = (int)(TimeLocal() - TimeCurrent());
+      datetime localNow    = TimeLocal();
+      datetime localToday0 = localNow - (localNow % 86400);
+      datetime svrToday0   = (datetime)(localToday0 - localOffset);
 
       int todayCnt = 0;
       for(int i = 0; i < OrdersTotal(); i++)
@@ -1944,12 +1943,11 @@ void CTradePanel::UpdateInfoContainers(void)
 //+------------------------------------------------------------------+
 double CTradePanel::CalculateDailyProfit(void)
 {
-   // 计算今日北京时间起始点
-   int      serverGMT  = (int)((TimeCurrent() - TimeGMT()) / 3600) + ServerGMT_Offset;
-   int      bjOffset   = (8 - serverGMT) * 3600;
-   datetime bjNow      = (datetime)(TimeCurrent() + bjOffset);
-   datetime bjToday0   = bjNow - (bjNow % 86400);
-   datetime svrToday0  = (datetime)(bjToday0 - bjOffset);
+   // 计算今日本地时间起始点
+   int      localOffset = (int)(TimeLocal() - TimeCurrent());
+   datetime localNow    = TimeLocal();
+   datetime localToday0 = localNow - (localNow % 86400);
+   datetime svrToday0   = (datetime)(localToday0 - localOffset);
    
    double totalProfit = 0;
    
